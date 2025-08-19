@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* Color Theme Variables */
+:root {
+  /* Default Orange Theme */
+  --primary-color: #f97316;
+  --primary-hover: #ea580c;
+  --primary-light: #fed7aa;
+  --primary-dark: #c2410c;
+  --gradient-from: #f97316;
+  --gradient-to: #dc2626;
+}
+
+/* Blue Theme */
+.color-blue {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-light: #bfdbfe;
+  --primary-dark: #1d4ed8;
+  --gradient-from: #3b82f6;
+  --gradient-to: #1d4ed8;
+}
+
+/* Green Theme */
+.color-green {
+  --primary-color: #10b981;
+  --primary-hover: #059669;
+  --primary-light: #a7f3d0;
+  --primary-dark: #047857;
+  --gradient-from: #10b981;
+  --gradient-to: #059669;
+}
+
+/* Purple Theme */
+.color-purple {
+  --primary-color: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-light: #c4b5fd;
+  --primary-dark: #6d28d9;
+  --gradient-from: #8b5cf6;
+  --gradient-to: #7c3aed;
+}
+
+/* Red Theme */
+.color-red {
+  --primary-color: #ef4444;
+  --primary-hover: #dc2626;
+  --primary-light: #fecaca;
+  --primary-dark: #b91c1c;
+  --gradient-from: #ef4444;
+  --gradient-to: #dc2626;
+}
+
+/* Orange Theme (default) */
+.color-orange {
+  --primary-color: #f97316;
+  --primary-hover: #ea580c;
+  --primary-light: #fed7aa;
+  --primary-dark: #c2410c;
+  --gradient-from: #f97316;
+  --gradient-to: #dc2626;
+}
+
+/* Utility classes for color themes */
+.bg-primary {
+  background-color: var(--primary-color);
+}
+
+.bg-primary-hover {
+  background-color: var(--primary-hover);
+}
+
+.bg-primary-light {
+  background-color: var(--primary-light);
+}
+
+.bg-primary-dark {
+  background-color: var(--primary-dark);
+}
+
+.text-primary {
+  color: var(--primary-color);
+}
+
+.text-primary-hover {
+  color: var(--primary-hover);
+}
+
+.border-primary {
+  border-color: var(--primary-color);
+}
+
+.border-primary-hover {
+  border-color: var(--primary-hover);
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(to right, var(--gradient-from), var(--gradient-to));
+}
+
+.hover\:bg-gradient-primary:hover {
+  background: linear-gradient(to right, var(--gradient-from), var(--gradient-to));
+}
+
+.focus\:ring-primary:focus {
+  --tw-ring-color: var(--primary-color);
+}
+
+.focus\:border-primary:focus {
+  border-color: var(--primary-color);
+}
