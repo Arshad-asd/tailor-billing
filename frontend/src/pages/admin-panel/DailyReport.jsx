@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Calendar, DollarSign, TrendingUp, Users, Package, Clock, BarChart3, Download, Printer, ArrowUp, ArrowDown, Plus, Minus } from 'lucide-react';
 
 export default function DailyReport() {
   const [selectedDate, setSelectedDate] = useState('2025-07-13');
+  const dailyReportRef = useRef(null);
+  const monthlyDataRef = useRef(null);
 
   // Daily Cash Flow Data
   const dailyCashFlow = {
@@ -27,35 +29,35 @@ export default function DailyReport() {
     }
   };
 
-  // Historical Monthly Data
+  // Historical Monthly Data - Matching image values
   const monthlyData2025 = [
-    { month: 'January', advance: 8500, delivery: 12000, sales: 15000, receipt: 250, total: 35750 },
-    { month: 'February', advance: 9200, delivery: 13500, sales: 14200, receipt: 180, total: 37080 },
-    { month: 'March', advance: 7800, delivery: 11000, sales: 12800, receipt: 320, total: 31920 },
-    { month: 'April', advance: 8900, delivery: 12500, sales: 13800, receipt: 290, total: 35490 },
-    { month: 'May', advance: 7600, delivery: 10800, sales: 12500, receipt: 210, total: 31110 },
-    { month: 'June', advance: 8200, delivery: 11800, sales: 13200, receipt: 265, total: 33465 },
-    { month: 'July', advance: 6300, delivery: 7800, sales: 8100, receipt: 0, total: 22200 },
-    { month: 'August', advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 },
-    { month: 'September', advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 },
-    { month: 'October', advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 },
-    { month: 'November', advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 },
-    { month: 'December', advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 }
+    { month: 'January', advance: 4865.00, delivery: 5565.00, sales: 5551.00, receipt: 0.00, total: 15981.00 },
+    { month: 'February', advance: 7590.00, delivery: 7300.00, sales: 7155.00, receipt: 470.00, total: 22515.00 },
+    { month: 'March', advance: 15780.00, delivery: 28245.00, sales: 29947.00, receipt: 725.00, total: 74697.00 },
+    { month: 'April', advance: 7230.00, delivery: 9670.00, sales: 9179.00, receipt: 170.00, total: 26249.00 },
+    { month: 'May', advance: 9495.00, delivery: 13215.00, sales: 14438.00, receipt: 100.00, total: 37248.00 },
+    { month: 'June', advance: 3140.00, delivery: 10625.00, sales: 10607.00, receipt: 0.00, total: 24372.00 },
+    { month: 'July', advance: 2530.00, delivery: 3810.00, sales: 4755.00, receipt: 50.00, total: 11145.00 },
+    { month: 'August', advance: 0.00, delivery: 0.00, sales: 0.00, receipt: 0.00, total: 0.00 },
+    { month: 'September', advance: 0.00, delivery: 0.00, sales: 0.00, receipt: 0.00, total: 0.00 },
+    { month: 'October', advance: 0.00, delivery: 0.00, sales: 40.00, receipt: 0.00, total: 40.00 },
+    { month: 'November', advance: 0.00, delivery: 0.00, sales: 0.00, receipt: 0.00, total: 0.00 },
+    { month: 'December', advance: 0.00, delivery: 0.00, sales: 0.00, receipt: 0.00, total: 0.00 }
   ];
 
   const monthlyData2024 = [
-    { month: 'January', advance: 9500, delivery: 14000, sales: 15800, receipt: 450, total: 39750 },
-    { month: 'February', advance: 10200, delivery: 14500, sales: 15200, receipt: 380, total: 40280 },
-    { month: 'March', advance: 8800, delivery: 12000, sales: 13800, receipt: 420, total: 35020 },
-    { month: 'April', advance: 9900, delivery: 13500, sales: 14800, receipt: 350, total: 38550 },
-    { month: 'May', advance: 8600, delivery: 11800, sales: 13500, receipt: 280, total: 34180 },
-    { month: 'June', advance: 9200, delivery: 12800, sales: 14200, receipt: 315, total: 36515 },
-    { month: 'July', advance: 7300, delivery: 9800, sales: 10800, receipt: 0, total: 27900 },
-    { month: 'August', advance: 8100, delivery: 11200, sales: 12500, receipt: 290, total: 32090 },
-    { month: 'September', advance: 7800, delivery: 10800, sales: 12200, receipt: 265, total: 31065 },
-    { month: 'October', advance: 8500, delivery: 11800, sales: 13200, receipt: 310, total: 33810 },
-    { month: 'November', advance: 9200, delivery: 12500, sales: 13800, receipt: 340, total: 35840 },
-    { month: 'December', advance: 9800, delivery: 13100, sales: 14400, receipt: 380, total: 37680 }
+    { month: 'January', advance: 5655.00, delivery: 8340.00, sales: 6761.00, receipt: 425.00, total: 21181.00 },
+    { month: 'February', advance: 13090.00, delivery: 9469.00, sales: 9807.00, receipt: 100.00, total: 32466.00 },
+    { month: 'March', advance: 30800.00, delivery: 18630.00, sales: 18925.00, receipt: 665.00, total: 69020.00 },
+    { month: 'April', advance: 5600.00, delivery: 27600.00, sales: 30962.00, receipt: 565.00, total: 64727.00 },
+    { month: 'May', advance: 17200.00, delivery: 13405.00, sales: 13904.00, receipt: 735.00, total: 45244.00 },
+    { month: 'June', advance: 9608.00, delivery: 20330.00, sales: 18704.00, receipt: 785.00, total: 49427.00 },
+    { month: 'July', advance: 5310.00, delivery: 7120.00, sales: 7742.00, receipt: 40.00, total: 20212.00 },
+    { month: 'August', advance: 3965.00, delivery: 7940.00, sales: 8359.00, receipt: 100.00, total: 20364.00 },
+    { month: 'September', advance: 2865.00, delivery: 6195.00, sales: 5048.00, receipt: 100.00, total: 14208.00 },
+    { month: 'October', advance: 5660.00, delivery: 5480.00, sales: 4037.00, receipt: 100.00, total: 15277.00 },
+    { month: 'November', advance: 4655.00, delivery: 7930.00, sales: 4306.00, receipt: 0.00, total: 16891.00 },
+    { month: 'December', advance: 5525.00, delivery: 6725.00, sales: 6344.00, receipt: 0.00, total: 18594.00 }
   ];
 
   const total2025 = monthlyData2025.reduce((acc, month) => ({
@@ -74,6 +76,336 @@ export default function DailyReport() {
     total: acc.total + month.total
   }), { advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 });
 
+  // Print Daily Report function
+  const printDailyReport = () => {
+    const printWindow = window.open('', '_blank');
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Daily Report - ${dailyCashFlow.date}</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              font-size: 12pt;
+              color: #000;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #000;
+            }
+            .header h1 {
+              font-size: 18pt;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .header p {
+              font-size: 10pt;
+            }
+            .section {
+              margin-bottom: 20px;
+            }
+            .section-title {
+              font-size: 14pt;
+              font-weight: bold;
+              margin-bottom: 10px;
+              padding: 5px;
+              background-color: #f0f0f0;
+            }
+            .cash-in {
+              margin-bottom: 15px;
+            }
+            .cash-in-title {
+              font-size: 12pt;
+              font-weight: bold;
+              margin-bottom: 8px;
+            }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 5px 10px;
+              border-bottom: 1px solid #ddd;
+            }
+            .item-row.total {
+              font-weight: bold;
+              background-color: #e3f2fd;
+              border: 2px solid #2196f3;
+              padding: 8px 10px;
+            }
+            .summary-section {
+              margin-top: 20px;
+            }
+            .summary-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 10px;
+            }
+            .summary-item {
+              padding: 10px;  
+              border: 1px solid #ddd;
+              text-align: center;
+            }
+            .summary-item strong {
+              display: block;
+              margin-bottom: 5px;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Daily Cash IN and OUT</h1>
+            <p>Date: ${dailyCashFlow.date}</p>
+          </div>
+          
+          <div class="section">
+            <div class="cash-in">
+              <div class="cash-in-title">Cash IN</div>
+              <div class="item-row">
+                <span>Advance on Order</span>
+                <span>${dailyCashFlow.cashIn.advanceOnOrder.toFixed(2)}</span>
+              </div>
+              <div class="item-row">
+                <span>Delivery</span>
+                <span>${dailyCashFlow.cashIn.delivery.toFixed(2)}</span>
+              </div>
+              <div class="item-row">
+                <span>Cash on Sales</span>
+                <span>${dailyCashFlow.cashIn.cashOnSales.toFixed(2)}</span>
+              </div>
+              <div class="item-row">
+                <span>Receipt</span>
+                <span>${dailyCashFlow.cashIn.receipt.toFixed(2)}</span>
+              </div>
+              <div class="item-row total">
+                <span>Total Cash IN</span>
+                <span>${dailyCashFlow.cashIn.total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section summary-section">
+            <div class="section-title">Summary</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <strong>Total Job Order</strong>
+                <span>${dailyCashFlow.summary.totalJobOrder.toFixed(2)}</span>
+              </div>
+              <div class="summary-item">
+                <strong>Total Sales</strong>
+                <span>${dailyCashFlow.summary.totalSales.toFixed(2)}</span>
+              </div>
+              <div class="summary-item">
+                <strong>Total Business</strong>
+                <span>${dailyCashFlow.summary.totalBusiness.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  // Print Monthly Data function
+  const printMonthlyData = () => {
+    const printWindow = window.open('', '_blank');
+    
+    const tableRow2025 = monthlyData2025.map(month => `
+      <tr>
+        <td>${month.month}</td>
+        <td style="text-align: right;">${month.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right; font-weight: bold;">${month.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    const tableRow2024 = monthlyData2024.map(month => `
+      <tr>
+        <td>${month.month}</td>
+        <td style="text-align: right;">${month.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${month.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right; font-weight: bold;">${month.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Monthly Data Report</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              font-size: 10pt;
+              color: #000;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #000;
+            }
+            .header h1 {
+              font-size: 16pt;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .section {
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            .section-title {
+              font-size: 12pt;
+              font-weight: bold;
+              margin-bottom: 10px;
+              padding: 5px;
+              background-color: #f0f0f0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 15px;
+            }
+            th {
+              background-color: #e0e0e0;
+              padding: 8px;
+              text-align: left;
+              font-weight: bold;
+              border: 1px solid #000;
+              font-size: 9pt;
+            }
+            th.text-right {
+              text-align: right;
+            }
+            td {
+              padding: 6px 8px;
+              border: 1px solid #ddd;
+              font-size: 9pt;
+            }
+            .total-row {
+              background-color: #e3f2fd;
+              font-weight: bold;
+              border-top: 2px solid #000;
+            }
+            .total-row td {
+              border: 1px solid #000;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .section {
+                page-break-inside: avoid;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Monthly Data Report</h1>
+            <p>Generated on ${new Date().toLocaleDateString()}</p>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">2025 Monthly Data</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="text-right">Advance</th>
+                  <th class="text-right">Delivery</th>
+                  <th class="text-right">Sales</th>
+                  <th class="text-right">Receipt</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRow2025}
+                <tr class="total-row">
+                  <td>TOTAL (2025)</td>
+                  <td style="text-align: right;">${total2025.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2025.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2025.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2025.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2025.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">2024 Monthly Data</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="text-right">Advance</th>
+                  <th class="text-right">Delivery</th>
+                  <th class="text-right">Sales</th>
+                  <th class="text-right">Receipt</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRow2024}
+                <tr class="total-row">
+                  <td>TOTAL (2024)</td>
+                  <td style="text-align: right;">${total2024.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2024.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2024.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2024.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style="text-align: right;">${total2024.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -89,10 +421,6 @@ export default function DailyReport() {
             onChange={(e) => setSelectedDate(e.target.value)}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <button className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-2">
-            <Printer className="w-4 h-4" />
-            <span>Print</span>
-          </button>
           <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2">
             <Download className="w-4 h-4" />
             <span>Export</span>
@@ -100,188 +428,179 @@ export default function DailyReport() {
         </div>
       </div>
 
-      {/* Date Display */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{dailyCashFlow.date}</h2>
-        </div>
-      </div>
-
-      {/* Main Cash Flow Section */}
+      {/* Main Section: Left (Cash IN/OUT) and Right (Monthly Data) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cash IN Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <ArrowUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+        {/* Left Side: Daily Cash IN and OUT */}
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Daily Cash IN and OUT</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">(for {dailyCashFlow.date})</p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cash IN</h3>
+
+            {/* Cash IN Section */}
+            <div className="mb-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <ArrowUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cash IN</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="text-gray-700 dark:text-gray-300">Advance on Order</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.cashIn.advanceOnOrder.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="text-gray-700 dark:text-gray-300">Delivery</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.cashIn.delivery.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="text-gray-700 dark:text-gray-300">Cash on Sales</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.cashIn.cashOnSales.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="text-gray-700 dark:text-gray-300">Receipt</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.cashIn.receipt.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-blue-100 dark:bg-blue-900 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                  <span className="font-semibold text-blue-800 dark:text-blue-200">Total Cash IN</span>
+                  <span className="font-bold text-blue-800 dark:text-blue-200 text-lg">{dailyCashFlow.cashIn.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+
           </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Advance on Order</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashIn.advanceOnOrder.toFixed(2)}</span>
+
+          {/* Summary Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" ref={dailyReportRef}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Summary</h3>
+              <button 
+                onClick={printDailyReport}
+                className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Daily Report</span>
+              </button>
             </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Delivery</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashIn.delivery.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Cash on Sales</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashIn.cashOnSales.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Receipt</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashIn.receipt.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Other Cash IN</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashIn.otherCashIn.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-blue-100 dark:bg-blue-900 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-              <span className="font-semibold text-blue-800 dark:text-blue-200">Total Cash IN</span>
-              <span className="font-bold text-blue-800 dark:text-blue-200 text-lg">${dailyCashFlow.cashIn.total.toFixed(2)}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <span className="text-gray-700 dark:text-gray-300">Total Job Order</span>
+                <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.summary.totalJobOrder.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <span className="text-gray-700 dark:text-gray-300">Total Sales</span>
+                <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.summary.totalSales.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <span className="text-gray-700 dark:text-gray-300">Total Business</span>
+                <span className="font-medium text-gray-900 dark:text-white">{dailyCashFlow.summary.totalBusiness.toFixed(2)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Cash OUT Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
-              <ArrowDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+        {/* Right Side: Monthly Data Tables */}
+        <div className="space-y-6" ref={monthlyDataRef}>
+          {/* 2025 Data */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">2025 Monthly Data</h3>
+              <div className="flex items-center space-x-2">
+                <div className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Current Year</span>
+                </div>
+                <button
+                  onClick={printMonthlyData}
+                  className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-1 text-sm"
+                  title="Print Monthly Data"
+                >
+                  <Printer className="w-3 h-3" />
+                  <span>Print</span>
+                </button>
+              </div>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cash OUT</h3>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">Cash Out (Exp)</span>
-              <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.cashOut.cashOutExp.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-red-100 dark:bg-red-900 rounded-lg border-2 border-red-200 dark:border-red-800">
-              <span className="font-semibold text-red-800 dark:text-red-200">Total Cash OUT</span>
-              <span className="font-bold text-red-800 dark:text-red-200 text-lg">${dailyCashFlow.cashOut.total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Net Cash */}
-          <div className="mt-6 p-4 bg-green-100 dark:bg-green-900 rounded-lg border-2 border-green-200 dark:border-green-800">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-green-800 dark:text-green-200">Net Cash</span>
-              <span className="font-bold text-green-800 dark:text-green-200 text-xl">${dailyCashFlow.netCash.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <span className="text-gray-700 dark:text-gray-300">Total Job Order</span>
-            <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.summary.totalJobOrder.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <span className="text-gray-700 dark:text-gray-300">Total Sales</span>
-            <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.summary.totalSales.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <span className="text-gray-700 dark:text-gray-300">Total Business</span>
-            <span className="font-medium text-gray-900 dark:text-white">${dailyCashFlow.summary.totalBusiness.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Historical Monthly Data */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 2025 Data */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">2025 Monthly Data</h3>
-            <div className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
-              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Current Year</span>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {monthlyData2025.map((month, index) => (
-                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-3 py-2 text-gray-900 dark:text-white">{month.month}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.advance.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.delivery.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.sales.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.receipt.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{month.total.toLocaleString()}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                   </tr>
-                ))}
-                <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold">
-                  <td className="px-3 py-2 text-blue-800 dark:text-blue-200">Total 2025</td>
-                  <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.advance.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.delivery.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.receipt.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.total.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 2024 Data */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">2024 Monthly Data</h3>
-            <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Previous Year</span>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {monthlyData2025.map((month, index) => (
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-3 py-2 text-gray-900 dark:text-white">{month.month}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{month.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold">
+                    <td className="px-3 py-2 text-blue-800 dark:text-blue-200">TOTAL (2025)</td>
+                    <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {monthlyData2024.map((month, index) => (
-                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-3 py-2 text-gray-900 dark:text-white">{month.month}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.advance.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.delivery.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.sales.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.receipt.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{month.total.toLocaleString()}</td>
+
+          {/* 2024 Data */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">2024 Monthly Data</h3>
+              <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Previous Year</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                   </tr>
-                ))}
-                <tr className="bg-gray-50 dark:bg-gray-700 font-semibold">
-                  <td className="px-3 py-2 text-gray-800 dark:text-gray-200">Total 2024</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.advance.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.delivery.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.receipt.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.total.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {monthlyData2024.map((month, index) => (
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-3 py-2 text-gray-900 dark:text-white">{month.month}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{month.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{month.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-50 dark:bg-gray-700 font-semibold">
+                    <td className="px-3 py-2 text-gray-800 dark:text-gray-200">TOTAL (2024)</td>
+                    <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

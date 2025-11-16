@@ -14,6 +14,8 @@ const Customers = lazy(() => import('../pages/admin-panel/Customers'));
 const Services = lazy(() => import('../pages/admin-panel/Services'));
 const Measurements = lazy(() => import('../pages/admin-panel/Measurements'));
 const Settings = lazy(() => import('../pages/admin-panel/Settings'));
+const Reports = lazy(() => import('../pages/admin-panel/Reports'));
+const CompanyDetails = lazy(() => import('../pages/admin-panel/CompanyDetails'));
 // const Users = lazy(() => import('../pages/admin-panel/Users'));
 
 const adminRoutes = [
@@ -79,6 +81,14 @@ const adminRoutes = [
   {
     path: 'settings',
     element: <Settings />,
+  },
+  {
+    path: 'reports',
+    element: <Reports />,
+  },
+  {
+    path: 'company-details',
+    element: <CompanyDetails />,
   },
 ];
 

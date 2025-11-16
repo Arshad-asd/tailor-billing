@@ -58,7 +58,7 @@ export function RestaurantSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
             <span className="text-sm font-bold">V</span>
           </div>
           <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Velosy</span>
@@ -76,7 +76,7 @@ export function RestaurantSidebar() {
                     tooltip={item.title}
                     className={
                       item.isActive
-                        ? "bg-teal-50 text-teal-700 border-r-2 border-teal-500 dark:bg-teal-900/20 dark:text-teal-300"
+                        ? "bg-primary-light text-primary border-r-2 border-primary dark:bg-primary-dark/20 dark:text-primary-light"
                         : ""
                     }
                   >

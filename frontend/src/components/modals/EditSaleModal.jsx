@@ -5,31 +5,82 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
+import { Plus, Trash2, Package } from "lucide-react";
+import ItemSearchModal from "./ItemSearchModal";
 
 export default function EditSaleModal({ open, onClose, onSubmit, editingSale = null }) {
   const [form, setForm] = useState({
     customerName: "",
-    service: "",
-    amount: "",
     date: "",
     paymentMethod: "",
-    status: "",
-    jobOrderId: "",
+    status: "pending",
     notes: "",
   });
+  const [saleItems, setSaleItems] = useState([]);
+  const [isItemSearchOpen, setIsItemSearchOpen] = useState(false);
+
+  // Debug form state changes
+  useEffect(() => {
+    console.log('EditSaleModal - Form state changed:', form);
+    console.log('EditSaleModal - Payment method in form:', form.paymentMethod);
+  }, [form]);
+
+  // Force payment method update when editingSale changes
+  useEffect(() => {
+    if (editingSale && editingSale.payment_method) {
+      console.log('EditSaleModal - Force setting payment method:', editingSale.payment_method);
+      setForm(prev => ({
+        ...prev,
+        paymentMethod: editingSale.payment_method
+      }));
+    }
+  }, [editingSale?.payment_method]);
 
   useEffect(() => {
     if (editingSale) {
-      setForm({
-        customerName: editingSale.customerName || "",
-        service: editingSale.service || "",
-        amount: editingSale.amount?.toString() || "",
-        date: editingSale.date || "",
-        paymentMethod: editingSale.paymentMethod || "",
-        status: editingSale.status || "",
-        jobOrderId: editingSale.jobOrderId || "",
+      console.log('EditSaleModal - editingSale data:', editingSale);
+      console.log('EditSaleModal - sale_items:', editingSale.sale_items);
+      
+      const formData = {
+        customerName: editingSale.customer_name || "",
+        date: editingSale.date ? editingSale.date.split('T')[0] : "",
+        paymentMethod: editingSale.payment_method || "",
+        status: editingSale.status || "pending",
         notes: editingSale.notes || "",
-      });
+      };
+      
+      // Ensure payment method is in the correct format
+      if (formData.paymentMethod) {
+        // Handle different formats that might come from the API
+        const paymentMethod = formData.paymentMethod.toLowerCase();
+        if (paymentMethod === 'cash_bank' || paymentMethod === 'cash bank') {
+          formData.paymentMethod = 'cash_bank';
+        } else if (paymentMethod === 'bank') {
+          formData.paymentMethod = 'bank';
+        } else if (paymentMethod === 'cash') {
+          formData.paymentMethod = 'cash';
+        }
+      }
+      console.log('EditSaleModal - Setting form data:', formData);
+      console.log('EditSaleModal - Payment method from API:', editingSale.payment_method);
+      setForm(formData);
+      
+      // Load existing sale items
+      if (editingSale.sale_items && Array.isArray(editingSale.sale_items)) {
+        console.log('EditSaleModal - Processing sale_items:', editingSale.sale_items);
+        setSaleItems(editingSale.sale_items.map((item, index) => ({
+          id: item.id || Date.now() + index,
+          item: item.item,
+          item_name: item.item_name || item.item?.name || 'Unknown Item',
+          item_sku: item.item_sku || item.item?.sku || '',
+          quantity: item.quantity || 1,
+          price: item.price || 0,
+          total_amount: item.total_amount || 0
+        })));
+      } else {
+        console.log('EditSaleModal - No sale_items found, setting empty array');
+        setSaleItems([]);
+      }
     }
   }, [editingSale, open]);
 
@@ -42,16 +93,74 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
     setForm((f) => ({ ...f, [name]: value }));
   };
 
+  const handleAddItem = (item) => {
+    const newSaleItem = {
+      id: Date.now(), // temporary ID for frontend
+      item: item.id,
+      item_name: item.name,
+      item_sku: item.sku,
+      quantity: 1,
+      price: 0,
+      total_amount: 0
+    };
+    setSaleItems(prev => [...prev, newSaleItem]);
+  };
+
+  const handleRemoveItem = (itemId) => {
+    setSaleItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const handleItemQuantityChange = (itemId, quantity) => {
+    setSaleItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const newTotal = parseFloat(quantity) * parseFloat(item.price || 0);
+        return { ...item, quantity: parseFloat(quantity), total_amount: newTotal };
+      }
+      return item;
+    }));
+  };
+
+  const handleItemPriceChange = (itemId, price) => {
+    setSaleItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const newTotal = parseFloat(item.quantity || 0) * parseFloat(price);
+        return { ...item, price: parseFloat(price), total_amount: newTotal };
+      }
+      return item;
+    }));
+  };
+
+  const calculateTotal = () => {
+    return saleItems.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const totalAmount = calculateTotal();
     const formData = {
       ...form,
-      amount: parseFloat(form.amount) || 0,
+      amount: totalAmount,
+      total_amount: totalAmount,
+      sale_items: saleItems.map(item => ({
+        item: item.item,
+        quantity: item.quantity,
+        price: item.price,
+        total_amount: item.total_amount
+      }))
     };
     onSubmit(formData, editingSale?.id);
   };
 
   const handleClose = () => {
+    // Reset form when closing
+    setForm({
+      customerName: "",
+      date: "",
+      paymentMethod: "",
+      status: "pending",
+      notes: "",
+    });
+    setSaleItems([]);
     onClose();
   };
 
@@ -81,46 +190,7 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="service">Service</Label>
-              <Select value={form.service} onValueChange={(value) => handleSelectChange("service", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectValue placeholder="Select service" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="Wedding Dress Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Wedding Dress Alterations</SelectItem>
-                  <SelectItem value="Custom Suit" className="hover:bg-gray-100 dark:hover:bg-gray-700">Custom Suit</SelectItem>
-                  <SelectItem value="Pants Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Pants Alterations</SelectItem>
-                  <SelectItem value="Jacket Repairs" className="hover:bg-gray-100 dark:hover:bg-gray-700">Jacket Repairs</SelectItem>
-                  <SelectItem value="Dress Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Dress Alterations</SelectItem>
-                  <SelectItem value="Shirt Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Shirt Alterations</SelectItem>
-                  <SelectItem value="Skirt Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Skirt Alterations</SelectItem>
-                  <SelectItem value="Blouse Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Blouse Alterations</SelectItem>
-                  <SelectItem value="Coat Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Coat Alterations</SelectItem>
-                  <SelectItem value="Uniform Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Uniform Alterations</SelectItem>
-                  <SelectItem value="Hemming" className="hover:bg-gray-100 dark:hover:bg-gray-700">Hemming</SelectItem>
-                  <SelectItem value="Zipper Replacement" className="hover:bg-gray-100 dark:hover:bg-gray-700">Zipper Replacement</SelectItem>
-                  <SelectItem value="Button Replacement" className="hover:bg-gray-100 dark:hover:bg-gray-700">Button Replacement</SelectItem>
-                  <SelectItem value="Patch Work" className="hover:bg-gray-100 dark:hover:bg-gray-700">Patch Work</SelectItem>
-                  <SelectItem value="Other" className="hover:bg-gray-100 dark:hover:bg-gray-700">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                value={form.amount}
-                onChange={handleChange}
-                placeholder="Enter amount"
-                required
-                min="0"
-              />
-            </div>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="date">Date</Label>
@@ -136,24 +206,31 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="paymentMethod">Payment Method</Label>
-              <Select value={form.paymentMethod} onValueChange={(value) => handleSelectChange("paymentMethod", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectValue placeholder="Select payment method" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="Cash" className="hover:bg-gray-100 dark:hover:bg-gray-700">Cash</SelectItem>
-                  <SelectItem value="Credit Card" className="hover:bg-gray-100 dark:hover:bg-gray-700">Credit Card</SelectItem>
-                  <SelectItem value="Debit Card" className="hover:bg-gray-100 dark:hover:bg-gray-700">Debit Card</SelectItem>
-                  <SelectItem value="Bank Transfer" className="hover:bg-gray-100 dark:hover:bg-gray-700">Bank Transfer</SelectItem>
-                  <SelectItem value="Check" className="hover:bg-gray-100 dark:hover:bg-gray-700">Check</SelectItem>
-                  <SelectItem value="Digital Payment" className="hover:bg-gray-100 dark:hover:bg-gray-700">Digital Payment</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                id="paymentMethod"
+                name="paymentMethod"
+                value={form.paymentMethod}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select payment method</option>
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+                <option value="cash_bank">Cash Bank</option>
+              </select>
+              {/* Debug display */}
+              <div className="text-xs text-gray-500">
+                Debug: Current payment method = "{form.paymentMethod}"
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={form.status} onValueChange={(value) => handleSelectChange("status", value)}>
+              <Select 
+                key={`status-${editingSale?.id || 'new'}`}
+                value={form.status} 
+                onValueChange={(value) => handleSelectChange("status", value)}
+              >
                 <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
@@ -165,16 +242,93 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="jobOrderId">Job Order ID</Label>
-              <Input
-                id="jobOrderId"
-                name="jobOrderId"
-                value={form.jobOrderId}
-                onChange={handleChange}
-                placeholder="Enter job order ID"
-              />
+          </div>
+
+          {/* Sale Items Section */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-lg font-medium">Sale Items</Label>
+              <Button
+                type="button"
+                onClick={() => setIsItemSearchOpen(true)}
+                className="flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Item</span>
+              </Button>
             </div>
+
+            {saleItems.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No items added yet</p>
+                <p className="text-sm text-gray-400">Click "Add Item" to start adding items to this sale</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {saleItems.map((item) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900 dark:text-white">{item.item_name}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {item.item_sku}</p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="flex flex-col">
+                        <Label htmlFor={`quantity-${item.id}`} className="text-xs">Qty</Label>
+                        <Input
+                          id={`quantity-${item.id}`}
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleItemQuantityChange(item.id, e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        <Label htmlFor={`price-${item.id}`} className="text-xs">Price</Label>
+                        <Input
+                          id={`price-${item.id}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.price}
+                          onChange={(e) => handleItemPriceChange(item.id, e.target.value)}
+                          className="w-24"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        <Label className="text-xs">Total</Label>
+                        <div className="w-24 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded text-sm font-medium">
+                          ${parseFloat(item.total_amount || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      ${calculateTotal().toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -199,6 +353,14 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
           </DialogFooter>
         </form>
       </DialogContent>
+      
+      {/* Item Search Modal */}
+      <ItemSearchModal
+        open={isItemSearchOpen}
+        onClose={() => setIsItemSearchOpen(false)}
+        onSelectItem={handleAddItem}
+        selectedItems={saleItems}
+      />
     </Dialog>
   );
 }

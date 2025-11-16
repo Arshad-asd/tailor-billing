@@ -22,26 +22,37 @@ import {
   Smartphone
 } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAppearance } from '../../hooks/useAppearance';
 
 export default function Settings() {
   const { settings, updateSettings, saveSettings, resetSettings } = useSettings();
-    const [localSettings, setLocalSettings] = useState(settings);
+  const { theme, colorTheme, changeTheme, changeColorTheme } = useAppearance();
+  const [localSettings, setLocalSettings] = useState(settings);
 
   const [activeTab, setActiveTab] = useState('appearance');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
 
-  // Update local settings when context settings change
+  // Update local settings when context settings or theme state change
   useEffect(() => {
-    setLocalSettings(settings);
-  }, [settings]);
+    setLocalSettings(prev => ({
+      ...prev,
+      ...settings,
+      theme: theme || settings.theme,
+      colorTheme: colorTheme || settings.colorTheme
+    }));
+  }, [settings, theme, colorTheme]);
 
   const handleSettingChange = (key, value) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
     
     // Apply theme changes immediately for better UX
     if (key === 'theme') {
-      updateSettings({ theme: value });
+      console.log('Changing theme to:', value);
+      changeTheme(value);
+    } else if (key === 'colorTheme') {
+      console.log('Changing color theme to:', value);
+      changeColorTheme(value);
     }
   };
 
@@ -114,11 +125,11 @@ export default function Settings() {
                   <button
                     key={option.value}
                     onClick={() => handleSettingChange('theme', option.value)}
-                                         className={`p-4 rounded-lg border-2 transition-all ${
-                       localSettings.theme === option.value
-                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                     }`}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      localSettings.theme === option.value
+                        ? 'border-primary bg-primary-light dark:bg-primary-dark/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
                   >
                     <div className="flex items-center space-x-3">
                       <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -127,6 +138,37 @@ export default function Settings() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Color Theme */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
+              Color Theme
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                { value: 'orange', label: 'Orange', color: 'bg-orange-500' },
+                { value: 'blue', label: 'Blue', color: 'bg-blue-500' },
+                { value: 'green', label: 'Green', color: 'bg-green-500' },
+                { value: 'purple', label: 'Purple', color: 'bg-purple-500' },
+                { value: 'red', label: 'Red', color: 'bg-red-500' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleSettingChange('colorTheme', option.value)}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    localSettings.colorTheme === option.value
+                      ? 'border-primary bg-primary-light dark:bg-primary-dark/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className={`w-8 h-8 rounded-full ${option.color}`}></div>
+                    <span className="font-medium text-gray-900 dark:text-white text-sm">{option.label}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -148,7 +190,7 @@ export default function Settings() {
                     onChange={(e) => handleSettingChange('sidebarCollapsed', e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary dark:peer-focus:ring-primary-dark rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -180,7 +222,7 @@ export default function Settings() {
                         onChange={(e) => handleSettingChange(option.key, e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary dark:peer-focus:ring-primary-dark rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                     </label>
                   </div>
                 );
@@ -223,7 +265,7 @@ export default function Settings() {
                     onChange={(e) => handleSettingChange(option.key, e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary dark:peer-focus:ring-primary-dark rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                 </label>
               </div>
             );
@@ -250,7 +292,7 @@ export default function Settings() {
             <select
               value={localSettings.autoLogout}
               onChange={(e) => handleSettingChange('autoLogout', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value={15}>15 minutes</option>
               <option value={30}>30 minutes</option>
@@ -280,7 +322,7 @@ export default function Settings() {
                       onChange={(e) => handleSettingChange(option.key, e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary dark:peer-focus:ring-primary-dark rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                   </label>
                 </div>
               );
@@ -316,7 +358,7 @@ export default function Settings() {
                 onChange={(e) => handleSettingChange('autoSave', e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary dark:peer-focus:ring-primary-dark rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
             </label>
           </div>
 
@@ -328,7 +370,7 @@ export default function Settings() {
             <select
               value={localSettings.dataRetention}
               onChange={(e) => handleSettingChange('dataRetention', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
@@ -346,7 +388,7 @@ export default function Settings() {
             <select
               value={localSettings.backupFrequency}
               onChange={(e) => handleSettingChange('backupFrequency', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -408,7 +450,7 @@ export default function Settings() {
           <button
             onClick={handleSaveSettings}
             disabled={isSaving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
@@ -428,7 +470,7 @@ export default function Settings() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
@@ -447,12 +489,12 @@ export default function Settings() {
       </div>
 
       {/* Info Card */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <div className="bg-primary-light dark:bg-primary-dark/20 border border-primary dark:border-primary-dark rounded-lg p-4">
         <div className="flex items-start space-x-3">
-          <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
           <div>
-            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Settings Information</h3>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+            <h3 className="text-sm font-medium text-primary-dark dark:text-primary-light">Settings Information</h3>
+            <p className="text-sm text-primary-dark dark:text-primary-light mt-1">
               Your settings are automatically saved to your browser's local storage. Theme changes are applied immediately, while other settings may require a page refresh to take full effect.
             </p>
           </div>

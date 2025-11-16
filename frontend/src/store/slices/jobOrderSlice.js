@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { jobOrderAPI } from '../../services';
+import { jobOrdersApi } from '../../services';
 
 // Async thunks for job order actions
 export const fetchJobOrders = createAsyncThunk(
   'jobOrder/fetchJobOrders',
   async (params, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getJobOrders(params);
+      const response = await jobOrdersApi.getJobOrders(params);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch job orders');
@@ -18,7 +18,7 @@ export const fetchJobOrder = createAsyncThunk(
   'jobOrder/fetchJobOrder',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getJobOrder(id);
+      const response = await jobOrdersApi.getJobOrder(id);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch job order');
@@ -30,7 +30,7 @@ export const createJobOrder = createAsyncThunk(
   'jobOrder/createJobOrder',
   async (jobOrderData, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.createJobOrder(jobOrderData);
+      const response = await jobOrdersApi.createJobOrder(jobOrderData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create job order');
@@ -42,7 +42,7 @@ export const updateJobOrder = createAsyncThunk(
   'jobOrder/updateJobOrder',
   async ({ id, jobOrderData }, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.updateJobOrder(id, jobOrderData);
+      const response = await jobOrdersApi.updateJobOrder(id, jobOrderData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update job order');
@@ -54,7 +54,7 @@ export const deleteJobOrder = createAsyncThunk(
   'jobOrder/deleteJobOrder',
   async (id, { rejectWithValue }) => {
     try {
-      await jobOrderAPI.deleteJobOrder(id);
+      await jobOrdersApi.deleteJobOrder(id);
       return id;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete job order');
@@ -66,7 +66,7 @@ export const updateJobOrderStatus = createAsyncThunk(
   'jobOrder/updateJobOrderStatus',
   async ({ id, status }, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.updateJobOrderStatus(id, status);
+      const response = await jobOrdersApi.updateJobOrderStatus(id, status);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update job order status');
@@ -78,7 +78,7 @@ export const assignJobOrder = createAsyncThunk(
   'jobOrder/assignJobOrder',
   async ({ id, tailorId }, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.assignJobOrder(id, tailorId);
+      const response = await jobOrdersApi.assignJobOrder(id, tailorId);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to assign job order');
@@ -90,7 +90,7 @@ export const completeJobOrder = createAsyncThunk(
   'jobOrder/completeJobOrder',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.completeJobOrder(id);
+      const response = await jobOrdersApi.completeJobOrder(id);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to complete job order');
@@ -103,7 +103,7 @@ export const fetchMeasurements = createAsyncThunk(
   'jobOrder/fetchMeasurements',
   async (params, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getMeasurements(params);
+      const response = await jobOrdersApi.getMeasurements(params);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch measurements');
@@ -115,7 +115,7 @@ export const fetchMeasurement = createAsyncThunk(
   'jobOrder/fetchMeasurement',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getMeasurement(id);
+      const response = await jobOrdersApi.getMeasurement(id);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch measurement');
@@ -127,7 +127,7 @@ export const createMeasurement = createAsyncThunk(
   'jobOrder/createMeasurement',
   async (measurementData, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.createMeasurement(measurementData);
+      const response = await jobOrdersApi.createMeasurement(measurementData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create measurement');
@@ -139,7 +139,7 @@ export const updateMeasurement = createAsyncThunk(
   'jobOrder/updateMeasurement',
   async ({ id, measurementData }, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.updateMeasurement(id, measurementData);
+      const response = await jobOrdersApi.updateMeasurement(id, measurementData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update measurement');
@@ -151,7 +151,7 @@ export const deleteMeasurement = createAsyncThunk(
   'jobOrder/deleteMeasurement',
   async (id, { rejectWithValue }) => {
     try {
-      await jobOrderAPI.deleteMeasurement(id);
+      await jobOrdersApi.deleteMeasurement(id);
       return id;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete measurement');
@@ -164,7 +164,7 @@ export const fetchDashboardStats = createAsyncThunk(
   'jobOrder/fetchDashboardStats',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getDashboardStats();
+      const response = await jobOrdersApi.getDashboardStats();
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch dashboard stats');
@@ -176,7 +176,7 @@ export const fetchJobOrderReport = createAsyncThunk(
   'jobOrder/fetchJobOrderReport',
   async (params, { rejectWithValue }) => {
     try {
-      const response = await jobOrderAPI.getJobOrderReport(params);
+      const response = await jobOrdersApi.getJobOrderReport(params);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch job order report');

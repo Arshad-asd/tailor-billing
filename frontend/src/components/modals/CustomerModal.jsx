@@ -1,268 +1,241 @@
-import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
-import { Badge } from "../ui/badge";
+import { useState, useEffect } from 'react';
+import { X, Save, User, Phone, DollarSign, Star } from 'lucide-react';
+import customerApi from '../../services/customerApi';
 
-export default function CustomerModal({ open, onClose, onSubmit, editingCustomer = null }) {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    status: "active",
-    preferences: [],
-    notes: "",
+export default function CustomerModal({ isOpen, onClose, onSave, customer = null, isEdit = false }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    balance: 0.00,
+    points: 0,
+    is_active: true
   });
-
-  const [newPreference, setNewPreference] = useState("");
-
-  const preferenceOptions = [
-    "Wedding Dresses",
-    "Custom Suits", 
-    "Business Attire",
-    "Alterations",
-    "Repairs",
-    "Custom Dresses",
-    "Formal Wear",
-    "Casual Wear",
-    "Accessories",
-    "Bridal",
-    "Prom Dresses",
-    "Uniforms"
-  ];
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (editingCustomer) {
-      setForm({
-        name: editingCustomer.name || "",
-        email: editingCustomer.email || "",
-        phone: editingCustomer.phone || "",
-        address: editingCustomer.address || "",
-        status: editingCustomer.status || "active",
-        preferences: editingCustomer.preferences || [],
-        notes: editingCustomer.notes || "",
-      });
-    } else {
-      setForm({
-        name: "",
-        email: "",
-        phone: "",
-        address: "",
-        status: "active",
-        preferences: [],
-        notes: "",
-      });
+    if (isOpen) {
+      if (customer && isEdit) {
+        setFormData({
+          name: customer.name || '',
+          phone: customer.phone || '',
+          balance: customer.balance || 0.00,
+          points: customer.points || 0,
+          is_active: customer.is_active !== undefined ? customer.is_active : true
+        });
+      } else {
+        setFormData({
+          name: '',
+          phone: '',
+          balance: 0.00,
+          points: 0,
+          is_active: true
+        });
+      }
+      setErrors({});
     }
-    setNewPreference("");
-  }, [editingCustomer, open]);
+  }, [isOpen, customer, isEdit]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-  };
-
-  const handleSelectChange = (name, value) => {
-    setForm((f) => ({ ...f, [name]: value }));
-  };
-
-  const handleAddPreference = () => {
-    if (newPreference.trim() && !form.preferences.includes(newPreference.trim())) {
-      setForm((f) => ({
-        ...f,
-        preferences: [...f.preferences, newPreference.trim()]
-      }));
-      setNewPreference("");
-    }
-  };
-
-  const handleRemovePreference = (preferenceToRemove) => {
-    setForm((f) => ({
-      ...f,
-      preferences: f.preferences.filter(pref => pref !== preferenceToRemove)
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
     }));
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const formData = {
-      ...form,
-      id: editingCustomer?.id || `CUST-${Date.now()}`,
-      joinDate: editingCustomer?.joinDate || new Date().toISOString().split('T')[0],
-      totalOrders: editingCustomer?.totalOrders || 0,
-      totalSpent: editingCustomer?.totalSpent || 0,
-      lastOrder: editingCustomer?.lastOrder || null,
-    };
-    onSubmit(formData, editingCustomer?.id);
-    setForm({
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      status: "active",
-      preferences: [],
-      notes: "",
-    });
-    setNewPreference("");
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Customer name is required';
+    }
+    
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    }
+    
+    if (formData.balance < 0) {
+      newErrors.balance = 'Balance cannot be negative';
+    }
+    
+    if (formData.points < 0) {
+      newErrors.points = 'Points cannot be negative';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const isEditing = !!editingCustomer;
+  const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      let savedCustomer;
+      if (isEdit && customer) {
+        savedCustomer = await customerApi.updateCustomer(customer.id, formData);
+      } else {
+        savedCustomer = await customerApi.createCustomer(formData);
+      }
+      
+      await onSave(savedCustomer);
+      onClose();
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      // You might want to show an error message to the user here
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    onClose();
+  };
+
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-[600px] h-[600px] p-0 max-h-[90vh] overflow-hidden">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader className="p-6 pb-4">
-            <DialogTitle>
-              {isEditing ? "Edit Customer" : "Add New Customer"}
-            </DialogTitle>
-            <DialogDescription>
-              {isEditing 
-                ? "Update the customer information below."
-                : "Add a new customer to your database. Fill in the details below."
-              }
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-y-auto px-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input 
-                  id="name" 
-                  name="name" 
-                  placeholder="e.g. Sarah Johnson" 
-                  value={form.name} 
-                  onChange={handleChange} 
-                  required 
-                />
-              </div>
-              
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input 
-                  id="email" 
-                  name="email" 
-                  type="email"
-                  placeholder="e.g. sarah.johnson@email.com" 
-                  value={form.email} 
-                  onChange={handleChange} 
-                  required 
-                />
-              </div>
-              
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input 
-                  id="phone" 
-                  name="phone" 
-                  placeholder="e.g. (555) 123-4567" 
-                  value={form.phone} 
-                  onChange={handleChange} 
-                  required 
-                />
-              </div>
-              
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={form.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999]">
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="vip">VIP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea 
-                id="address" 
-                name="address" 
-                placeholder="e.g. 123 Main St, City, State 12345"
-                value={form.address} 
-                onChange={handleChange}
-                rows={2}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {isEdit ? 'Edit Customer' : 'New Customer'}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {isEdit ? `Editing: ${customer?.name}` : 'Create a new customer'}
+            </p>
+          </div>
+          <button
+            onClick={handleCancel}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Close</span>
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div className="p-6 space-y-6">
+          {/* Customer Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <User className="w-4 h-4 inline mr-2" />
+              Customer Name *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
+              placeholder="Enter customer name"
+            />
+            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+          </div>
+
+          {/* Phone Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Phone className="w-4 h-4 inline mr-2" />
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.phone ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
+              placeholder="Enter phone number"
+            />
+            {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+          </div>
+
+          {/* Balance and Points */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <DollarSign className="w-4 h-4 inline mr-2" />
+                Balance
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.balance}
+                onChange={(e) => handleInputChange('balance', parseFloat(e.target.value) || 0)}
+                className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+                placeholder="0.00"
               />
+              {errors.balance && <p className="text-red-500 text-sm mt-1">{errors.balance}</p>}
             </div>
-            
-            <div className="flex flex-col gap-3">
-              <Label>Preferences</Label>
-              <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
-                {form.preferences.map((pref, index) => (
-                  <Badge 
-                    key={index} 
-                    variant="secondary"
-                    className="flex items-center gap-1"
-                  >
-                    {pref}
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePreference(pref)}
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Select value={newPreference} onValueChange={setNewPreference}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Add preference" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999]">
-                    {preferenceOptions
-                      .filter(option => !form.preferences.includes(option))
-                      .map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={handleAddPreference}
-                  disabled={!newPreference.trim()}
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea 
-                id="notes" 
-                name="notes" 
-                placeholder="Additional notes about the customer..."
-                value={form.notes} 
-                onChange={handleChange}
-                rows={2}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Star className="w-4 h-4 inline mr-2" />
+                Points
+              </label>
+              <input
+                type="number"
+                value={formData.points}
+                onChange={(e) => handleInputChange('points', parseInt(e.target.value) || 0)}
+                className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.points ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+                placeholder="0"
               />
+              {errors.points && <p className="text-red-500 text-sm mt-1">{errors.points}</p>}
             </div>
           </div>
-          
-          <DialogFooter className="flex flex-row gap-2 justify-end p-6 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+
+          {/* Active Status */}
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) => handleInputChange('is_active', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Active Customer</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+          <div className="flex items-center justify-end space-x-3">
+            <button
+              onClick={handleCancel}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            >
               Cancel
-            </Button>
-            <Button type="submit" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-              {isEditing ? "Update Customer" : "Add Customer"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{loading ? 'Saving...' : 'Save Customer'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
-} 
+}

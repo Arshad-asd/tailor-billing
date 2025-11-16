@@ -5,18 +5,19 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
+import { Plus, Trash2, Package } from "lucide-react";
+import ItemSearchModal from "./ItemSearchModal";
 
 export default function AddSaleModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState({
-    customerName: "",
-    service: "",
-    amount: "",
+    customerName: "Khartoum",
     date: "",
     paymentMethod: "",
-    status: "",
-    jobOrderId: "",
+    status: "pending",
     notes: "",
   });
+  const [saleItems, setSaleItems] = useState([]);
+  const [isItemSearchOpen, setIsItemSearchOpen] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,44 +28,93 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
+  const handleAddItem = (item) => {
+    const newSaleItem = {
+      id: Date.now(), // temporary ID for frontend
+      item: item.id,
+      item_name: item.name,
+      item_sku: item.sku,
+      quantity: 1,
+      price: 0,
+      total_amount: 0
+    };
+    setSaleItems(prev => [...prev, newSaleItem]);
+  };
+
+  const handleRemoveItem = (itemId) => {
+    setSaleItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const handleItemQuantityChange = (itemId, quantity) => {
+    setSaleItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const newTotal = parseFloat(quantity) * parseFloat(item.price || 0);
+        return { ...item, quantity: parseFloat(quantity), total_amount: newTotal };
+      }
+      return item;
+    }));
+  };
+
+  const handleItemPriceChange = (itemId, price) => {
+    setSaleItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const newTotal = parseFloat(item.quantity || 0) * parseFloat(price);
+        return { ...item, price: parseFloat(price), total_amount: newTotal };
+      }
+      return item;
+    }));
+  };
+
+  const calculateTotal = () => {
+    return saleItems.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const totalAmount = calculateTotal();
     const formData = {
       ...form,
-      amount: parseFloat(form.amount) || 0,
+      amount: totalAmount,
+      total_amount: totalAmount,
+      sale_items: saleItems.map(item => ({
+        item: item.item,
+        quantity: item.quantity,
+        price: item.price,
+        total_amount: item.total_amount
+      }))
     };
     onSubmit(formData);
     setForm({
-      customerName: "",
-      service: "",
-      amount: "",
+      customerName: "Khartoum",
       date: "",
       paymentMethod: "",
-      status: "",
-      jobOrderId: "",
+      status: "pending",
       notes: "",
     });
+    setSaleItems([]);
   };
 
   const handleClose = () => {
     setForm({
-      customerName: "",
-      service: "",
-      amount: "",
+      customerName: "Khartoum",
       date: "",
       paymentMethod: "",
-      status: "",
-      jobOrderId: "",
+      status: "pending",
       notes: "",
     });
+    setSaleItems([]);
     onClose();
   };
 
-  // Set default date to today
+  // Set default date to today and default customer name to Khartoum
   React.useEffect(() => {
-    if (open && !form.date) {
+    if (open) {
       const today = new Date().toISOString().split('T')[0];
-      setForm(prev => ({ ...prev, date: today }));
+      setForm(prev => ({ 
+        ...prev, 
+        date: prev.date || today,
+        customerName: prev.customerName || "Khartoum"
+      }));
     }
   }, [open]);
 
@@ -92,46 +142,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="service">Service</Label>
-              <Select value={form.service} onValueChange={(value) => handleSelectChange("service", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectValue placeholder="Select service" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="Wedding Dress Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Wedding Dress Alterations</SelectItem>
-                  <SelectItem value="Custom Suit" className="hover:bg-gray-100 dark:hover:bg-gray-700">Custom Suit</SelectItem>
-                  <SelectItem value="Pants Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Pants Alterations</SelectItem>
-                  <SelectItem value="Jacket Repairs" className="hover:bg-gray-100 dark:hover:bg-gray-700">Jacket Repairs</SelectItem>
-                  <SelectItem value="Dress Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Dress Alterations</SelectItem>
-                  <SelectItem value="Shirt Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Shirt Alterations</SelectItem>
-                  <SelectItem value="Skirt Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Skirt Alterations</SelectItem>
-                  <SelectItem value="Blouse Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Blouse Alterations</SelectItem>
-                  <SelectItem value="Coat Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Coat Alterations</SelectItem>
-                  <SelectItem value="Uniform Alterations" className="hover:bg-gray-100 dark:hover:bg-gray-700">Uniform Alterations</SelectItem>
-                  <SelectItem value="Hemming" className="hover:bg-gray-100 dark:hover:bg-gray-700">Hemming</SelectItem>
-                  <SelectItem value="Zipper Replacement" className="hover:bg-gray-100 dark:hover:bg-gray-700">Zipper Replacement</SelectItem>
-                  <SelectItem value="Button Replacement" className="hover:bg-gray-100 dark:hover:bg-gray-700">Button Replacement</SelectItem>
-                  <SelectItem value="Patch Work" className="hover:bg-gray-100 dark:hover:bg-gray-700">Patch Work</SelectItem>
-                  <SelectItem value="Other" className="hover:bg-gray-100 dark:hover:bg-gray-700">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                value={form.amount}
-                onChange={handleChange}
-                placeholder="Enter amount"
-                required
-                min="0"
-              />
-            </div>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="date">Date</Label>
@@ -152,12 +163,9 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="Cash" className="hover:bg-gray-100 dark:hover:bg-gray-700">Cash</SelectItem>
-                  <SelectItem value="Credit Card" className="hover:bg-gray-100 dark:hover:bg-gray-700">Credit Card</SelectItem>
-                  <SelectItem value="Debit Card" className="hover:bg-gray-100 dark:hover:bg-gray-700">Debit Card</SelectItem>
-                  <SelectItem value="Bank Transfer" className="hover:bg-gray-100 dark:hover:bg-gray-700">Bank Transfer</SelectItem>
-                  <SelectItem value="Check" className="hover:bg-gray-100 dark:hover:bg-gray-700">Check</SelectItem>
-                  <SelectItem value="Digital Payment" className="hover:bg-gray-100 dark:hover:bg-gray-700">Digital Payment</SelectItem>
+                  <SelectItem value="cash" className="hover:bg-gray-100 dark:hover:bg-gray-700">Cash</SelectItem>
+                  <SelectItem value="bank" className="hover:bg-gray-100 dark:hover:bg-gray-700">Bank</SelectItem>
+                  <SelectItem value="cash_bank" className="hover:bg-gray-100 dark:hover:bg-gray-700">Cash Bank</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -176,16 +184,93 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="jobOrderId">Job Order ID</Label>
-              <Input
-                id="jobOrderId"
-                name="jobOrderId"
-                value={form.jobOrderId}
-                onChange={handleChange}
-                placeholder="Enter job order ID"
-              />
+          </div>
+
+          {/* Sale Items Section */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-lg font-medium">Sale Items</Label>
+              <Button
+                type="button"
+                onClick={() => setIsItemSearchOpen(true)}
+                className="flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Item</span>
+              </Button>
             </div>
+
+            {saleItems.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No items added yet</p>
+                <p className="text-sm text-gray-400">Click "Add Item" to start adding items to this sale</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {saleItems.map((item) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900 dark:text-white">{item.item_name}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {item.item_sku}</p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="flex flex-col">
+                        <Label htmlFor={`quantity-${item.id}`} className="text-xs">Qty</Label>
+                        <Input
+                          id={`quantity-${item.id}`}
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleItemQuantityChange(item.id, e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        <Label htmlFor={`price-${item.id}`} className="text-xs">Price</Label>
+                        <Input
+                          id={`price-${item.id}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.price}
+                          onChange={(e) => handleItemPriceChange(item.id, e.target.value)}
+                          className="w-24"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        <Label className="text-xs">Total</Label>
+                        <div className="w-24 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded text-sm font-medium">
+                          ${parseFloat(item.total_amount || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      ${calculateTotal().toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -210,6 +295,14 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
           </DialogFooter>
         </form>
       </DialogContent>
+      
+      {/* Item Search Modal */}
+      <ItemSearchModal
+        open={isItemSearchOpen}
+        onClose={() => setIsItemSearchOpen(false)}
+        onSelectItem={handleAddItem}
+        selectedItems={saleItems}
+      />
     </Dialog>
   );
 }

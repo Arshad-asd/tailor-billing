@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Outlet, Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, Scissors, Package, Package2, Truck, DollarSign, BarChart3, Settings, Users, Bell, Search, User, Menu, X, ChevronLeft, ChevronRight, LogOut, ClipboardList, Receipt, ShoppingCart, Ruler, ChevronDown, UserCircle, Shield, HelpCircle } from 'lucide-react'
+import { LayoutDashboard, Scissors, Package, Package2, Truck, DollarSign, BarChart3, Settings, Users, Bell, Search, User, Menu, X, ChevronLeft, ChevronRight, LogOut, ClipboardList, Receipt, ShoppingCart, Ruler, ChevronDown, UserCircle, Shield, HelpCircle, FileText, Building2 } from 'lucide-react'
 import useTokenExpiry from "../hooks/useTokenExpiry"
 import LogoutModal from "../components/modals/LogoutModal"
 import { useSettings } from "../contexts/SettingsContext"
@@ -35,23 +35,17 @@ const AdminLayout = ({ children }) => {
       icon: ClipboardList,
       badge: "12",
     },
-    {
-      name: "Measurements",
-      href: "/admin/measurements",
-      icon: Ruler,
-      badge: "3",
-    },
+    // {
+    //   name: "Measurements",
+    //   href: "/admin/measurements",
+    //   icon: Ruler,
+    //   badge: "3",
+    // },
     {
       name: "Materials",
       href: "/admin/materials",
       icon: Package,
       badge: "8",
-    },
-    {
-      name: "Inventory",
-      href: "/admin/inventory",
-      icon: Package2,
-      badge: "5",
     },
     {
       name: "Delivery",
@@ -65,35 +59,52 @@ const AdminLayout = ({ children }) => {
       icon: DollarSign,
     },
     {
-      name: "Daily Report",
-      href: "/admin/daily-report",
-      icon: BarChart3,
-    },
-    {
-      name: "Purchase",
-      href: "/admin/purchase",
-      icon: ShoppingCart,
-    },
-    {
       name: "Receipt",
       href: "/admin/receipt",
       icon: Receipt,
     },
     {
-      name: "Services",
-      href: "/admin/services",
-      icon: Scissors,
+      name: "Daily Report",
+      href: "/admin/daily-report",
+      icon: BarChart3,
     },
+    {
+      name: "Reports",
+      href: "/admin/reports",
+      icon: FileText,
+    },
+    // {
+    //   name: "Purchase",
+    //   href: "/admin/purchase",
+    //   icon: ShoppingCart,
+    // },
+
+    {
+      name: "Inventory",
+      href: "/admin/inventory",
+      icon: Package2,
+      badge: "5",
+    },
+    // {
+    //   name: "Services",
+    //   href: "/admin/services",
+    //   icon: Scissors,
+    // },
     {
       name: "Customers",
       href: "/admin/customers",
       icon: Users,
     },
     {
-      name: "Settings",
-      href: "/admin/settings",
-      icon: Settings,
+      name: "Company Details",
+      href: "/admin/company-details",
+      icon: Building2,
     },
+    // {
+    //   name: "Settings",
+    //   href: "/admin/settings",
+    //   icon: Settings,
+    // },
   ]
 
   const isActiveRoute = (href, exact = false) => {
@@ -142,7 +153,7 @@ const AdminLayout = ({ children }) => {
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             {sidebarOpen && (
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
                   <Scissors className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -176,7 +187,7 @@ const AdminLayout = ({ children }) => {
                     flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200
                     ${
                       isActive
-                        ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+                        ? "bg-gradient-primary text-white shadow-md"
                         : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     }
                     ${!sidebarOpen ? "justify-center" : ""}
@@ -206,7 +217,7 @@ const AdminLayout = ({ children }) => {
               {/* Mobile Sidebar Header */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
                     <Scissors className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -233,7 +244,7 @@ const AdminLayout = ({ children }) => {
                         flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200
                         ${
                           isActive
-                            ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+                            ? "bg-gradient-primary text-white shadow-md"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         }
                       `}

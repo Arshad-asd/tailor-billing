@@ -3,20 +3,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
 
-export default function AddMaterialModal({ open, onClose, onSubmit }) {
+export default function AddMaterialModal({ open, onClose, onSubmit, loading = false }) {
   const [form, setForm] = useState({
     name: "",
-    category: "",
-    color: "",
-    quantity: "",
-    unit: "",
-    minStock: "",
+    thool: "",
+    kethet: "",
+    thool_kum: "",
+    ardh_f_kum: "",
+    jamba: "",
+    ragab: "",
     price: "",
-    supplier: "",
-    description: "",
   });
 
   const handleChange = (e) => {
@@ -24,43 +21,42 @@ export default function AddMaterialModal({ open, onClose, onSubmit }) {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const handleSelectChange = (name, value) => {
-    setForm((f) => ({ ...f, [name]: value }));
-  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const formData = {
       ...form,
-      quantity: parseInt(form.quantity) || 0,
-      minStock: parseInt(form.minStock) || 0,
+      thool: parseFloat(form.thool) || 0,
+      kethet: parseFloat(form.kethet) || 0,
+      thool_kum: parseFloat(form.thool_kum) || 0,
+      ardh_f_kum: parseFloat(form.ardh_f_kum) || 0,
+      jamba: parseFloat(form.jamba) || 0,
+      ragab: parseFloat(form.ragab) || 0,
       price: parseFloat(form.price) || 0,
     };
     onSubmit(formData);
     setForm({
       name: "",
-      category: "",
-      color: "",
-      quantity: "",
-      unit: "",
-      minStock: "",
+      thool: "",
+      kethet: "",
+      thool_kum: "",
+      ardh_f_kum: "",
+      jamba: "",
+      ragab: "",
       price: "",
-      supplier: "",
-      description: "",
     });
   };
 
   const handleClose = () => {
     setForm({
       name: "",
-      category: "",
-      color: "",
-      quantity: "",
-      unit: "",
-      minStock: "",
+      thool: "",
+      kethet: "",
+      thool_kum: "",
+      ardh_f_kum: "",
+      jamba: "",
+      ragab: "",
       price: "",
-      supplier: "",
-      description: "",
     });
     onClose();
   };
@@ -90,78 +86,7 @@ export default function AddMaterialModal({ open, onClose, onSubmit }) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Select value={form.category} onValueChange={(value) => handleSelectChange("category", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="Fabric" className="hover:bg-gray-100 dark:hover:bg-gray-700">Fabric</SelectItem>
-                  <SelectItem value="Hardware" className="hover:bg-gray-100 dark:hover:bg-gray-700">Hardware</SelectItem>
-                  <SelectItem value="Sewing" className="hover:bg-gray-100 dark:hover:bg-gray-700">Sewing</SelectItem>
-                  <SelectItem value="Accessories" className="hover:bg-gray-100 dark:hover:bg-gray-700">Accessories</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                name="color"
-                value={form.color}
-                onChange={handleChange}
-                placeholder="Enter color"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                name="quantity"
-                type="number"
-                value={form.quantity}
-                onChange={handleChange}
-                placeholder="Enter quantity"
-                required
-                min="0"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="unit">Unit</Label>
-              <Select value={form.unit} onValueChange={(value) => handleSelectChange("unit", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
-                  <SelectItem value="yards" className="hover:bg-gray-100 dark:hover:bg-gray-700">Yards</SelectItem>
-                  <SelectItem value="meters" className="hover:bg-gray-100 dark:hover:bg-gray-700">Meters</SelectItem>
-                  <SelectItem value="pieces" className="hover:bg-gray-100 dark:hover:bg-gray-700">Pieces</SelectItem>
-                  <SelectItem value="spools" className="hover:bg-gray-100 dark:hover:bg-gray-700">Spools</SelectItem>
-                  <SelectItem value="packs" className="hover:bg-gray-100 dark:hover:bg-gray-700">Packs</SelectItem>
-                  <SelectItem value="boxes" className="hover:bg-gray-100 dark:hover:bg-gray-700">Boxes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="minStock">Minimum Stock</Label>
-              <Input
-                id="minStock"
-                name="minStock"
-                type="number"
-                value={form.minStock}
-                onChange={handleChange}
-                placeholder="Enter minimum stock"
-                required
-                min="0"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="price">Price per Unit</Label>
+              <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
                 name="price"
@@ -176,35 +101,102 @@ export default function AddMaterialModal({ open, onClose, onSubmit }) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="supplier">Supplier</Label>
+              <Label htmlFor="thool">Thool</Label>
               <Input
-                id="supplier"
-                name="supplier"
-                value={form.supplier}
+                id="thool"
+                name="thool"
+                type="number"
+                step="0.01"
+                value={form.thool}
                 onChange={handleChange}
-                placeholder="Enter supplier name"
+                placeholder="Enter thool measurement"
+                required
+                min="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="kethet">Kethef</Label>
+              <Input
+                id="kethet"
+                name="kethet"
+                type="number"
+                step="0.01"
+                value={form.kethet}
+                onChange={handleChange}
+                placeholder="Enter kethet measurement"
+                required
+                min="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="thool_kum">Thool Kum</Label>
+              <Input
+                id="thool_kum"
+                name="thool_kum"
+                type="number"
+                step="0.01"
+                value={form.thool_kum}
+                onChange={handleChange}
+                placeholder="Enter thool kum measurement"
+                required
+                min="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ardh_f_kum">Ardh F. Kum</Label>
+              <Input
+                id="ardh_f_kum"
+                name="ardh_f_kum"
+                type="number"
+                step="0.01"
+                value={form.ardh_f_kum}
+                onChange={handleChange}
+                placeholder="Enter ardh f. kum measurement"
+                required
+                min="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="jamba">Jamba</Label>
+              <Input
+                id="jamba"
+                name="jamba"
+                type="number"
+                step="0.01"
+                value={form.jamba}
+                onChange={handleChange}
+                placeholder="Enter jamba measurement"
+                required
+                min="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ragab">Ragab</Label>
+              <Input
+                id="ragab"
+                name="ragab"
+                type="number"
+                step="0.01"
+                value={form.ragab}
+                onChange={handleChange}
+                placeholder="Enter ragab measurement"
+                required
+                min="0"
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Enter material description"
-              rows={3}
-            />
-          </div>
-
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit">
-              Add Material
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Material'}
             </Button>
           </DialogFooter>
         </form>

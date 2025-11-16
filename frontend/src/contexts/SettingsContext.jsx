@@ -14,6 +14,7 @@ export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({
     // Theme Settings
     theme: 'system', // 'light', 'dark', 'system'
+    colorTheme: 'orange', // 'orange', 'blue', 'green', 'purple', 'red'
     sidebarCollapsed: false,
     sidebarWidth: 256,
     
@@ -52,35 +53,7 @@ export const SettingsProvider = ({ children }) => {
     }
   }, []);
 
-  // Apply theme changes
-  useEffect(() => {
-    const root = document.documentElement;
-    
-    if (settings.theme === 'dark' || 
-        (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [settings.theme]);
-
-  // Listen for system theme changes
-  useEffect(() => {
-    if (settings.theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = () => {
-        const root = document.documentElement;
-        if (mediaQuery.matches) {
-          root.classList.add('dark');
-        } else {
-          root.classList.remove('dark');
-        }
-      };
-
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-  }, [settings.theme]);
+  // Theme changes are now handled by the ThemeProvider and useAppearance hook
 
   const updateSettings = (newSettings) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
@@ -108,6 +81,7 @@ export const SettingsProvider = ({ children }) => {
   const resetSettings = () => {
     const defaultSettings = {
       theme: 'system',
+      colorTheme: 'orange',
       sidebarCollapsed: false,
       sidebarWidth: 256,
       showNotifications: true,

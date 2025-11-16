@@ -1,100 +1,111 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Receipt as ReceiptIcon, DollarSign, CheckCircle, Clock, Download } from 'lucide-react';
+import AddReceiptModal from '../../components/modals/AddReceiptModal';
+import EditReceiptModal from '../../components/modals/EditReceiptModal';
+import { useNotification } from '../../hooks/useNotification';
+import receiptApi from '../../services/receiptApi';
 
 export default function ReceiptPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [receipts, setReceipts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingReceipt, setEditingReceipt] = useState(null);
+  const { showNotification } = useNotification();
 
-  const receipts = [
-    {
-      id: 'RCP-001',
-      customerName: 'Sarah Johnson',
-      jobOrderId: 'JO-001',
-      amount: 150.00,
-      date: '2024-01-20',
-      paymentMethod: 'Credit Card',
-      status: 'paid',
-      receiptNumber: 'RCP-2024-001'
-    },
-    {
-      id: 'RCP-002',
-      customerName: 'Mike Chen',
-      jobOrderId: 'JO-002',
-      amount: 300.00,
-      date: '2024-01-18',
-      paymentMethod: 'Cash',
-      status: 'paid',
-      receiptNumber: 'RCP-2024-002'
-    },
-    {
-      id: 'RCP-003',
-      customerName: 'Lisa Rodriguez',
-      jobOrderId: 'JO-003',
-      amount: 25.00,
-      date: '2024-01-22',
-      paymentMethod: 'Credit Card',
-      status: 'pending',
-      receiptNumber: 'RCP-2024-003'
-    },
-    {
-      id: 'RCP-004',
-      customerName: 'David Wilson',
-      jobOrderId: 'JO-004',
-      amount: 45.00,
-      date: '2024-01-24',
-      paymentMethod: 'Cash',
-      status: 'paid',
-      receiptNumber: 'RCP-2024-004'
-    },
-    {
-      id: 'RCP-005',
-      customerName: 'Emma Davis',
-      jobOrderId: 'JO-005',
-      amount: 75.00,
-      date: '2024-01-16',
-      paymentMethod: 'Credit Card',
-      status: 'paid',
-      receiptNumber: 'RCP-2024-005'
-    }
-  ];
+  // Fetch receipts on component mount
+  useEffect(() => {
+    fetchReceipts();
+  }, []);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const fetchReceipts = async () => {
+    setLoading(true);
+    try {
+      const response = await receiptApi.getReceipts();
+      // Handle both paginated and non-paginated responses
+      const receiptsData = response.results || response;
+      setReceipts(Array.isArray(receiptsData) ? receiptsData : []);
+    } catch (error) {
+      console.error('Error fetching receipts:', error);
+      showNotification('Error fetching receipts', 'error');
+      // Set empty array on error instead of mock data
+      setReceipts([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getPaymentMethodColor = (method) => {
-    switch (method) {
-      case 'Credit Card':
-        return 'bg-blue-100 text-blue-800';
-      case 'Cash':
-        return 'bg-green-100 text-green-800';
-      case 'Bank Transfer':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handleAddReceipt = async (receiptData) => {
+    try {
+      showNotification('Receipt created successfully!', 'success');
+      await fetchReceipts(); // Refresh the list
+    } catch (error) {
+      console.error('Error refreshing receipts:', error);
+      showNotification('Error refreshing receipts', 'error');
     }
   };
 
-  const filteredReceipts = receipts.filter(receipt => {
-    const matchesSearch = receipt.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.receiptNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || receipt.status === statusFilter;
+  const handleEditReceipt = async (receiptData, receiptId) => {
+    try {
+      showNotification('Receipt updated successfully!', 'success');
+      await fetchReceipts(); // Refresh the list
+    } catch (error) {
+      console.error('Error refreshing receipts:', error);
+      showNotification('Error refreshing receipts', 'error');
+    }
+  };
+
+  const handleDeleteReceipt = async (receiptId) => {
+    if (window.confirm('Are you sure you want to delete this receipt?')) {
+      try {
+        await receiptApi.deleteReceipt(receiptId);
+        showNotification('Receipt deleted successfully!', 'success');
+        await fetchReceipts(); // Refresh the list
+      } catch (error) {
+        console.error('Error deleting receipt:', error);
+        showNotification('Error deleting receipt', 'error');
+      }
+    }
+  };
+
+  const handleToggleStatus = async (receiptId) => {
+    try {
+      await receiptApi.toggleReceiptStatus(receiptId);
+      showNotification('Receipt status updated!', 'success');
+      await fetchReceipts(); // Refresh the list
+    } catch (error) {
+      console.error('Error toggling receipt status:', error);
+      showNotification('Error updating receipt status', 'error');
+    }
+  };
+
+  const getStatusColor = (isActive) => {
+    return isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  };
+
+  const getStatusText = (isActive) => {
+    return isActive ? 'Active' : 'Inactive';
+  };
+
+  // Ensure receipts is always an array
+  const receiptsArray = Array.isArray(receipts) ? receipts : [];
+
+  const filteredReceipts = receiptsArray.filter(receipt => {
+    const matchesSearch = receipt.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         receipt.receipt_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         receipt.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         receipt.receipt_remarks?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && receipt.is_active) ||
+                         (statusFilter === 'inactive' && !receipt.is_active);
     return matchesSearch && matchesStatus;
   });
 
-  const totalPaid = receipts.filter(r => r.status === 'paid').reduce((sum, r) => sum + r.amount, 0);
-  const pendingAmount = receipts.filter(r => r.status === 'pending').reduce((sum, r) => sum + r.amount, 0);
-  const totalReceipts = receipts.length;
+  const totalPaid = receiptsArray.filter(r => r.is_active).reduce((sum, r) => sum + parseFloat(r.receipt_amount || 0), 0);
+  const pendingAmount = receiptsArray.filter(r => !r.is_active).reduce((sum, r) => sum + parseFloat(r.receipt_amount || 0), 0);
+  const totalReceipts = receiptsArray.length;
 
   return (
     <div className="space-y-6">
@@ -104,7 +115,10 @@ export default function ReceiptPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Receipts</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage receipts and invoices</p>
         </div>
-        <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2">
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2"
+        >
           <Plus className="w-4 h-4" />
           <span>Generate Receipt</span>
         </button>
@@ -180,9 +194,8 @@ export default function ReceiptPage() {
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
             <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               <Filter className="w-4 h-4" />
@@ -213,7 +226,7 @@ export default function ReceiptPage() {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Payment Method
+                  Remarks
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
@@ -224,56 +237,111 @@ export default function ReceiptPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredReceipts.map((receipt) => (
-                <tr key={receipt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{receipt.receiptNumber}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{receipt.id}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{receipt.customerName}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">{receipt.jobOrderId}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">${receipt.amount.toFixed(2)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">{receipt.date}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentMethodColor(receipt.paymentMethod)}`}>
-                      {receipt.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(receipt.status)}`}>
-                      {receipt.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    Loading receipts...
                   </td>
                 </tr>
-              ))}
+              ) : filteredReceipts.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    No receipts found
+                  </td>
+                </tr>
+              ) : (
+                filteredReceipts.map((receipt) => (
+                  <tr key={receipt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{receipt.receipt_id}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">ID: {receipt.id}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{receipt.customer_name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">{receipt.job_order_number}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">${parseFloat(receipt.receipt_amount || 0).toFixed(2)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {receipt.receipt_date ? new Date(receipt.receipt_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {receipt.receipt_remarks || 'No remarks'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(receipt.is_active)}`}>
+                        {getStatusText(receipt.is_active)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button 
+                          onClick={() => {
+                            setEditingReceipt(receipt);
+                            setShowEditModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingReceipt(receipt);
+                            setShowEditModal(true);
+                          }}
+                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                          title="Edit Receipt"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(receipt.id)}
+                          className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+                          title="Toggle Status"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteReceipt(receipt.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          title="Delete Receipt"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modals */}
+      <AddReceiptModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleAddReceipt}
+      />
+
+      <EditReceiptModal
+        open={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingReceipt(null);
+        }}
+        onSubmit={handleEditReceipt}
+        editingReceipt={editingReceipt}
+      />
     </div>
   );
 } 

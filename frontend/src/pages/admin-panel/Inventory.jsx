@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Package,
   Plus,
@@ -19,8 +19,26 @@ import {
   Activity,
 } from "lucide-react"
 import InventoryCategoryModal from "../../components/modals/InventoryCategoryModal"
-import InventoryItemModal from "../../components/modals/InventoryItemModal"
+import AddInventoryItemModal from "../../components/modals/AddInventoryItemModal"
+import EditInventoryItemModal from "../../components/modals/EditInventoryItemModal"
 import InventoryStockMovementModal from "../../components/modals/InventoryStockMovementModal"
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getItems,
+  createItem,
+  updateItem,
+  deleteItem,
+  getStockMovements,
+  createStockMovement,
+  updateStockMovement,
+  deleteStockMovement,
+  adjustItemStock,
+  getLowStockAlerts
+} from "../../services/inventoryApi"
+import { useNotification } from "../../hooks/useNotification"
 
 const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("")
@@ -28,101 +46,59 @@ const Inventory = () => {
   const [sortBy, setSortBy] = useState("name")
   const [activeTab, setActiveTab] = useState("items") // "categories", "items", "stock"
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [editingCategory, setEditingCategory] = useState(null)
   const [editingMovement, setEditingMovement] = useState(null)
+  
+  // Data states
+  const [categories, setCategories] = useState([])
+  const [inventoryItems, setInventoryItems] = useState([])
+  const [stockMovements, setStockMovements] = useState([])
+  const [loading, setLoading] = useState(false)
+  
+  const { showNotification } = useNotification()
 
-  // Mock inventory data
-  const inventoryItems = [
-    {
-      id: 1,
-      name: "Premium Cotton Fabric",
-      category: "Fabric",
-      sku: "FAB-001",
-      quantity: 150,
-      unit: "yards",
-      minStock: 20,
-      cost: 12.50,
-      supplier: "Textile Corp",
-      lastUpdated: "2024-01-15",
-      status: "In Stock",
-    },
-    {
-      id: 2,
-      name: "Silk Thread",
-      category: "Thread",
-      sku: "THR-002",
-      quantity: 45,
-      unit: "spools",
-      minStock: 10,
-      cost: 8.75,
-      supplier: "Thread Masters",
-      lastUpdated: "2024-01-14",
-      status: "Low Stock",
-    },
-    {
-      id: 3,
-      name: "Zipper - Metal",
-      category: "Hardware",
-      sku: "HW-003",
-      quantity: 200,
-      unit: "pieces",
-      minStock: 50,
-      cost: 2.25,
-      supplier: "Hardware Plus",
-      lastUpdated: "2024-01-13",
-      status: "In Stock",
-    },
-    {
-      id: 4,
-      name: "Buttons - Pearl",
-      category: "Hardware",
-      sku: "HW-004",
-      quantity: 8,
-      unit: "packets",
-      minStock: 15,
-      cost: 15.00,
-      supplier: "Button World",
-      lastUpdated: "2024-01-12",
-      status: "Out of Stock",
-    },
-    {
-      id: 5,
-      name: "Linen Fabric",
-      category: "Fabric",
-      sku: "FAB-005",
-      quantity: 75,
-      unit: "yards",
-      minStock: 25,
-      cost: 18.50,
-      supplier: "Textile Corp",
-      lastUpdated: "2024-01-11",
-      status: "In Stock",
-    },
-  ]
+  // Load data on component mount and when activeTab changes
+  useEffect(() => {
+    loadData()
+  }, [activeTab])
 
-  // Mock categories data
-  const categories = [
-    { id: 1, name: "Fabric", itemCount: 2, description: "Various fabric materials" },
-    { id: 2, name: "Thread", itemCount: 1, description: "Sewing threads and yarns" },
-    { id: 3, name: "Hardware", itemCount: 2, description: "Zippers, buttons, and other hardware" },
-    { id: 4, name: "Tools", itemCount: 0, description: "Sewing and cutting tools" },
-    { id: 5, name: "Accessories", itemCount: 0, description: "Decorative accessories" },
-  ]
-
-  // Mock stock movement data
-  const stockMovements = [
-    { id: 1, itemName: "Premium Cotton Fabric", type: "In", quantity: 50, date: "2024-01-15", reason: "Purchase" },
-    { id: 2, itemName: "Silk Thread", type: "Out", quantity: 10, date: "2024-01-14", reason: "Production" },
-    { id: 3, itemName: "Zipper - Metal", type: "In", quantity: 100, date: "2024-01-13", reason: "Purchase" },
-    { id: 4, itemName: "Buttons - Pearl", type: "Out", quantity: 5, date: "2024-01-12", reason: "Production" },
-    { id: 5, itemName: "Linen Fabric", type: "In", quantity: 25, date: "2024-01-11", reason: "Purchase" },
-  ]
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      if (activeTab === "categories") {
+        const categoriesData = await getCategories()
+        setCategories(categoriesData.results || categoriesData)
+      } else if (activeTab === "items") {
+        const [itemsData, categoriesData] = await Promise.all([
+          getItems(),
+          getCategories()
+        ])
+        setInventoryItems(itemsData.results || itemsData)
+        setCategories(categoriesData.results || categoriesData)
+      } else if (activeTab === "stock") {
+        const [movementsData, itemsData] = await Promise.all([
+          getStockMovements(),
+          getItems()
+        ])
+        setStockMovements(movementsData.results || movementsData)
+        setInventoryItems(itemsData.results || itemsData)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+      showNotification('Error loading data', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
+    const matchesCategory = selectedCategory === "all" || 
+                           (item.category_name && item.category_name === selectedCategory) ||
+                           (item.category && typeof item.category === 'object' && item.category.name === selectedCategory)
     return matchesSearch && matchesCategory
   })
 
@@ -158,6 +134,7 @@ const Inventory = () => {
 
   const handleCloseModal = () => {
     setShowCreateModal(false)
+    setShowEditModal(false)
     setEditingItem(null)
     setEditingCategory(null)
     setEditingMovement(null)
@@ -168,9 +145,20 @@ const Inventory = () => {
     setShowCreateModal(true)
   }
 
-  const handleEditItem = (item) => {
+  const handleEditItem = async (item) => {
+    // Ensure categories are loaded before opening edit modal
+    if (categories.length === 0) {
+      try {
+        const categoriesData = await getCategories()
+        setCategories(categoriesData.results || categoriesData)
+      } catch (error) {
+        console.error('Error loading categories for edit:', error)
+        showNotification('Error loading categories', 'error')
+        return
+      }
+    }
     setEditingItem(item)
-    setShowCreateModal(true)
+    setShowEditModal(true)
   }
 
   const handleEditMovement = (movement) => {
@@ -178,22 +166,62 @@ const Inventory = () => {
     setShowCreateModal(true)
   }
 
-  const handleSubmitCategory = (formData, categoryId) => {
-    console.log("Category submitted:", formData, categoryId)
-    // TODO: Implement API call
-    handleCloseModal()
+  const handleSubmitCategory = async (formData, categoryId) => {
+    try {
+      if (categoryId) {
+        await updateCategory(categoryId, formData)
+        showNotification('Category updated successfully', 'success')
+      } else {
+        await createCategory(formData)
+        showNotification('Category created successfully', 'success')
+      }
+      loadData()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error saving category:', error)
+      showNotification('Error saving category', 'error')
+    }
   }
 
-  const handleSubmitItem = (formData, itemId) => {
-    console.log("Item submitted:", formData, itemId)
-    // TODO: Implement API call
-    handleCloseModal()
+  const handleSubmitItem = async (formData) => {
+    try {
+      await createItem(formData)
+      showNotification('Item created successfully', 'success')
+      loadData()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error creating item:', error)
+      showNotification('Error creating item', 'error')
+    }
   }
 
-  const handleSubmitMovement = (formData, movementId) => {
-    console.log("Movement submitted:", formData, movementId)
-    // TODO: Implement API call
-    handleCloseModal()
+  const handleUpdateItem = async (formData, itemId) => {
+    try {
+      await updateItem(itemId, formData)
+      showNotification('Item updated successfully', 'success')
+      loadData()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error updating item:', error)
+      showNotification('Error updating item', 'error')
+    }
+  }
+
+  const handleSubmitMovement = async (formData, movementId) => {
+    try {
+      if (movementId) {
+        await updateStockMovement(movementId, formData)
+        showNotification('Stock movement updated successfully', 'success')
+      } else {
+        await createStockMovement(formData)
+        showNotification('Stock movement created successfully', 'success')
+      }
+      loadData()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error saving stock movement:', error)
+      showNotification('Error saving stock movement', 'error')
+    }
   }
 
   const renderCategoriesContent = () => (
@@ -317,16 +345,16 @@ const Inventory = () => {
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Stock Level
+                  Current Stock
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Cost
+                  Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Last Updated
+                  ID
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Actions
@@ -356,36 +384,42 @@ const Inventory = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <Tag className="w-4 h-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-900 dark:text-white">{item.category}</span>
+                      <span className="text-sm text-gray-900 dark:text-white">
+                        {item.category_name || (item.category && item.category.name) || 'No Category'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm">
-                      <span className={`font-medium ${getStockLevelColor(item.quantity, item.minStock)}`}>
-                        {item.quantity} {item.unit}
+                      <span className={`font-medium ${getStockLevelColor(item.current_stock || 0, 0)}`}>
+                        {item.current_stock || 0} {item.unit}
                       </span>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Min: {item.minStock} {item.unit}
+                        {item.is_active ? 'Active' : 'Inactive'}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      ${item.cost.toFixed(2)}
+                      {item.is_raw_material ? 'Raw Material' : 'Final Product'}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Total: ${(item.cost * item.quantity).toFixed(2)}
+                      SKU: {item.sku}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                      {item.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      item.is_active 
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                        : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                    }`}>
+                      {item.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                       <Calendar className="w-4 h-4 mr-2" />
-                      {new Date(item.lastUpdated).toLocaleDateString()}
+                      {item.id ? `ID: ${item.id}` : 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -452,7 +486,7 @@ const Inventory = () => {
                   Quantity
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Reason
+                  Reference
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Date
@@ -467,12 +501,15 @@ const Inventory = () => {
                 <tr key={movement.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {movement.itemName}
+                      {movement.item_name || (movement.item && movement.item.name) || 'Unknown Item'}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      SKU: {movement.item_sku || (movement.item && movement.item.sku) || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMovementTypeColor(movement.type)}`}>
-                      {movement.type}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMovementTypeColor(movement.movement_type)}`}>
+                      {movement.movement_type_display || movement.movement_type}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -482,8 +519,13 @@ const Inventory = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {movement.reason}
+                      {movement.reference || 'No Reference'}
                     </div>
+                    {movement.remarks && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {movement.remarks}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
@@ -594,9 +636,9 @@ const Inventory = () => {
                 <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Stock</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Items</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {inventoryItems.filter(item => item.status === "In Stock").length}
+                  {inventoryItems.filter(item => item.is_active).length}
                 </p>
               </div>
             </div>
@@ -608,9 +650,9 @@ const Inventory = () => {
                 <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Low Stock</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Raw Materials</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {inventoryItems.filter(item => item.status === "Low Stock").length}
+                  {inventoryItems.filter(item => item.is_raw_material).length}
                 </p>
               </div>
             </div>
@@ -622,9 +664,9 @@ const Inventory = () => {
                 <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Out of Stock</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Final Products</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {inventoryItems.filter(item => item.status === "Out of Stock").length}
+                  {inventoryItems.filter(item => !item.is_raw_material).length}
                 </p>
               </div>
             </div>
@@ -632,10 +674,18 @@ const Inventory = () => {
         </div>
       )}
 
+      {/* Loading State */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+        </div>
+      )}
+
       {/* Content based on active tab */}
-      {activeTab === "categories" && renderCategoriesContent()}
-      {activeTab === "items" && renderItemsContent()}
-      {activeTab === "stock" && renderStockContent()}
+      {!loading && activeTab === "categories" && renderCategoriesContent()}
+      {!loading && activeTab === "items" && renderItemsContent()}
+      {!loading && activeTab === "stock" && renderStockContent()}
 
       {/* Modals */}
       {activeTab === "categories" && (
@@ -648,13 +698,21 @@ const Inventory = () => {
       )}
 
       {activeTab === "items" && (
-        <InventoryItemModal
-          open={showCreateModal}
-          onClose={handleCloseModal}
-          onSubmit={handleSubmitItem}
-          editingItem={editingItem}
-          categories={categories}
-        />
+        <>
+          <AddInventoryItemModal
+            open={showCreateModal}
+            onClose={handleCloseModal}
+            onSubmit={handleSubmitItem}
+            categories={categories}
+          />
+          <EditInventoryItemModal
+            open={showEditModal}
+            onClose={handleCloseModal}
+            onSubmit={handleUpdateItem}
+            editingItem={editingItem}
+            categories={categories}
+          />
+        </>
       )}
 
       {activeTab === "stock" && (

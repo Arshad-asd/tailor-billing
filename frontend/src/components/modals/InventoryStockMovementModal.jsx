@@ -8,32 +8,29 @@ import { Textarea } from "../ui/textarea";
 
 export default function InventoryStockMovementModal({ open, onClose, onSubmit, editingMovement = null, inventoryItems = [] }) {
   const [form, setForm] = useState({
-    itemId: "",
-    type: "",
+    item: "",
     quantity: "",
-    reason: "",
-    notes: "",
-    date: "",
+    movement_type: "",
+    reference: "",
+    remarks: "",
   });
 
   useEffect(() => {
     if (editingMovement) {
       setForm({
-        itemId: editingMovement.itemId?.toString() || "",
-        type: editingMovement.type || "",
+        item: editingMovement.item?.toString() || "",
         quantity: editingMovement.quantity?.toString() || "",
-        reason: editingMovement.reason || "",
-        notes: editingMovement.notes || "",
-        date: editingMovement.date || new Date().toISOString().split('T')[0],
+        movement_type: editingMovement.movement_type || "",
+        reference: editingMovement.reference || "",
+        remarks: editingMovement.remarks || "",
       });
     } else {
       setForm({
-        itemId: "",
-        type: "",
+        item: "",
         quantity: "",
-        reason: "",
-        notes: "",
-        date: new Date().toISOString().split('T')[0],
+        movement_type: "",
+        reference: "",
+        remarks: "",
       });
     }
   }, [editingMovement, open]);
@@ -51,16 +48,16 @@ export default function InventoryStockMovementModal({ open, onClose, onSubmit, e
     e.preventDefault();
     const formData = {
       ...form,
-      quantity: parseInt(form.quantity) || 0,
+      item: parseInt(form.item) || null,
+      quantity: parseFloat(form.quantity) || 0,
     };
     onSubmit(formData, editingMovement?.id);
     setForm({
-      itemId: "",
-      type: "",
+      item: "",
       quantity: "",
-      reason: "",
-      notes: "",
-      date: new Date().toISOString().split('T')[0],
+      movement_type: "",
+      reference: "",
+      remarks: "",
     });
   };
 
@@ -84,8 +81,8 @@ export default function InventoryStockMovementModal({ open, onClose, onSubmit, e
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="itemId">Item</Label>
-              <Select value={form.itemId} onValueChange={(value) => handleSelectChange("itemId", value)}>
+              <Label htmlFor="item">Item</Label>
+              <Select value={form.item} onValueChange={(value) => handleSelectChange("item", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select item" />
                 </SelectTrigger>
@@ -100,14 +97,15 @@ export default function InventoryStockMovementModal({ open, onClose, onSubmit, e
             </div>
             
             <div className="flex flex-col gap-2">
-              <Label htmlFor="type">Movement Type</Label>
-              <Select value={form.type} onValueChange={(value) => handleSelectChange("type", value)}>
+              <Label htmlFor="movement_type">Movement Type</Label>
+              <Select value={form.movement_type} onValueChange={(value) => handleSelectChange("movement_type", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999]">
-                  <SelectItem value="In">Stock In</SelectItem>
-                  <SelectItem value="Out">Stock Out</SelectItem>
+                  <SelectItem value="IN">Stock In</SelectItem>
+                  <SelectItem value="OUT">Stock Out</SelectItem>
+                  <SelectItem value="ADJUST">Adjustment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -118,7 +116,8 @@ export default function InventoryStockMovementModal({ open, onClose, onSubmit, e
                 id="quantity" 
                 name="quantity" 
                 type="number"
-                placeholder="0" 
+                step="0.01"
+                placeholder="0.00" 
                 value={form.quantity} 
                 onChange={handleChange} 
                 required 
@@ -126,43 +125,24 @@ export default function InventoryStockMovementModal({ open, onClose, onSubmit, e
             </div>
             
             <div className="flex flex-col gap-2">
-              <Label htmlFor="reason">Reason</Label>
-              <Select value={form.reason} onValueChange={(value) => handleSelectChange("reason", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select reason" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999]">
-                  <SelectItem value="Purchase">Purchase</SelectItem>
-                  <SelectItem value="Production">Production</SelectItem>
-                  <SelectItem value="Return">Return</SelectItem>
-                  <SelectItem value="Adjustment">Adjustment</SelectItem>
-                  <SelectItem value="Damage">Damage</SelectItem>
-                  <SelectItem value="Transfer">Transfer</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="reference">Reference</Label>
               <Input 
-                id="date" 
-                name="date" 
-                type="date"
-                value={form.date} 
-                onChange={handleChange} 
-                required 
+                id="reference" 
+                name="reference" 
+                placeholder="e.g. PO-001, Job-123, Manual Adjustment"
+                value={form.reference} 
+                onChange={handleChange}
               />
             </div>
           </div>
           
           <div className="flex flex-col gap-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="remarks">Remarks</Label>
             <Textarea 
-              id="notes" 
-              name="notes" 
-              placeholder="Additional notes about this movement..."
-              value={form.notes} 
+              id="remarks" 
+              name="remarks" 
+              placeholder="Additional remarks about this movement..."
+              value={form.remarks} 
               onChange={handleChange}
               rows={3}
             />

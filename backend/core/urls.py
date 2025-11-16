@@ -21,8 +21,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # API URLs
     path('api/', include('apps.users.urls')),
-    # path('api/job-orders/', include('apps.joborder.urls')),
-    # path('api/inventory/', include('apps.inventory.urls')),
+    path('api/crm/', include('apps.crm.urls')),
+    path('api/job-orders/', include('apps.joborder.urls')),
+    path('api/inventory/', include('apps.inventory.urls')),
+    path('api/receipts/', include('apps.receipt.urls')),
+    path('api/materials/', include('apps.materials.urls')),
+    path('api/sales/', include('apps.sale.urls')),
+    path('api/master/', include('apps.master.urls')),
     # path('api/transactions/', include('apps.transactions.urls')),
     # path('api/services/', include('apps.service.urls')),
 ]

@@ -5,7 +5,10 @@ export { default as api, setAuthToken, setRefreshToken, clearAuthTokens } from '
 export { authAPI, userAPI, refreshAuthToken } from './authApi';
 
 // Export job orders API
-export { jobOrderAPI } from './jobOrdersApi';
+export { jobOrdersApi } from './jobOrdersApi';
+
+// Export delivery API
+export { deliveryApi } from './deliveryApi';
 
 // Export inventory API
 export { inventoryAPI } from './inventoryApi';
@@ -14,4 +17,7 @@ export { inventoryAPI } from './inventoryApi';
 export { transactionAPI } from './transactionsApi';
 
 // Export services API
-export { serviceAPI } from './servicesApi'; 
+export { serviceAPI } from './servicesApi';
+
+// Export sales API
+export { salesAPI } from './salesApi'; 

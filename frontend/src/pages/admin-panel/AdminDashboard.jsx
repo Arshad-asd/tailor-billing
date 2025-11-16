@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table"
 import { Badge } from "../../components/ui/badge"
 import { Button } from "../../components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu"
+import { jobOrdersApi } from "../../services/jobOrdersApi"
+import LoadingSpinner from "../../components/LoadingSpinner"
 import {
   Scissors,
   Users,
@@ -33,13 +35,51 @@ import {
 
 const AdminDashboard = () => {
   const [timeRange, setTimeRange] = useState("7d")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [stats, setStats] = useState({
+    total_orders: 0,
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
+    delivered: 0,
+    total_revenue: 0,
+    total_balance: 0,
+  })
+  const [recentJobOrders, setRecentJobOrders] = useState([])
 
-  // Mock data for tailoring business
-  const stats = [
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Fetch stats and recent job orders in parallel
+        const [statsResponse, recentResponse] = await Promise.all([
+          jobOrdersApi.getJobOrderStats(),
+          jobOrdersApi.getRecentJobOrders(5)
+        ])
+        
+        setStats(statsResponse)
+        setRecentJobOrders(recentResponse)
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+        setError('Failed to load dashboard data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [timeRange])
+
+  // Transform stats data for display
+  const statsData = [
     {
       title: "Total Job Orders",
-      value: "156",
-      change: "+18%",
+      value: stats.total_orders?.toString() || "0",
+      change: "+18%", // This would need to be calculated from historical data
       trend: "up",
       icon: Scissors,
       color: "text-blue-600",
@@ -47,7 +87,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Active Customers",
-      value: "89",
+      value: "89", // This would need to come from customer API
       change: "+12%",
       trend: "up",
       icon: Users,
@@ -55,8 +95,8 @@ const AdminDashboard = () => {
       bgColor: "bg-green-100",
     },
     {
-      title: "Monthly Revenue",
-      value: "$12,450",
+      title: "Total Revenue",
+      value: `$${stats.total_revenue?.toFixed(2) || "0.00"}`,
       change: "+25%",
       trend: "up",
       icon: DollarSign,
@@ -65,7 +105,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Pending Orders",
-      value: "23",
+      value: stats.pending?.toString() || "0",
       change: "-5%",
       trend: "down",
       icon: Clock,
@@ -74,64 +114,12 @@ const AdminDashboard = () => {
     },
   ]
 
-  const recentJobOrders = [
-    {
-      id: "JO-001",
-      customerName: "AYMAN HASHIM MOHAMED",
-      service: "Jalabiya",
-      status: "in-progress",
-      price: 150.00,
-      dueDate: "2025-07-05",
-      priority: "high",
-      measurements: "Complete",
-    },
-    {
-      id: "JO-002",
-      customerName: "Sarah Johnson",
-      service: "Wedding Dress Alterations",
-      status: "completed",
-      price: 300.00,
-      dueDate: "2025-07-01",
-      priority: "medium",
-      measurements: "Complete",
-    },
-    {
-      id: "JO-003",
-      customerName: "Mike Chen",
-      service: "Custom Suit",
-      status: "pending",
-      price: 800.00,
-      dueDate: "2025-07-10",
-      priority: "high",
-      measurements: "Pending",
-    },
-    {
-      id: "JO-004",
-      customerName: "Lisa Rodriguez",
-      service: "Pants Alterations",
-      status: "completed",
-      price: 25.00,
-      dueDate: "2025-06-28",
-      priority: "low",
-      measurements: "Complete",
-    },
-    {
-      id: "JO-005",
-      customerName: "David Wilson",
-      service: "Jacket Repairs",
-      status: "in-progress",
-      price: 45.00,
-      dueDate: "2025-07-03",
-      priority: "medium",
-      measurements: "Complete",
-    },
-  ]
-
   const getStatusBadge = (status) => {
     const variants = {
       completed: "bg-green-100 text-green-800",
       "in-progress": "bg-blue-100 text-blue-800",
       pending: "bg-yellow-100 text-yellow-800",
+      delivered: "bg-purple-100 text-purple-800",
     }
     return variants[status] || "bg-gray-100 text-gray-800"
   }
@@ -153,9 +141,36 @@ const AdminDashboard = () => {
         return <Clock className="w-4 h-4" />;
       case 'pending':
         return <AlertCircle className="w-4 h-4" />;
+      case 'delivered':
+        return <Truck className="w-4 h-4" />;
       default:
         return <Clock className="w-4 h-4" />;
     }
+  }
+
+  // Show loading spinner
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  // Show error message
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Error Loading Dashboard</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -187,7 +202,7 @@ const AdminDashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {statsData.map((stat, index) => {
           const Icon = stat.icon
           return (
             <Card key={index} className="hover:shadow-lg transition-shadow">
@@ -251,70 +266,89 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentJobOrders.map((jobOrder) => (
-                    <TableRow key={jobOrder.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{jobOrder.id}</div>
-                          <div className="text-sm text-gray-500">Due {jobOrder.dueDate}</div>
+                  {recentJobOrders.length > 0 ? (
+                    recentJobOrders.map((jobOrder) => (
+                      <TableRow key={jobOrder.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{jobOrder.job_order_number}</div>
+                            <div className="text-sm text-gray-500">
+                              Due {new Date(jobOrder.delivery_date).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{jobOrder.customer_name}</div>
+                          <div className="text-sm text-gray-500">{jobOrder.customer_phone}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {jobOrder.job_order_items?.length > 0 
+                              ? jobOrder.job_order_items.map(item => item.material_name).join(', ')
+                              : 'No items'
+                            }
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusBadge(jobOrder.status)}>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(jobOrder.status)}
+                              <span className="capitalize">{jobOrder.status.replace('_', ' ')}</span>
+                            </div>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-gray-100 text-gray-800">
+                            {jobOrder.balance_amount > 0 ? 'Outstanding' : 'Paid'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">${parseFloat(jobOrder.total_amount).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">{new Date(jobOrder.delivery_date).toLocaleDateString()}</div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Ruler className="w-4 h-4 mr-2" />
+                                View Measurements
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Order
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Print Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Cancel Order
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <div className="text-gray-500">
+                          <Scissors className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No job orders found</p>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{jobOrder.customerName}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{jobOrder.service}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusBadge(jobOrder.status)}>
-                          <div className="flex items-center space-x-1">
-                            {getStatusIcon(jobOrder.status)}
-                            <span className="capitalize">{jobOrder.status.replace('-', ' ')}</span>
-                          </div>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getPriorityBadge(jobOrder.priority)}>
-                          {jobOrder.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">${jobOrder.price.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">{jobOrder.dueDate}</div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Ruler className="w-4 h-4 mr-2" />
-                              View Measurements
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Order
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Print Invoice
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Cancel Order
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -331,44 +365,44 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Scissors className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-medium">Today's Orders</span>
+                <span className="text-sm font-medium">Total Orders</span>
               </div>
-              <Badge className="bg-blue-100 text-blue-800">12</Badge>
+              <Badge className="bg-blue-100 text-blue-800">{stats.total_orders}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4 text-yellow-500" />
                 <span className="text-sm font-medium">Pending Orders</span>
               </div>
-              <Badge className="bg-yellow-100 text-yellow-800">23</Badge>
+              <Badge className="bg-yellow-100 text-yellow-800">{stats.pending}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Completed Today</span>
+                <span className="text-sm font-medium">Completed Orders</span>
               </div>
-              <Badge className="bg-green-100 text-green-800">8</Badge>
+              <Badge className="bg-green-100 text-green-800">{stats.completed}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <DollarSign className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-medium">Today's Revenue</span>
+                <Truck className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-medium">Delivered Orders</span>
               </div>
-              <span className="text-sm font-medium">$1,250</span>
+              <Badge className="bg-purple-100 text-purple-800">{stats.delivered}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-indigo-500" />
-                <span className="text-sm font-medium">New Customers</span>
+                <DollarSign className="w-4 h-4 text-green-500" />
+                <span className="text-sm font-medium">Total Revenue</span>
               </div>
-              <Badge className="bg-indigo-100 text-indigo-800">5</Badge>
+              <span className="text-sm font-medium">${stats.total_revenue?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Package className="w-4 h-4 text-orange-500" />
-                <span className="text-sm font-medium">Materials Used</span>
+                <CreditCard className="w-4 h-4 text-orange-500" />
+                <span className="text-sm font-medium">Outstanding Balance</span>
               </div>
-              <span className="text-sm font-medium">15 units</span>
+              <span className="text-sm font-medium">${stats.total_balance?.toFixed(2) || '0.00'}</span>
             </div>
           </CardContent>
         </Card>
