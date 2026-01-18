@@ -17,7 +17,8 @@ class MaterialSerializer(serializers.ModelSerializer):
             'price',
             'created_at',
             'updated_at',
-            'is_active'
+            'is_active',
+            'is_measurement_required'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -68,3 +69,22 @@ class MaterialSerializer(serializers.ModelSerializer):
         if value is not None and value < 0:
             raise serializers.ValidationError("Ragab measurement cannot be negative")
         return value
+
+    def validate(self, data):
+        """Validate that measurements are provided if is_measurement_required is True"""
+        is_measurement_required = data.get('is_measurement_required', False)
+        
+        if is_measurement_required:
+            measurement_fields = ['thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab']
+            missing_fields = []
+            
+            for field in measurement_fields:
+                if field not in data or data[field] is None:
+                    missing_fields.append(field)
+            
+            if missing_fields:
+                raise serializers.ValidationError(
+                    f"Measurement fields are required when is_measurement_required is True: {', '.join(missing_fields)}"
+                )
+        
+        return data

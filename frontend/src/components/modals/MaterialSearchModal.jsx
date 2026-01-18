@@ -3,7 +3,7 @@ import { Search, Plus, Edit, X, Package, DollarSign, CheckCircle, Ruler } from '
 import materialsApi from '../../services/materialsApi';
 import { formatCurrency } from '../../utils/currencyUtils';
 
-export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial, onEditMaterial, onCreateMaterial }) {
+export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial, onEditMaterial, onCreateMaterial, filterByMeasurementRequired = null }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -15,14 +15,23 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
     if (isOpen) {
       loadMaterials();
     }
-  }, [isOpen]);
+  }, [isOpen, filterByMeasurementRequired]);
 
   const loadMaterials = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await materialsApi.getActiveMaterials();
-      setMaterials(data || []);
+      const params = { is_active: true };
+      if (filterByMeasurementRequired !== null) {
+        params.is_measurement_required = filterByMeasurementRequired;
+      }
+      const data = await materialsApi.getMaterials(params);
+      // Filter materials client-side if needed (as backup)
+      let filteredData = data || [];
+      if (filterByMeasurementRequired !== null) {
+        filteredData = filteredData.filter(m => m.is_measurement_required === filterByMeasurementRequired);
+      }
+      setMaterials(filteredData);
     } catch (error) {
       console.error('Error loading materials:', error);
       if (error.response?.status === 404) {
@@ -44,13 +53,23 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
     setError(null);
     
     try {
+      let data = [];
       if (query.trim() === '') {
-        const data = await materialsApi.getActiveMaterials();
-        setMaterials(data || []);
+        const params = { is_active: true };
+        if (filterByMeasurementRequired !== null) {
+          params.is_measurement_required = filterByMeasurementRequired;
+        }
+        data = await materialsApi.getMaterials(params);
       } else {
-        const data = await materialsApi.searchMaterials(query);
-        setMaterials(data || []);
+        data = await materialsApi.searchMaterials(query);
       }
+      
+      // Filter materials client-side if needed
+      if (filterByMeasurementRequired !== null) {
+        data = data.filter(m => m.is_measurement_required === filterByMeasurementRequired);
+      }
+      
+      setMaterials(data || []);
     } catch (error) {
       console.error('Error searching materials:', error);
       if (error.response?.status === 404) {
@@ -64,7 +83,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterByMeasurementRequired]);
 
   // Debounced search effect
   useEffect(() => {
@@ -112,7 +131,13 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Search Materials</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Select materials for measurements</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {filterByMeasurementRequired === true 
+                ? 'Select materials that require measurements' 
+                : filterByMeasurementRequired === false
+                ? 'Select materials for bill items (no measurements required)'
+                : 'Select materials'}
+            </p>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -218,11 +243,15 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
                         <div>
                           <h3 className="font-medium text-gray-900 dark:text-white">{material.name}</h3>
                           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            <span className="flex items-center space-x-1">
-                              <Ruler className="w-3 h-3" />
-                              <span>Thool: {material.thool}</span>
-                            </span>
-                            <span>Kethef: {material.kethet}</span>
+                            {material.is_measurement_required && (
+                              <>
+                                <span className="flex items-center space-x-1">
+                                  <Ruler className="w-3 h-3" />
+                                  <span>Thool: {material.thool ?? 'N/A'}</span>
+                                </span>
+                                <span>Kethef: {material.kethet ?? 'N/A'}</span>
+                              </>
+                            )}
                             <span>Price: {formatCurrency(material.price)}</span>
                           </div>
                         </div>
@@ -235,7 +264,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
                           <span className="text-green-600 font-medium">{formatCurrency(material.price)}</span>
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Measurements available
+                          {material.is_measurement_required ? 'Measurements available' : 'No measurements required'}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -262,35 +291,37 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
                     </div>
                   </div>
                   
-                  {/* Material Measurements Details */}
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                    <div className="grid grid-cols-6 gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <div className="text-center">
-                        <div className="font-medium">Thool</div>
-                        <div>{material.thool}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">Kethef</div>
-                        <div>{material.kethet}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">Thool Kum</div>
-                        <div>{material.thool_kum}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">Ardh F Kum</div>
-                        <div>{material.ardh_f_kum}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">Jamba</div>
-                        <div>{material.jamba}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium">Ragab</div>
-                        <div>{material.ragab}</div>
+                  {/* Material Measurements Details - Only show if measurement is required */}
+                  {material.is_measurement_required && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      <div className="grid grid-cols-6 gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <div className="text-center">
+                          <div className="font-medium">Thool</div>
+                          <div>{material.thool ?? 'N/A'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">Kethef</div>
+                          <div>{material.kethet ?? 'N/A'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">Thool Kum</div>
+                          <div>{material.thool_kum ?? 'N/A'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">Ardh F Kum</div>
+                          <div>{material.ardh_f_kum ?? 'N/A'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">Jamba</div>
+                          <div>{material.jamba ?? 'N/A'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">Ragab</div>
+                          <div>{material.ragab ?? 'N/A'}</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>

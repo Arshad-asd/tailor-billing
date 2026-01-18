@@ -27,7 +27,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
     serializer_class = MaterialSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['is_active', 'name']
+    filterset_fields = ['is_active', 'name', 'is_measurement_required']
     search_fields = ['name']
     ordering_fields = ['created_at', 'updated_at', 'name', 'price']
     ordering = ['-created_at']
@@ -80,6 +80,11 @@ class MaterialViewSet(viewsets.ModelViewSet):
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        # Filter by measurement required status if requested
+        is_measurement_required = self.request.query_params.get('is_measurement_required', None)
+        if is_measurement_required is not None:
+            queryset = queryset.filter(is_measurement_required=is_measurement_required.lower() == 'true')
             
         return queryset
 

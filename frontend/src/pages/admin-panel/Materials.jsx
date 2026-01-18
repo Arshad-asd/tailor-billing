@@ -1043,14 +1043,38 @@ export default function Materials() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{material.name}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">ID: {material.id}</div>
+                        {material.is_measurement_required !== undefined && (
+                          <div className="mt-1">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                material.is_measurement_required
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                              }`}
+                            >
+                              {material.is_measurement_required ? "Measurement Required" : "No Measurement"}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          Thool: {material.thool} | Kethef: {material.kethet}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          ThoolKum: {material.thool_kum} | ArdhF.Kum: {material.ardh_f_kum}
-                        </div>
+                        {material.is_measurement_required ? (
+                          <>
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              Thool: {material.thool ?? "N/A"} | Kethef: {material.kethet ?? "N/A"}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              ThoolKum: {material.thool_kum ?? "N/A"} | ArdhF.Kum: {material.ardh_f_kum ?? "N/A"}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              Jamba: {material.jamba ?? "N/A"} | Ragab: {material.ragab ?? "N/A"}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                            Measurements not required
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">

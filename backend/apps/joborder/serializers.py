@@ -340,7 +340,7 @@ class JobOrderListSerializer(serializers.ModelSerializer):
     
     def get_job_order_measurements(self, obj):
         measurements = obj.jobordermeasurement_set.filter(is_active=True)
-        return JobOrderMeasurementReadSerializer(measurements, many=True).data
+        return JobOrderMeasurementSerializer(measurements, many=True).data
     
     def get_job_order_items(self, obj):
         items = obj.joborderitem_set.filter(is_active=True)

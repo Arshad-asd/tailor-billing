@@ -86,21 +86,44 @@ export default function JobOrders() {
   }
 
   const mapToA5 = (order) => {
-    const amount = safeParseFloat(order?.total_amount ?? 0)
+    const totalAmount = safeParseFloat(order?.total_amount ?? 0)
+    const advanceAmount = safeParseFloat(order?.advance_amount ?? 0)
+    const balanceAmount = safeParseFloat(order?.balance_amount ?? 0)
+    
+    // Map job order items to print items
+    let items = []
+    if (order?.job_order_items && Array.isArray(order.job_order_items) && order.job_order_items.length > 0) {
+      // Use actual job order items
+      items = order.job_order_items.map(item => ({
+        description: item.material_name || "خدمة خياطة",
+        qty: parseInt(item.quantity) || 1,
+        unitPrice: safeParseFloat(item.fees) || 0,
+        amount: safeParseFloat(item.total_amount) || (safeParseFloat(item.fees) * (parseInt(item.quantity) || 1))
+      }))
+    } else {
+      // Fallback to single item with remarks if no items exist
+      items = [
+        {
+          description: order?.remarks || "خدمة خياطة",
+          qty: 1,
+          unitPrice: totalAmount || 0,
+          amount: totalAmount || 0
+        },
+      ]
+    }
+    
     return {
       invoiceNumber: order?.job_order_number || "",
       date: toIsoDate(order?.created_at),
       customerNumber: order?.customer_id || order?.id || "",
       customerName: order?.customer_name || "",
       customerPhone: order?.customer_phone || "",
-      items: [
-        {
-          description: order?.remarks || "خدمة خياطة",
-          qty: 1,
-          unitPrice: amount || 0,
-        },
-      ],
-      totals: { total: amount || 0, advance: 0, balance: amount || 0 },
+      items: items,
+      totals: { 
+        total: totalAmount, 
+        advance: advanceAmount, 
+        balance: balanceAmount 
+      },
       deliveryDate: toDMY(order?.delivery_date),
     }
   }
@@ -187,14 +210,17 @@ export default function JobOrders() {
                     </tr>
                   </thead>
                   <tbody>
-                    ${a5.items.map(item => `
+                    ${a5.items.map(item => {
+                      const itemAmount = item.amount !== undefined ? item.amount : (item.qty * item.unitPrice);
+                      return `
                       <tr>
                         <td class="col-details">${item.description}</td>
                         <td class="col-qty">${item.qty}</td>
                         <td class="col-unit">${item.unitPrice.toFixed(2)}</td>
-                        <td class="col-amt">${(item.qty * item.unitPrice).toFixed(2)}</td>
+                        <td class="col-amt">${itemAmount.toFixed(2)}</td>
                       </tr>
-                    `).join('')}
+                    `;
+                    }).join('')}
                     ${Array.from({ length: Math.max(6 - a5.items.length, 0) }).map(() => `
                       <tr>
                         <td class="col-details">&nbsp;</td>
@@ -659,7 +685,7 @@ export default function JobOrders() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            ${formatCurrency(order.total_amount)}
+                            QAR {formatCurrency(order.total_amount)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -756,7 +782,7 @@ export default function JobOrders() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${formatCurrency(stats.total_revenue)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR {formatCurrency(stats.total_revenue)}</p>
             </div>
           </div>
         </div>

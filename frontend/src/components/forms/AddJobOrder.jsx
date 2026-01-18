@@ -15,6 +15,8 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const [isEditCustomer, setIsEditCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isMaterialSearchOpen, setIsMaterialSearchOpen] = useState(false);
+  const [materialSearchType, setMaterialSearchType] = useState('measurement'); // 'measurement' or 'bill'
+  const [linkingItemSl, setLinkingItemSl] = useState(null); // Track which item is being linked to a material
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [billItems, setBillItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,14 +51,20 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
   // Function to update bill items based on selected materials
   const updateBillItemsFromMaterials = (materials) => {
-    const newBillItems = materials.map((material, index) => ({
-      sl: index + 1,
-      itemName: material.material_name,
-      remarks: formData.measurement.remarks || 'Custom tailoring service',
-      qty: 1,
-      fees: material.material_price,
-      amount: material.material_price
-    }));
+    const newBillItems = materials.map((material, index) => {
+      const qty = 1;
+      const fees = parseFloat(material.material_price) || 0;
+      const amount = fees * qty;
+      return {
+        sl: index + 1,
+        itemName: material.material_name,
+        remarks: formData.measurement.remarks || 'Custom tailoring service',
+        qty: qty,
+        fees: fees,
+        amount: amount,
+        material_id: material.material_id || material.id
+      };
+    });
     
     setBillItems(newBillItems);
     updateBillTotal(newBillItems);
@@ -72,8 +80,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const handleBillItemQtyChange = (itemSl, newQty) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const newAmount = item.fees * newQty;
-        return { ...item, qty: newQty, amount: newAmount };
+        const fees = parseFloat(item.fees) || 0;
+        const qty = parseInt(newQty) || 1;
+        const newAmount = fees * qty;
+        return { ...item, qty: qty, amount: newAmount };
       }
       return item;
     });
@@ -86,8 +96,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const handleBillItemFeesChange = (itemSl, newFees) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const newAmount = newFees * item.qty;
-        return { ...item, fees: newFees, amount: newFees };
+        const fees = parseFloat(newFees) || 0;
+        const qty = parseInt(item.qty) || 1;
+        const newAmount = fees * qty;
+        return { ...item, fees: fees, amount: newAmount };
       }
       return item;
     });
@@ -98,15 +110,21 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
   // Function to update total amount when bill items change
   const updateBillTotal = (items) => {
-    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
-    setFormData(prev => ({
-      ...prev,
-      bill: {
-        ...prev.bill,
-        total: totalAmount,
-        balance: totalAmount - prev.bill.advance
-      }
-    }));
+    const totalAmount = items.reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+    setFormData(prev => {
+      const advance = parseFloat(prev.bill.advance) || 0;
+      return {
+        ...prev,
+        bill: {
+          ...prev.bill,
+          total: totalAmount,
+          balance: totalAmount - advance
+        }
+      };
+    });
   };
 
   // Function to remove a bill item
@@ -231,10 +249,66 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
   // Material search and management functions
   const handleMaterialSearch = () => {
+    setMaterialSearchType('measurement');
+    setIsMaterialSearchOpen(true);
+  };
+
+  // Bill item material search
+  const handleBillItemMaterialSearch = (itemSl = null) => {
+    setMaterialSearchType('bill');
+    setLinkingItemSl(itemSl); // Set which item to link if provided
     setIsMaterialSearchOpen(true);
   };
 
   const handleSelectMaterial = (material) => {
+    if (materialSearchType === 'bill') {
+      // Check if we're linking to an existing item
+      if (linkingItemSl !== null) {
+        // Link material to existing item
+        const materialId = material.id || material.material_id;
+        const updatedBillItems = billItems.map(item => {
+          if (item.sl === linkingItemSl) {
+            const newFees = item.fees === 0 ? parseFloat(material.price) || 0 : item.fees;
+            return {
+              ...item,
+              material_id: materialId,
+              itemName: item.itemName === 'New Item' ? material.name : item.itemName,
+              fees: newFees,
+              amount: newFees * item.qty
+            };
+          }
+          return item;
+        });
+        setBillItems(updatedBillItems);
+        updateBillTotal(updatedBillItems);
+        setLinkingItemSl(null);
+        setIsMaterialSearchOpen(false);
+        return;
+      }
+      
+      // Handle new bill item material selection
+      const qty = 1;
+      const fees = parseFloat(material.price) || 0;
+      const amount = fees * qty;
+      const materialId = material.id || material.material_id;
+      
+      const newBillItem = {
+        sl: billItems.length + 1,
+        itemName: material.name,
+        remarks: 'Custom tailoring service',
+        qty: qty,
+        fees: fees,
+        amount: amount,
+        material_id: materialId
+      };
+      const updatedBillItems = [...billItems, newBillItem];
+      setBillItems(updatedBillItems);
+      updateBillTotal(updatedBillItems);
+      setIsMaterialSearchOpen(false);
+      return;
+    }
+
+    // Handle measurement material selection
     const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
     
     if (!isAlreadySelected) {
@@ -312,6 +386,14 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     setError(null);
 
     try {
+      // Validate bill items have material_id
+      const itemsWithoutMaterial = billItems.filter(item => !item.material_id);
+      if (itemsWithoutMaterial.length > 0) {
+        setError(`Please select materials for all bill items. ${itemsWithoutMaterial.length} item(s) missing material.`);
+        setIsLoading(false);
+        return;
+      }
+
       // Prepare job order payload
       const jobOrderPayload = {
         customer_id: selectedCustomer?.id,
@@ -334,25 +416,39 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         cash_amount: formData.bill.cashAmount,
         card_amount: formData.bill.cardAmount,
         remarks: formData.measurement.remarks,
-        job_order_items: billItems.map(item => ({
-          material: item.material_id || 1, // Default material ID
-          quantity: item.qty,
-          fees: item.fees
-        })),
-        job_order_measurements: selectedMaterials.map(material => ({
-          material: material.material_id,
-          thool: material.custom_thool,
-          kethet: material.custom_kethet,
-          thool_kum: material.custom_thool_kum,
-          ardh_f_kum: material.custom_ardh_f_kum,
-          jamba: material.custom_jamba,
-          ragab: material.custom_ragab,
-          note1: material.note1,
-          note2: material.note2,
-          note3: material.note3,
-          note4: material.note4
-        }))
+        job_order_items: billItems.map(item => {
+          const materialId = parseInt(item.material_id);
+          if (!materialId || isNaN(materialId)) {
+            throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
+          }
+          return {
+            material: materialId,
+            quantity: parseInt(item.qty) || 1,
+            fees: parseFloat(item.fees) || 0
+          };
+        }),
+        job_order_measurements: selectedMaterials.map(material => {
+          const materialId = parseInt(material.material_id || material.id);
+          if (!materialId || isNaN(materialId)) {
+            throw new Error(`Invalid material ID for measurement: ${material.material_name}`);
+          }
+          return {
+            material: materialId,
+            thool: material.custom_thool || 0,
+            kethet: material.custom_kethet || 0,
+            thool_kum: material.custom_thool_kum || 0,
+            ardh_f_kum: material.custom_ardh_f_kum || 0,
+            jamba: material.custom_jamba || 0,
+            ragab: material.custom_ragab || 0,
+            note1: material.note1 || '',
+            note2: material.note2 || '',
+            note3: material.note3 || '',
+            note4: material.note4 || ''
+          };
+        })
       };
+
+      console.log('Job Order Payload:', JSON.stringify(jobOrderPayload, null, 2));
 
       const result = await jobOrdersApi.createJobOrder(jobOrderPayload);
       console.log('Job order created successfully:', result);
@@ -750,6 +846,13 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 <span>Add Item</span>
               </button>
               <button 
+                onClick={handleBillItemMaterialSearch}
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+              >
+                <Search className="w-3 h-3" />
+                <span>Find</span>
+              </button>
+              <button 
                 onClick={() => setBillItems([])}
                 disabled={billItems.length === 0}
                 className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -779,7 +882,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                       billItems.map((item) => (
                         <tr key={item.sl} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                           <td className="px-4 py-3 text-gray-900 dark:text-white">{item.sl}</td>
-                          <td className="px-4 py-3 text-gray-900 dark:text-white">{item.itemName}</td>
+                          <td className="px-4 py-3 text-gray-900 dark:text-white">
+                            {item.itemName}
+                            {!item.material_id && (
+                              <span className="ml-2 text-xs text-red-600 dark:text-red-400">(No material selected)</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-gray-900 dark:text-white">{item.remarks}</td>
                           <td className="px-4 py-3 text-center">
                             <input
@@ -804,13 +912,24 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             ${formatCurrency(item.amount)}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleRemoveBillItem(item.sl)}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
-                              title="Remove item"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center space-x-2">
+                              {!item.material_id && (
+                                <button
+                                  onClick={() => handleBillItemMaterialSearch(item.sl)}
+                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1"
+                                  title="Link material to this item"
+                                >
+                                  <Search className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleRemoveBillItem(item.sl)}
+                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
+                                title="Remove item"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -834,9 +953,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
               <div>
@@ -846,9 +965,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.deliveryDate}
                     onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
               <div>
@@ -960,10 +1079,14 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
       <MaterialSearchModal
         isOpen={isMaterialSearchOpen}
-        onClose={() => setIsMaterialSearchOpen(false)}
+        onClose={() => {
+          setIsMaterialSearchOpen(false);
+          setLinkingItemSl(null);
+        }}
         onSelectMaterial={handleSelectMaterial}
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
+        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : false}
       />
     </div>
   );

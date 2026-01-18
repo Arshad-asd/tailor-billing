@@ -166,6 +166,17 @@ export const jobOrdersApi = {
     }
   },
 
+  // Update a single measurement by measurement ID
+  updateSingleMeasurement: async (jobOrderId, measurementId, measurementData) => {
+    try {
+      const response = await api.patch(`${JOB_ORDERS_BASE_URL}${jobOrderId}/update_measurement/${measurementId}/`, measurementData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating single measurement:', error);
+      throw error;
+    }
+  },
+
   // Update only bill section
   updateBill: async (id, billData) => {
     try {

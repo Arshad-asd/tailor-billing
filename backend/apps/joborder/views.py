@@ -387,6 +387,63 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['patch'], url_path='update_measurement/(?P<measurement_id>[^/.]+)')
+    def update_single_measurement(self, request, pk=None, measurement_id=None):
+        """Update a single measurement by its ID"""
+        job_order = self.get_object()
+        
+        try:
+            measurement_id = int(measurement_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': f'Invalid measurement ID: {measurement_id}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            measurement = jobOrderMeasurement.objects.get(id=measurement_id, job_order=job_order)
+        except jobOrderMeasurement.DoesNotExist:
+            return Response(
+                {'error': f'Measurement with ID {measurement_id} does not exist for this job order'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            with transaction.atomic():
+                # Update material if provided
+                material_id = request.data.get('material')
+                if material_id is not None:
+                    try:
+                        material_id = int(material_id)
+                        material = Material.objects.get(id=material_id)
+                        measurement.material = material
+                    except (ValueError, TypeError):
+                        return Response(
+                            {'error': f'Invalid material ID: {material_id}'}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    except Material.DoesNotExist:
+                        return Response(
+                            {'error': f'Material with ID {material_id} does not exist'}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                
+                # Update measurement fields
+                update_fields = ['thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4']
+                for field in update_fields:
+                    if field in request.data:
+                        setattr(measurement, field, request.data[field])
+                
+                measurement.save()
+                
+                serializer = JobOrderMeasurementSerializer(measurement)
+                return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update measurement: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
     @action(detail=True, methods=['patch'])
     def update_bill(self, request, pk=None):
         """Update only bill section of a job order"""
@@ -414,32 +471,78 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
+                # Convert string values to Decimal for proper arithmetic
+                from decimal import Decimal
+                
                 # Calculate balance amount if total or advance changed
                 if 'total_amount' in bill_data or 'advance_amount' in bill_data:
+                    # Get values and convert to Decimal
                     total_amount = bill_data.get('total_amount', job_order.total_amount)
                     advance_amount = bill_data.get('advance_amount', job_order.advance_amount)
+                    
+                    # Convert to Decimal if they're strings
+                    if isinstance(total_amount, str):
+                        total_amount = Decimal(total_amount)
+                    elif not isinstance(total_amount, Decimal):
+                        total_amount = Decimal(str(total_amount))
+                    
+                    if isinstance(advance_amount, str):
+                        advance_amount = Decimal(advance_amount)
+                    elif not isinstance(advance_amount, Decimal):
+                        advance_amount = Decimal(str(advance_amount))
+                    
                     bill_data['balance_amount'] = total_amount - advance_amount
+                    bill_data['total_amount'] = total_amount
+                    bill_data['advance_amount'] = advance_amount
                 
                 # Handle cash and card amounts based on payment method
                 payment_method = bill_data.get('payment_method', job_order.payment_method)
                 total_amount = bill_data.get('total_amount', job_order.total_amount)
                 
+                # Ensure total_amount is Decimal
+                if isinstance(total_amount, str):
+                    total_amount = Decimal(total_amount)
+                elif not isinstance(total_amount, Decimal):
+                    total_amount = Decimal(str(total_amount))
+                
                 if payment_method == 'cash':
                     bill_data['cash_amount'] = total_amount
-                    bill_data['card_amount'] = 0
+                    bill_data['card_amount'] = Decimal('0')
                 elif payment_method == 'card':
-                    bill_data['cash_amount'] = 0
+                    bill_data['cash_amount'] = Decimal('0')
                     bill_data['card_amount'] = total_amount
                 elif payment_method == 'cash_card':
                     # For cash_card, use provided amounts or keep existing
                     if 'cash_amount' not in bill_data and 'card_amount' not in bill_data:
                         # If neither is provided, split the total amount
-                        bill_data['cash_amount'] = total_amount / 2
-                        bill_data['card_amount'] = total_amount / 2
+                        bill_data['cash_amount'] = total_amount / Decimal('2')
+                        bill_data['card_amount'] = total_amount / Decimal('2')
                     elif 'cash_amount' in bill_data and 'card_amount' not in bill_data:
-                        bill_data['card_amount'] = total_amount - bill_data['cash_amount']
+                        cash_amount = bill_data['cash_amount']
+                        if isinstance(cash_amount, str):
+                            cash_amount = Decimal(cash_amount)
+                        elif not isinstance(cash_amount, Decimal):
+                            cash_amount = Decimal(str(cash_amount))
+                        bill_data['cash_amount'] = cash_amount
+                        bill_data['card_amount'] = total_amount - cash_amount
                     elif 'card_amount' in bill_data and 'cash_amount' not in bill_data:
-                        bill_data['cash_amount'] = total_amount - bill_data['card_amount']
+                        card_amount = bill_data['card_amount']
+                        if isinstance(card_amount, str):
+                            card_amount = Decimal(card_amount)
+                        elif not isinstance(card_amount, Decimal):
+                            card_amount = Decimal(str(card_amount))
+                        bill_data['card_amount'] = card_amount
+                        bill_data['cash_amount'] = total_amount - card_amount
+                
+                # Ensure all numeric fields in bill_data are Decimal
+                numeric_fields = ['total_amount', 'advance_amount', 'balance_amount', 'cash_amount', 'card_amount']
+                for field in numeric_fields:
+                    if field in bill_data:
+                        value = bill_data[field]
+                        if isinstance(value, str):
+                            bill_data[field] = Decimal(value)
+                        elif not isinstance(value, Decimal):
+                            bill_data[field] = Decimal(str(value))
                 
                 # Update job order bill fields
                 for attr, value in bill_data.items():

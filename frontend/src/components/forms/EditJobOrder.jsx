@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar, Edit } from 'lucide-react';
+import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar, Edit, AlertCircle } from 'lucide-react';
 import CustomerSearchModal from '../modals/CustomerSearchModal';
 import CustomerModal from '../modals/CustomerModal';
 import MaterialSearchModal from '../modals/MaterialSearchModal';
@@ -15,6 +15,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [isEditCustomer, setIsEditCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isMaterialSearchOpen, setIsMaterialSearchOpen] = useState(false);
+  const [materialSearchType, setMaterialSearchType] = useState('measurement'); // 'measurement' or 'bill'
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [billItems, setBillItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +31,8 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     measurement: null,
     bill: null
   });
+  const [measurementLoading, setMeasurementLoading] = useState({}); // Track loading state for individual measurements
+  const [measurementError, setMeasurementError] = useState({}); // Track errors for individual measurements
 
   const [formData, setFormData] = useState({
     customer: {
@@ -115,56 +118,114 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
         // Set job order items
         if (jobOrder.job_order_items) {
-          const items = jobOrder.job_order_items.map((item, index) => ({
-            sl: index + 1,
-            itemName: item.material_name || 'Item',
-            remarks: 'Custom tailoring service',
-            qty: item.quantity || 1,
-            fees: item.fees || 0,
-            amount: item.total_amount || 0,
-            material_id: item.material
-          }));
+          const items = jobOrder.job_order_items.map((item, index) => {
+            const qty = parseInt(item.quantity) || 1;
+            const fees = parseFloat(item.fees) || 0;
+            const amount = parseFloat(item.total_amount) || (fees * qty);
+            return {
+              sl: index + 1,
+              itemName: item.material_name || 'Item',
+              remarks: 'Custom tailoring service',
+              qty: qty,
+              fees: fees,
+              amount: amount,
+              material_id: item.material
+            };
+          });
           setBillItems(items);
+          updateBillTotal(items);
         }
 
         // Set measurements
         if (jobOrder.job_order_measurements) {
-          const materials = jobOrder.job_order_measurements.map((measurement, index) => {
-            // Find the corresponding item to get the price
-            const correspondingItem = jobOrder.job_order_items?.find(item => item.material === measurement.material);
-            const materialPrice = correspondingItem ? parseFloat(correspondingItem.material_price) : 0;
-            
-            // Handle both cases: material as ID or as object
-            const materialId = typeof measurement.material === 'object' ? measurement.material.id : measurement.material;
-            const materialName = measurement.material_name || (typeof measurement.material === 'object' ? measurement.material.name : 'Material');
-            
-            return {
-              id: materialId || index + 1,
-              material_id: materialId,
-              material_name: materialName,
-              material_price: materialPrice,
-              measurements: {
-              thool: measurement.thool || 0,
-              kethet: measurement.kethet || 0,
-              thool_kum: measurement.thool_kum || 0,
-              ardh_f_kum: measurement.ardh_f_kum || 0,
-              jamba: measurement.jamba || 0,
-              ragab: measurement.ragab || 0
-            },
-            custom_thool: measurement.thool || 0,
-            custom_kethet: measurement.kethet || 0,
-            custom_thool_kum: measurement.thool_kum || 0,
-            custom_ardh_f_kum: measurement.ardh_f_kum || 0,
-            custom_jamba: measurement.jamba || 0,
-            custom_ragab: measurement.ragab || 0,
-            note1: measurement.note1 || '',
-            note2: measurement.note2 || '',
-            note3: measurement.note3 || '',
-            note4: measurement.note4 || '',
-            is_customized: true
-            };
-          });
+          // First, create materials array with basic data
+          const materials = await Promise.all(
+            jobOrder.job_order_measurements.map(async (measurement, index) => {
+              // Find the corresponding item to get the price
+              const correspondingItem = jobOrder.job_order_items?.find(item => item.material === measurement.material);
+              const materialPrice = correspondingItem ? parseFloat(correspondingItem.material_price) : 0;
+              
+              // Handle both cases: material as ID or as object
+              let materialId = typeof measurement.material === 'object' ? measurement.material.id : measurement.material;
+              
+              // Ensure materialId is a valid number, if not try to get it from measurement.id
+              if (!materialId || isNaN(parseInt(materialId))) {
+                materialId = measurement.id || measurement.material_id;
+              }
+              
+              // If still no valid ID, use a unique identifier (but this should be rare)
+              if (!materialId || isNaN(parseInt(materialId))) {
+                console.warn(`Warning: Measurement at index ${index} has no valid material ID. Using temporary ID.`);
+                materialId = `temp_${index}`;
+              }
+              
+              const materialName = measurement.material_name || (typeof measurement.material === 'object' ? measurement.material.name : 'Material');
+              
+              // Ensure material_id is always a number (or string that can be parsed)
+              const finalMaterialId = typeof materialId === 'number' ? materialId : parseInt(materialId);
+              
+              // Check if material exists in database
+              let materialExists = false;
+              let materialError = null;
+              if (finalMaterialId && !isNaN(finalMaterialId) && finalMaterialId > 0) {
+                try {
+                  await materialsApi.getMaterial(finalMaterialId);
+                  materialExists = true;
+                } catch (error) {
+                  if (error.response?.status === 404) {
+                    materialExists = false;
+                    materialError = `Material (ID: ${finalMaterialId}) no longer exists in database`;
+                  } else {
+                    // Network error or other issue - assume it might exist
+                    materialExists = true;
+                    materialError = null;
+                  }
+                }
+              } else {
+                materialError = 'Invalid material ID';
+              }
+              
+              return {
+                id: finalMaterialId || index + 1,
+                measurement_id: measurement.id, // Store the measurement ID from database
+                material_id: finalMaterialId,
+                material_name: materialName,
+                material_price: materialPrice,
+                material_exists: materialExists,
+                material_error: materialError,
+                measurements: {
+                  thool: measurement.thool || 0,
+                  kethet: measurement.kethet || 0,
+                  thool_kum: measurement.thool_kum || 0,
+                  ardh_f_kum: measurement.ardh_f_kum || 0,
+                  jamba: measurement.jamba || 0,
+                  ragab: measurement.ragab || 0
+                },
+                custom_thool: measurement.thool || 0,
+                custom_kethet: measurement.kethet || 0,
+                custom_thool_kum: measurement.thool_kum || 0,
+                custom_ardh_f_kum: measurement.ardh_f_kum || 0,
+                custom_jamba: measurement.jamba || 0,
+                custom_ragab: measurement.ragab || 0,
+                note1: measurement.note1 || '',
+                note2: measurement.note2 || '',
+                note3: measurement.note3 || '',
+                note4: measurement.note4 || '',
+                is_customized: true
+              };
+            })
+          );
           setSelectedMaterials(materials);
+          
+          // Show warning if any materials don't exist
+          const invalidMaterials = materials.filter(m => !m.material_exists);
+          if (invalidMaterials.length > 0) {
+            const errorMsg = `Warning: ${invalidMaterials.length} material(s) no longer exist in the database and cannot be saved. Please remove them: ${invalidMaterials.map(m => m.material_name || `ID: ${m.material_id}`).join(', ')}`;
+            setSectionError(prev => ({ ...prev, measurement: errorMsg }));
+            setTimeout(() => {
+              setSectionError(prev => ({ ...prev, measurement: null }));
+            }, 10000); // Show for 10 seconds
+          }
         }
 
       } catch (error) {
@@ -180,15 +241,20 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
   // Function to update bill items based on selected materials
   const updateBillItemsFromMaterials = (materials) => {
-    const newBillItems = materials.map((material, index) => ({
-      sl: index + 1,
-      itemName: material.material_name,
-      remarks: formData.measurement.remarks || 'Custom tailoring service',
-      qty: 1,
-      fees: material.material_price,
-      amount: material.material_price,
-      material_id: material.material_id
-    }));
+    const newBillItems = materials.map((material, index) => {
+      const qty = 1;
+      const fees = parseFloat(material.material_price) || 0;
+      const amount = fees * qty;
+      return {
+        sl: index + 1,
+        itemName: material.material_name,
+        remarks: formData.measurement.remarks || 'Custom tailoring service',
+        qty: qty,
+        fees: fees,
+        amount: amount,
+        material_id: material.material_id
+      };
+    });
     
     setBillItems(newBillItems);
     updateBillTotal(newBillItems);
@@ -204,8 +270,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const handleBillItemQtyChange = (itemSl, newQty) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const newAmount = item.fees * newQty;
-        return { ...item, qty: newQty, amount: newAmount };
+        const fees = parseFloat(item.fees) || 0;
+        const qty = parseInt(newQty) || 1;
+        const newAmount = fees * qty;
+        return { ...item, qty: qty, amount: newAmount };
       }
       return item;
     });
@@ -218,8 +286,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const handleBillItemFeesChange = (itemSl, newFees) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const newAmount = newFees * item.qty;
-        return { ...item, fees: newFees, amount: newAmount };
+        const fees = parseFloat(newFees) || 0;
+        const qty = parseInt(item.qty) || 1;
+        const newAmount = fees * qty;
+        return { ...item, fees: fees, amount: newAmount };
       }
       return item;
     });
@@ -230,15 +300,21 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
   // Function to update total amount when bill items change
   const updateBillTotal = (items) => {
-    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
-    setFormData(prev => ({
-      ...prev,
-      bill: {
-        ...prev.bill,
-        total: totalAmount,
-        balance: totalAmount - prev.bill.advance
-      }
-    }));
+    const totalAmount = items.reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+    setFormData(prev => {
+      const advance = parseFloat(prev.bill.advance) || 0;
+      return {
+        ...prev,
+        bill: {
+          ...prev.bill,
+          total: totalAmount,
+          balance: totalAmount - advance
+        }
+      };
+    });
   };
 
   // Function to remove a bill item
@@ -364,10 +440,40 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
   // Material search and management functions
   const handleMaterialSearch = () => {
+    setMaterialSearchType('measurement');
+    setIsMaterialSearchOpen(true);
+  };
+
+  // Bill item material search
+  const handleBillItemMaterialSearch = () => {
+    setMaterialSearchType('bill');
     setIsMaterialSearchOpen(true);
   };
 
   const handleSelectMaterial = (material) => {
+    if (materialSearchType === 'bill') {
+      // Handle bill item material selection
+      const qty = 1;
+      const fees = parseFloat(material.price) || 0;
+      const amount = fees * qty;
+      
+      const newBillItem = {
+        sl: billItems.length + 1,
+        itemName: material.name,
+        remarks: 'Custom tailoring service',
+        qty: qty,
+        fees: fees,
+        amount: amount,
+        material_id: material.id
+      };
+      const updatedBillItems = [...billItems, newBillItem];
+      setBillItems(updatedBillItems);
+      updateBillTotal(updatedBillItems);
+      setIsMaterialSearchOpen(false);
+      return;
+    }
+
+    // Handle measurement material selection
     const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
     
     if (!isAlreadySelected) {
@@ -486,12 +592,40 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     }
   };
 
-  // Handle measurement section update
+  // Handle measurement section update (all measurements)
   const handleSaveMeasurements = async () => {
     setSectionLoading(prev => ({ ...prev, measurement: true }));
     setSectionError(prev => ({ ...prev, measurement: null }));
 
     try {
+      // Validate all materials exist before attempting to save
+      const invalidMaterials = [];
+      for (const material of selectedMaterials) {
+        const materialId = parseInt(material.material_id);
+        if (!materialId || isNaN(materialId)) {
+          invalidMaterials.push({ material, reason: 'Invalid material ID' });
+          continue;
+        }
+        
+        try {
+          await materialsApi.getMaterial(materialId);
+        } catch (materialError) {
+          if (materialError.response?.status === 404) {
+            invalidMaterials.push({ 
+              material, 
+              reason: `Material "${material.material_name || 'Unknown'}" (ID: ${materialId}) no longer exists` 
+            });
+          }
+        }
+      }
+      
+      if (invalidMaterials.length > 0) {
+        const errorMessages = invalidMaterials.map(({ material, reason }) => 
+          `${material.material_name || 'Unknown material'}: ${reason}`
+        );
+        throw new Error(`Cannot save measurements. The following materials are invalid:\n${errorMessages.join('\n')}\n\nPlease remove these materials from the job order.`);
+      }
+
       const measurementsPayload = {
         job_order_measurements: selectedMaterials.map(material => {
           const materialId = parseInt(material.material_id);
@@ -525,12 +659,149 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
     } catch (error) {
       console.error('Error updating measurements:', error);
+      
+      // Parse backend error messages to extract material ID
+      let errorMessage = error.message || 'Failed to update measurements';
+      
+      if (error.response?.data?.error) {
+        const backendError = error.response.data.error;
+        errorMessage = backendError;
+        
+        // Check if error mentions a material ID that doesn't exist
+        const materialIdMatch = backendError.match(/Material with ID (\d+) does not exist/);
+        if (materialIdMatch) {
+          const missingMaterialId = materialIdMatch[1];
+          const missingMaterial = selectedMaterials.find(m => {
+            const mId = parseInt(m.material_id);
+            return mId === parseInt(missingMaterialId);
+          });
+          
+          if (missingMaterial) {
+            errorMessage = `Material "${missingMaterial.material_name || 'Unknown'}" (ID: ${missingMaterialId}) no longer exists in the database. Please remove this measurement from the job order.`;
+          } else {
+            errorMessage = `Material with ID ${missingMaterialId} does not exist. This material may have been deleted. Please remove this measurement from the job order.`;
+          }
+        }
+      }
+      
       setSectionError(prev => ({ 
         ...prev, 
-        measurement: error.response?.data?.error || 'Failed to update measurements' 
+        measurement: errorMessage
       }));
     } finally {
       setSectionLoading(prev => ({ ...prev, measurement: false }));
+    }
+  };
+
+  // Handle individual measurement update
+  const handleSaveSingleMeasurement = async (materialId) => {
+    setMeasurementLoading(prev => ({ ...prev, [materialId]: true }));
+    setMeasurementError(prev => ({ ...prev, [materialId]: null }));
+
+    try {
+      const material = selectedMaterials.find(m => m.id === materialId || m.material_id === materialId);
+      if (!material) {
+        throw new Error('Material not found in selected materials');
+      }
+
+      // Check if we have a measurement_id (for existing measurements)
+      if (!material.measurement_id) {
+        throw new Error(`Measurement ID is missing for material: ${material.material_name || 'Unknown'}. This measurement may not have been saved yet. Please use "Save All" to create it first.`);
+      }
+
+      // Validate material_id exists and is valid
+      if (material.material_id === undefined || material.material_id === null) {
+        throw new Error(`Material ID is missing for material: ${material.material_name || 'Unknown'}. Please reload the page or re-add this material.`);
+      }
+
+      // Handle both number and string material_id
+      let materialIdInt;
+      if (typeof material.material_id === 'string' && material.material_id.startsWith('temp_')) {
+        throw new Error(`Cannot save measurement: Material "${material.material_name || 'Unknown'}" has a temporary ID. Please reload the page or re-add this material.`);
+      }
+      
+      materialIdInt = parseInt(material.material_id);
+      if (isNaN(materialIdInt) || materialIdInt <= 0) {
+        throw new Error(`Invalid material ID: ${material.material_id} for material: ${material.material_name || 'Unknown'}`);
+      }
+
+      // Validate that the material exists in the database before saving
+      try {
+        await materialsApi.getMaterial(materialIdInt);
+      } catch (materialError) {
+        if (materialError.response?.status === 404) {
+          throw new Error(`Material "${material.material_name || 'Unknown'}" (ID: ${materialIdInt}) no longer exists in the database. Please remove this measurement or contact support.`);
+        }
+        // If it's not a 404, continue (might be a network error, but material might still exist)
+        console.warn('Could not verify material existence:', materialError);
+      }
+
+      // Prepare payload for single measurement update
+      const measurementPayload = {
+        material: materialIdInt,
+        thool: material.custom_thool || 0,
+        kethet: material.custom_kethet || 0,
+        thool_kum: material.custom_thool_kum || 0,
+        ardh_f_kum: material.custom_ardh_f_kum || 0,
+        jamba: material.custom_jamba || 0,
+        ragab: material.custom_ragab || 0,
+        note1: material.note1 || '',
+        note2: material.note2 || '',
+        note3: material.note3 || '',
+        note4: material.note4 || ''
+      };
+
+      // Update only this single measurement
+      const result = await jobOrdersApi.updateSingleMeasurement(jobOrderId, material.measurement_id, measurementPayload);
+      console.log('Single measurement updated successfully:', result);
+      
+      // Mark this measurement as saved (not customized anymore)
+      setSelectedMaterials(prev => 
+        prev.map(m => 
+          (m.id === materialId || m.material_id === materialId)
+            ? { ...m, is_customized: false }
+            : m
+        )
+      );
+      
+      setMeasurementError(prev => ({ ...prev, [materialId]: 'Measurement updated successfully' }));
+      setTimeout(() => {
+        setMeasurementError(prev => ({ ...prev, [materialId]: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error updating measurement:', error);
+      
+      // Parse backend error messages to extract material ID
+      let errorMessage = error.message || 'Failed to update measurement';
+      
+      if (error.response?.data?.error) {
+        const backendError = error.response.data.error;
+        errorMessage = backendError;
+        
+        // Check if error mentions a material ID that doesn't exist
+        const materialIdMatch = backendError.match(/Material with ID (\d+) does not exist/);
+        if (materialIdMatch) {
+          const missingMaterialId = materialIdMatch[1];
+          const missingMaterial = selectedMaterials.find(m => {
+            const mId = parseInt(m.material_id);
+            return mId === parseInt(missingMaterialId);
+          });
+          
+          if (missingMaterial) {
+            errorMessage = `Material "${missingMaterial.material_name || 'Unknown'}" (ID: ${missingMaterialId}) no longer exists in the database. Please remove this measurement from the job order.`;
+          } else {
+            errorMessage = `Material with ID ${missingMaterialId} does not exist. This material may have been deleted. Please remove this measurement from the job order.`;
+          }
+        }
+      }
+      
+      setMeasurementError(prev => ({ 
+        ...prev, 
+        [materialId]: errorMessage
+      }));
+    } finally {
+      setMeasurementLoading(prev => ({ ...prev, [materialId]: false }));
     }
   };
 
@@ -907,10 +1178,26 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           #{index + 1}
                         </span>
                         <div>
-                          <h5 className="font-medium text-gray-900 dark:text-white">{material.material_name}</h5>
+                          <div className="flex items-center space-x-2">
+                            <h5 className="font-medium text-gray-900 dark:text-white">{material.material_name}</h5>
+                            {material.material_exists === false && (
+                              <span className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs font-medium px-2 py-0.5 rounded-full flex items-center space-x-1">
+                                <AlertCircle className="w-3 h-3" />
+                                <span>Material Deleted</span>
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Price: {formatCurrency(material.material_price)}
+                            {material.material_id && (
+                              <span className="ml-2">(ID: {material.material_id})</span>
+                            )}
                           </p>
+                          {material.material_error && (
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                              ⚠️ {material.material_error}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
@@ -1032,27 +1319,50 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       </div>
                     </div>
 
-                    {/* Edit/Save buttons for each material */}
+                    {/* Individual Save button and status for each material */}
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => console.log('Edit material:', material)}
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900"
+                          onClick={() => handleSaveSingleMeasurement(material.id)}
+                          disabled={measurementLoading[material.id] || material.material_exists === false}
+                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs px-3 py-1 rounded border border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                          title={material.material_exists === false ? 'Cannot save: Material no longer exists in database' : 'Save this measurement'}
                         >
-                          Edit
+                          {measurementLoading[material.id] ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3 h-3" />
+                              <span>Save</span>
+                            </>
+                          )}
                         </button>
                         <button
-                          onClick={() => console.log('Save material:', material)}
-                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs px-2 py-1 rounded border border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900"
+                          onClick={() => handleResetMeasurements(material.id)}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900"
                         >
-                          Save
+                          Reset
                         </button>
                       </div>
-                      {material.is_customized && (
-                        <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          Customized
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {material.is_customized && (
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                            Modified
+                          </span>
+                        )}
+                        {measurementError[material.id] && (
+                          <span className={`text-xs font-medium ${
+                            measurementError[material.id].includes('successfully')
+                              ? 'text-green-600 dark:text-green-400'
+                              : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {measurementError[material.id].includes('successfully') ? '✓ Saved' : '✗ Error'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1085,6 +1395,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
               >
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
+              </button>
+              <button 
+                onClick={handleBillItemMaterialSearch}
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+              >
+                <Search className="w-3 h-3" />
+                <span>Find</span>
               </button>
               <button 
                 onClick={() => setBillItems([])}
@@ -1196,9 +1513,9 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
               <div>
@@ -1208,9 +1525,9 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.deliveryDate}
                     onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
               <div>
@@ -1326,6 +1643,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         onSelectMaterial={handleSelectMaterial}
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
+        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : false}
       />
     </div>
   );
