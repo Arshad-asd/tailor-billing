@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -311,4 +311,155 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         
         serializer = JobOrderListSerializer(job_order)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['patch'])
+    def update_measurements(self, request, pk=None):
+        """Update only measurements section of a job order"""
+        job_order = self.get_object()
+        job_order_measurements_data = request.data.get('job_order_measurements', None)
+        
+        if job_order_measurements_data is None:
+            return Response(
+                {'error': 'job_order_measurements field is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Delete existing measurements
+                job_order.jobordermeasurement_set.all().delete()
+                
+                # Create new measurements
+                for measurement_data in job_order_measurements_data:
+                    material_id = measurement_data.get('material')
+                    if material_id is None:
+                        raise serializers.ValidationError("Material field is required for measurements")
+                    
+                    try:
+                        material_id = int(material_id)
+                    except (ValueError, TypeError):
+                        raise serializers.ValidationError(f"Invalid material ID: {material_id}")
+                    
+                    try:
+                        material = Material.objects.get(id=material_id)
+                    except Material.DoesNotExist:
+                        raise serializers.ValidationError(f"Material with ID {material_id} does not exist")
+                    
+                    # Remove material from measurement_data
+                    measurement_data_copy = measurement_data.copy()
+                    measurement_data_copy.pop('material', None)
+                    
+                    jobOrderMeasurement.objects.create(
+                        job_order=job_order,
+                        material=material,
+                        **measurement_data_copy
+                    )
+                
+                serializer = JobOrderListSerializer(job_order)
+                return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update measurements: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def update_bill(self, request, pk=None):
+        """Update only bill section of a job order"""
+        job_order = self.get_object()
+        
+        # Extract bill-related fields
+        bill_data = {}
+        if 'delivery_date' in request.data:
+            bill_data['delivery_date'] = request.data['delivery_date']
+        if 'total_amount' in request.data:
+            bill_data['total_amount'] = request.data['total_amount']
+        if 'advance_amount' in request.data:
+            bill_data['advance_amount'] = request.data['advance_amount']
+        if 'payment_method' in request.data:
+            bill_data['payment_method'] = request.data['payment_method']
+        if 'cash_amount' in request.data:
+            bill_data['cash_amount'] = request.data['cash_amount']
+        if 'card_amount' in request.data:
+            bill_data['card_amount'] = request.data['card_amount']
+        if 'remarks' in request.data:
+            bill_data['remarks'] = request.data['remarks']
+        
+        # Handle job_order_items if provided
+        job_order_items_data = request.data.get('job_order_items', None)
+        
+        try:
+            with transaction.atomic():
+                # Calculate balance amount if total or advance changed
+                if 'total_amount' in bill_data or 'advance_amount' in bill_data:
+                    total_amount = bill_data.get('total_amount', job_order.total_amount)
+                    advance_amount = bill_data.get('advance_amount', job_order.advance_amount)
+                    bill_data['balance_amount'] = total_amount - advance_amount
+                
+                # Handle cash and card amounts based on payment method
+                payment_method = bill_data.get('payment_method', job_order.payment_method)
+                total_amount = bill_data.get('total_amount', job_order.total_amount)
+                
+                if payment_method == 'cash':
+                    bill_data['cash_amount'] = total_amount
+                    bill_data['card_amount'] = 0
+                elif payment_method == 'card':
+                    bill_data['cash_amount'] = 0
+                    bill_data['card_amount'] = total_amount
+                elif payment_method == 'cash_card':
+                    # For cash_card, use provided amounts or keep existing
+                    if 'cash_amount' not in bill_data and 'card_amount' not in bill_data:
+                        # If neither is provided, split the total amount
+                        bill_data['cash_amount'] = total_amount / 2
+                        bill_data['card_amount'] = total_amount / 2
+                    elif 'cash_amount' in bill_data and 'card_amount' not in bill_data:
+                        bill_data['card_amount'] = total_amount - bill_data['cash_amount']
+                    elif 'card_amount' in bill_data and 'cash_amount' not in bill_data:
+                        bill_data['cash_amount'] = total_amount - bill_data['card_amount']
+                
+                # Update job order bill fields
+                for attr, value in bill_data.items():
+                    setattr(job_order, attr, value)
+                job_order.save()
+                
+                # Update job order items if provided
+                if job_order_items_data is not None:
+                    # Delete existing items
+                    job_order.joborderitem_set.all().delete()
+                    
+                    # Create new items
+                    for item_data in job_order_items_data:
+                        material_id = item_data.get('material')
+                        if material_id is None:
+                            raise serializers.ValidationError("Material field is required for job order items")
+                        
+                        try:
+                            material_id = int(material_id)
+                        except (ValueError, TypeError):
+                            raise serializers.ValidationError(f"Invalid material ID: {material_id}")
+                        
+                        quantity = item_data['quantity']
+                        fees = item_data['fees']
+                        total_amount = quantity * fees
+                        
+                        try:
+                            material = Material.objects.get(id=material_id)
+                        except Material.DoesNotExist:
+                            raise serializers.ValidationError(f"Material with ID {material_id} does not exist")
+                        
+                        jobOrderItem.objects.create(
+                            job_order=job_order,
+                            material=material,
+                            quantity=quantity,
+                            fees=fees,
+                            total_amount=total_amount
+                        )
+                
+                serializer = JobOrderListSerializer(job_order)
+                return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update bill: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
     

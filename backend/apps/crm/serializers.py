@@ -24,8 +24,11 @@ class CustomerSerializer(serializers.ModelSerializer):
             'updated_at',
             'is_active'
         ]
-        read_only_fields = ['id', 'customer_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
         extra_kwargs = {
+            'customer_id': {'required': False},
+            'name': {'required': False},
+            'phone': {'required': False},
             'balance': {'required': False},
             'points': {'required': False},
         }
@@ -54,10 +57,21 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def validate_phone(self, value):
         """Validate phone number format"""
-        if not value:
-            raise serializers.ValidationError("Phone number is required")
+        # Only validate if value is provided (for partial updates)
+        if value is not None and not value:
+            raise serializers.ValidationError("Phone number cannot be empty if provided")
         # Add more phone validation logic if needed
         return value
+    
+    def validate(self, data):
+        """Validate that name and phone are provided on create"""
+        # Only enforce required fields on create, not on update
+        if self.instance is None:  # This is a create operation
+            if not data.get('name'):
+                raise serializers.ValidationError({"name": "This field is required."})
+            if not data.get('phone'):
+                raise serializers.ValidationError({"phone": "This field is required."})
+        return data
 
     def validate_balance(self, value):
         """Validate balance is not negative"""

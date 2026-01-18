@@ -5,8 +5,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import CompanyDetails
-from .serializers import CompanyDetailsSerializer
+from .models import CompanyDetails, SidebarItemConfiguration, PageBackgroundSettings
+from .serializers import (
+    CompanyDetailsSerializer,
+    SidebarItemConfigurationSerializer,
+    PageBackgroundSettingsSerializer
+)
 
 
 class CompanyDetailsViewSet(viewsets.ModelViewSet):
@@ -132,3 +136,90 @@ class CompanyDetailsViewSet(viewsets.ModelViewSet):
         company.save()
         serializer = self.get_serializer(company)
         return Response(serializer.data)
+
+
+class SidebarItemConfigurationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing sidebar item configurations.
+    
+    Provides:
+    - GET /api/master/sidebar-items/ - List all sidebar item configurations
+    - POST /api/master/sidebar-items/ - Create new sidebar item configuration
+    - GET /api/master/sidebar-items/{id}/ - Retrieve specific sidebar item configuration
+    - PUT /api/master/sidebar-items/{id}/ - Update sidebar item configuration (full update)
+    - PATCH /api/master/sidebar-items/{id}/ - Update sidebar item configuration (partial update)
+    - DELETE /api/master/sidebar-items/{id}/ - Delete sidebar item configuration
+    - GET /api/master/sidebar-items/active/ - Get only active sidebar items
+    """
+    queryset = SidebarItemConfiguration.objects.all()
+    serializer_class = SidebarItemConfigurationSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['item_name', 'item_key', 'route_path']
+    ordering_fields = ['display_order', 'item_name', 'created_at']
+    ordering = ['display_order', 'item_name']
+
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """Get only active sidebar items ordered by display_order"""
+        active_items = self.get_queryset().filter(is_active=True).order_by('display_order', 'item_name')
+        serializer = self.get_serializer(active_items, many=True)
+        return Response(serializer.data)
+
+
+class PageBackgroundSettingsViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing page background settings.
+    
+    Provides:
+    - GET /api/master/page-backgrounds/ - List all page background settings
+    - POST /api/master/page-backgrounds/ - Create new page background setting
+    - GET /api/master/page-backgrounds/{id}/ - Retrieve specific page background setting
+    - PUT /api/master/page-backgrounds/{id}/ - Update page background setting (full update)
+    - PATCH /api/master/page-backgrounds/{id}/ - Update page background setting (partial update)
+    - DELETE /api/master/page-backgrounds/{id}/ - Delete page background setting
+    - GET /api/master/page-backgrounds/active/ - Get only active page background settings
+    - GET /api/master/page-backgrounds/by-route/{route}/ - Get background setting for a specific route
+    """
+    queryset = PageBackgroundSettings.objects.all()
+    serializer_class = PageBackgroundSettingsSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active', 'background_type']
+    search_fields = ['page_name', 'page_route']
+    ordering_fields = ['page_name', 'created_at']
+    ordering = ['page_name']
+
+    def get_serializer_context(self):
+        """Add request to serializer context for building absolute URLs"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """Get only active page background settings"""
+        active_settings = self.get_queryset().filter(is_active=True)
+        serializer = self.get_serializer(active_settings, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='by-route/(?P<route>[^/.]+)')
+    def by_route(self, request, route=None):
+        """Get background setting for a specific route"""
+        # Reconstruct the full route path
+        full_route = f"/admin/{route}" if not route.startswith('/') else route
+        
+        background_setting = self.get_queryset().filter(
+            page_route=full_route,
+            is_active=True
+        ).first()
+        
+        if background_setting:
+            serializer = self.get_serializer(background_setting)
+            return Response(serializer.data)
+        
+        return Response(
+            {'error': f'No background setting found for route: {full_route}'},
+            status=status.HTTP_404_NOT_FOUND
+        )

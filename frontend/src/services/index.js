@@ -20,4 +20,7 @@ export { transactionAPI } from './transactionsApi';
 export { serviceAPI } from './servicesApi';
 
 // Export sales API
-export { salesAPI } from './salesApi'; 
+export { salesAPI } from './salesApi';
+
+// Export settings API
+export { default as settingsApi } from './settingsApi'; 

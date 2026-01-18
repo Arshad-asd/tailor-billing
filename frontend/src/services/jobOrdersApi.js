@@ -152,6 +152,28 @@ export const jobOrdersApi = {
       console.error('Error testing POST:', error);
       throw error;
     }
+  },
+
+  // Update only measurements section
+  updateMeasurements: async (id, measurementsData) => {
+    try {
+      const response = await api.patch(`${JOB_ORDERS_BASE_URL}${id}/update_measurements/`, measurementsData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating measurements:', error);
+      throw error;
+    }
+  },
+
+  // Update only bill section
+  updateBill: async (id, billData) => {
+    try {
+      const response = await api.patch(`${JOB_ORDERS_BASE_URL}${id}/update_bill/`, billData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating bill:', error);
+      throw error;
+    }
   }
 };
 

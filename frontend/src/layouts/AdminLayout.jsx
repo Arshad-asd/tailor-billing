@@ -1,14 +1,45 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Outlet, Link, useLocation } from "react-router-dom"
 import { LayoutDashboard, Scissors, Package, Package2, Truck, DollarSign, BarChart3, Settings, Users, Bell, Search, User, Menu, X, ChevronLeft, ChevronRight, LogOut, ClipboardList, Receipt, ShoppingCart, Ruler, ChevronDown, UserCircle, Shield, HelpCircle, FileText, Building2 } from 'lucide-react'
 import useTokenExpiry from "../hooks/useTokenExpiry"
 import LogoutModal from "../components/modals/LogoutModal"
 import { useSettings } from "../contexts/SettingsContext"
 
+// Icon mapping for dynamic sidebar items
+const iconMap = {
+  'LayoutDashboard': LayoutDashboard,
+  'ClipboardList': ClipboardList,
+  'Package': Package,
+  'Package2': Package2,
+  'Truck': Truck,
+  'DollarSign': DollarSign,
+  'BarChart3': BarChart3,
+  'Settings': Settings,
+  'Users': Users,
+  'Receipt': Receipt,
+  'FileText': FileText,
+  'Building2': Building2,
+  'Ruler': Ruler,
+  'ShoppingCart': ShoppingCart,
+  'Scissors': Scissors,
+  'Bell': Bell,
+  'Search': Search,
+  'User': User,
+  'Menu': Menu,
+  'X': X,
+  'ChevronLeft': ChevronLeft,
+  'ChevronRight': ChevronRight,
+  'LogOut': LogOut,
+  'ChevronDown': ChevronDown,
+  'UserCircle': UserCircle,
+  'Shield': Shield,
+  'HelpCircle': HelpCircle,
+};
+
 const AdminLayout = ({ children }) => {
-  const { settings } = useSettings();
+  const { settings, getPageBackground } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(!settings.sidebarCollapsed)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
@@ -22,7 +53,8 @@ const AdminLayout = ({ children }) => {
     handleManualLogout
   } = useTokenExpiry()
 
-  const navigationItems = [
+  // Default navigation items (fallback if no custom items configured)
+  const defaultNavigationItems = [
     {
       name: "Dashboard",
       href: "/admin/dashboard",
@@ -35,12 +67,6 @@ const AdminLayout = ({ children }) => {
       icon: ClipboardList,
       badge: "12",
     },
-    // {
-    //   name: "Measurements",
-    //   href: "/admin/measurements",
-    //   icon: Ruler,
-    //   badge: "3",
-    // },
     {
       name: "Materials",
       href: "/admin/materials",
@@ -64,6 +90,11 @@ const AdminLayout = ({ children }) => {
       icon: Receipt,
     },
     {
+      name: "Invoice",
+      href: "/admin/invoice",
+      icon: FileText,
+    },
+    {
       name: "Daily Report",
       href: "/admin/daily-report",
       icon: BarChart3,
@@ -73,23 +104,12 @@ const AdminLayout = ({ children }) => {
       href: "/admin/reports",
       icon: FileText,
     },
-    // {
-    //   name: "Purchase",
-    //   href: "/admin/purchase",
-    //   icon: ShoppingCart,
-    // },
-
     {
       name: "Inventory",
       href: "/admin/inventory",
       icon: Package2,
       badge: "5",
     },
-    // {
-    //   name: "Services",
-    //   href: "/admin/services",
-    //   icon: Scissors,
-    // },
     {
       name: "Customers",
       href: "/admin/customers",
@@ -100,12 +120,40 @@ const AdminLayout = ({ children }) => {
       href: "/admin/company-details",
       icon: Building2,
     },
-    // {
-    //   name: "Settings",
-    //   href: "/admin/settings",
-    //   icon: Settings,
-    // },
-  ]
+  ];
+
+  // Build navigation items from settings or use defaults
+  const navigationItems = useMemo(() => {
+    if (settings.sidebarItems && settings.sidebarItems.length > 0) {
+      return settings.sidebarItems.map(item => ({
+        name: item.item_name,
+        href: item.route_path,
+        icon: iconMap[item.icon_name] || LayoutDashboard, // Fallback to LayoutDashboard if icon not found
+        exact: item.route_path === '/admin/dashboard',
+        badge: null, // Badges can be added later if needed
+      }));
+    }
+    return defaultNavigationItems;
+  }, [settings.sidebarItems]);
+
+  // Get background style for current page
+  const pageBackground = useMemo(() => {
+    const bg = getPageBackground(location.pathname);
+    if (!bg || !bg.is_active) return null;
+    
+    let style = {};
+    if (bg.background_type === 'color' && bg.background_color) {
+      style.backgroundColor = bg.background_color;
+    } else if (bg.background_type === 'image' && bg.background_image_url) {
+      style.backgroundImage = `url(${bg.background_image_url})`;
+      style.backgroundSize = 'cover';
+      style.backgroundPosition = 'center';
+      style.backgroundRepeat = 'no-repeat';
+    } else if (bg.background_type === 'gradient' && bg.background_gradient) {
+      style.background = bg.background_gradient;
+    }
+    return style;
+  }, [location.pathname, getPageBackground]);
 
   const isActiveRoute = (href, exact = false) => {
     if (exact) {
@@ -435,7 +483,10 @@ const AdminLayout = ({ children }) => {
           </header>
 
           {/* Page Content */}
-          <main className={`flex-1 bg-gray-50 dark:bg-gray-900 ${settings.compactMode ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}>
+          <main 
+            className={`flex-1 bg-gray-50 dark:bg-gray-900 ${settings.compactMode ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}
+            style={pageBackground || {}}
+          >
             <div className="max-w-7xl mx-auto">{children || <Outlet />}</div>
           </main>
         </div>

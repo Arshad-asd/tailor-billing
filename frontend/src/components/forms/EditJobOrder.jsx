@@ -20,6 +20,16 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState(null);
+  const [sectionLoading, setSectionLoading] = useState({
+    customer: false,
+    measurement: false,
+    bill: false
+  });
+  const [sectionError, setSectionError] = useState({
+    customer: null,
+    measurement: null,
+    bill: null
+  });
 
   const [formData, setFormData] = useState({
     customer: {
@@ -430,6 +440,167 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     );
   };
 
+  // Handle customer section update
+  const handleSaveCustomerSection = async () => {
+    setSectionLoading(prev => ({ ...prev, customer: true }));
+    setSectionError(prev => ({ ...prev, customer: null }));
+
+    try {
+      // Note: Customer assignment (which customer is linked to the job order) is read-only
+      // However, we can update the customer's details if they were edited
+      if (selectedCustomer) {
+        // Update customer details through customer API if they were changed
+        const customerUpdateData = {};
+        if (formData.customer.customerName !== selectedCustomer.name) {
+          customerUpdateData.name = formData.customer.customerName;
+        }
+        if (formData.customer.mobileNo !== selectedCustomer.phone) {
+          customerUpdateData.phone = formData.customer.mobileNo;
+        }
+        if (formData.customer.customerNo !== selectedCustomer.customer_id) {
+          customerUpdateData.customer_id = formData.customer.customerNo;
+        }
+        
+        if (Object.keys(customerUpdateData).length > 0) {
+          await customerApi.patchCustomer(selectedCustomer.id, customerUpdateData);
+          // Refresh selected customer data
+          const updatedCustomer = await customerApi.getCustomer(selectedCustomer.id);
+          setSelectedCustomer(updatedCustomer);
+        }
+      }
+      
+      // Show success message
+      setSectionError(prev => ({ ...prev, customer: 'Customer information updated successfully' }));
+      setTimeout(() => {
+        setSectionError(prev => ({ ...prev, customer: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      setSectionError(prev => ({ 
+        ...prev, 
+        customer: error.response?.data?.error || error.response?.data?.detail || 'Failed to update customer information' 
+      }));
+    } finally {
+      setSectionLoading(prev => ({ ...prev, customer: false }));
+    }
+  };
+
+  // Handle measurement section update
+  const handleSaveMeasurements = async () => {
+    setSectionLoading(prev => ({ ...prev, measurement: true }));
+    setSectionError(prev => ({ ...prev, measurement: null }));
+
+    try {
+      const measurementsPayload = {
+        job_order_measurements: selectedMaterials.map(material => {
+          const materialId = parseInt(material.material_id);
+          if (!materialId || isNaN(materialId)) {
+            throw new Error(`Invalid material ID: ${material.material_id}`);
+          }
+          
+          return {
+            material: materialId,
+            thool: material.custom_thool || 0,
+            kethet: material.custom_kethet || 0,
+            thool_kum: material.custom_thool_kum || 0,
+            ardh_f_kum: material.custom_ardh_f_kum || 0,
+            jamba: material.custom_jamba || 0,
+            ragab: material.custom_ragab || 0,
+            note1: material.note1 || '',
+            note2: material.note2 || '',
+            note3: material.note3 || '',
+            note4: material.note4 || ''
+          };
+        })
+      };
+
+      const result = await jobOrdersApi.updateMeasurements(jobOrderId, measurementsPayload);
+      console.log('Measurements updated successfully:', result);
+      
+      setSectionError(prev => ({ ...prev, measurement: 'Measurements updated successfully' }));
+      setTimeout(() => {
+        setSectionError(prev => ({ ...prev, measurement: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error updating measurements:', error);
+      setSectionError(prev => ({ 
+        ...prev, 
+        measurement: error.response?.data?.error || 'Failed to update measurements' 
+      }));
+    } finally {
+      setSectionLoading(prev => ({ ...prev, measurement: false }));
+    }
+  };
+
+  // Handle bill section update
+  const handleSaveBill = async () => {
+    setSectionLoading(prev => ({ ...prev, bill: true }));
+    setSectionError(prev => ({ ...prev, bill: null }));
+
+    try {
+      const billPayload = {
+        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate).toISOString() : null,
+        total_amount: formData.bill.total,
+        advance_amount: formData.bill.advance,
+        payment_method: formData.bill.paymentMethod,
+        cash_amount: formData.bill.cashAmount,
+        card_amount: formData.bill.cardAmount,
+        remarks: formData.measurement.remarks,
+        job_order_items: billItems.map(item => {
+          const materialId = parseInt(item.material_id);
+          if (!materialId || isNaN(materialId)) {
+            throw new Error(`Invalid material ID for item: ${item.material_id}`);
+          }
+          
+          return {
+            material: materialId,
+            quantity: item.qty,
+            fees: item.fees
+          };
+        })
+      };
+
+      const result = await jobOrdersApi.updateBill(jobOrderId, billPayload);
+      console.log('Bill updated successfully:', result);
+      
+      // Update local state with response data
+      if (result) {
+        setFormData(prev => ({
+          ...prev,
+          bill: {
+            ...prev.bill,
+            total: result.total_amount || prev.bill.total,
+            advance: result.advance_amount || prev.bill.advance,
+            balance: result.balance_amount || prev.bill.balance,
+            paymentMethod: result.payment_method || prev.bill.paymentMethod,
+            cashAmount: result.cash_amount || prev.bill.cashAmount,
+            cardAmount: result.card_amount || prev.bill.cardAmount
+          },
+          measurement: {
+            ...prev.measurement,
+            remarks: result.remarks || prev.measurement.remarks
+          }
+        }));
+      }
+      
+      setSectionError(prev => ({ ...prev, bill: 'Bill information updated successfully' }));
+      setTimeout(() => {
+        setSectionError(prev => ({ ...prev, bill: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error updating bill:', error);
+      setSectionError(prev => ({ 
+        ...prev, 
+        bill: error.response?.data?.error || 'Failed to update bill information' 
+      }));
+    } finally {
+      setSectionLoading(prev => ({ ...prev, bill: false }));
+    }
+  };
+
   const handleSaveAll = async () => {
     setIsLoading(true);
     setError(null);
@@ -575,8 +746,33 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <Search className="w-3 h-3" />
                 <span>Find</span>
               </button>
+              <button 
+                onClick={handleSaveCustomerSection}
+                disabled={sectionLoading.customer}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-3 h-3" />
+                <span>{sectionLoading.customer ? 'Saving...' : 'Save'}</span>
+              </button>
             </div>
           </div>
+          
+          {/* Customer Section Error/Success Message */}
+          {sectionError.customer && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              sectionError.customer.includes('successfully') 
+                ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700' 
+                : 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700'
+            }`}>
+              <p className={`text-sm ${
+                sectionError.customer.includes('successfully')
+                  ? 'text-green-800 dark:text-green-200'
+                  : 'text-red-800 dark:text-red-200'
+              }`}>
+                {sectionError.customer}
+              </p>
+            </div>
+          )}
           
           {/* Selected Customer Indicator */}
           {selectedCustomer && (
@@ -669,8 +865,33 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
               </button>
+              <button 
+                onClick={handleSaveMeasurements}
+                disabled={sectionLoading.measurement || selectedMaterials.length === 0}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-3 h-3" />
+                <span>{sectionLoading.measurement ? 'Saving...' : 'Save'}</span>
+              </button>
             </div>
           </div>
+          
+          {/* Measurement Section Error/Success Message */}
+          {sectionError.measurement && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              sectionError.measurement.includes('successfully') 
+                ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700' 
+                : 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700'
+            }`}>
+              <p className={`text-sm ${
+                sectionError.measurement.includes('successfully')
+                  ? 'text-green-800 dark:text-green-200'
+                  : 'text-red-800 dark:text-red-200'
+              }`}>
+                {sectionError.measurement}
+              </p>
+            </div>
+          )}
           
           {/* Selected Materials Display - Card Format with Individual Notes */}
           {selectedMaterials.length > 0 ? (
@@ -872,8 +1093,33 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
               >
                 <span>Clear All</span>
               </button>
+              <button 
+                onClick={handleSaveBill}
+                disabled={sectionLoading.bill}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-3 h-3" />
+                <span>{sectionLoading.bill ? 'Saving...' : 'Save'}</span>
+              </button>
             </div>
           </div>
+          
+          {/* Bill Section Error/Success Message */}
+          {sectionError.bill && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              sectionError.bill.includes('successfully') 
+                ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700' 
+                : 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700'
+            }`}>
+              <p className={`text-sm ${
+                sectionError.bill.includes('successfully')
+                  ? 'text-green-800 dark:text-green-200'
+                  : 'text-red-800 dark:text-red-200'
+              }`}>
+                {sectionError.bill}
+              </p>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">

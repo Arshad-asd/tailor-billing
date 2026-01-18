@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import settingsApi from '../services/settingsApi';
 
 const SettingsContext = createContext();
 
@@ -38,19 +39,61 @@ export const SettingsProvider = ({ children }) => {
     autoSave: true,
     dataRetention: 365, // days
     backupFrequency: 'daily', // 'daily', 'weekly', 'monthly'
+    
+    // Sidebar Configuration (loaded from API)
+    sidebarItems: [],
+    
+    // Page Background Settings (loaded from API)
+    pageBackgrounds: {},
   });
 
-  // Load settings from localStorage on mount
+  const [loading, setLoading] = useState(true);
+
+  // Load settings from localStorage and API on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('adminSettings');
-    if (savedSettings) {
+    const loadSettings = async () => {
       try {
-        const parsed = JSON.parse(savedSettings);
-        setSettings(prev => ({ ...prev, ...parsed }));
+        // Load local settings first
+        const savedSettings = localStorage.getItem('adminSettings');
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setSettings(prev => ({ ...prev, ...parsed }));
+          } catch (error) {
+            console.error('Error loading local settings:', error);
+          }
+        }
+
+        // Load sidebar items from API
+        try {
+          const sidebarItems = await settingsApi.getActiveSidebarItems();
+          setSettings(prev => ({ ...prev, sidebarItems }));
+        } catch (error) {
+          console.error('Error loading sidebar items:', error);
+          // Keep default empty array if API fails
+        }
+
+        // Load page backgrounds from API
+        try {
+          const pageBackgrounds = await settingsApi.getActivePageBackgrounds();
+          // Convert array to object keyed by route for easier lookup
+          const backgroundsObj = {};
+          pageBackgrounds.forEach(bg => {
+            backgroundsObj[bg.page_route] = bg;
+          });
+          setSettings(prev => ({ ...prev, pageBackgrounds: backgroundsObj }));
+        } catch (error) {
+          console.error('Error loading page backgrounds:', error);
+          // Keep default empty object if API fails
+        }
       } catch (error) {
         console.error('Error loading settings:', error);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+
+    loadSettings();
   }, []);
 
   // Theme changes are now handled by the ThemeProvider and useAppearance hook
@@ -103,11 +146,48 @@ export const SettingsProvider = ({ children }) => {
     localStorage.setItem('adminSettings', JSON.stringify(defaultSettings));
   };
 
+  // Refresh sidebar items from API
+  const refreshSidebarItems = async () => {
+    try {
+      const sidebarItems = await settingsApi.getActiveSidebarItems();
+      setSettings(prev => ({ ...prev, sidebarItems }));
+      return { success: true };
+    } catch (error) {
+      console.error('Error refreshing sidebar items:', error);
+      return { success: false, error };
+    }
+  };
+
+  // Refresh page backgrounds from API
+  const refreshPageBackgrounds = async () => {
+    try {
+      const pageBackgrounds = await settingsApi.getActivePageBackgrounds();
+      const backgroundsObj = {};
+      pageBackgrounds.forEach(bg => {
+        backgroundsObj[bg.page_route] = bg;
+      });
+      setSettings(prev => ({ ...prev, pageBackgrounds: backgroundsObj }));
+      return { success: true };
+    } catch (error) {
+      console.error('Error refreshing page backgrounds:', error);
+      return { success: false, error };
+    }
+  };
+
+  // Get background for a specific route
+  const getPageBackground = (route) => {
+    return settings.pageBackgrounds[route] || null;
+  };
+
   const value = {
     settings,
+    loading,
     updateSettings,
     saveSettings,
     resetSettings,
+    refreshSidebarItems,
+    refreshPageBackgrounds,
+    getPageBackground,
   };
 
   return (
