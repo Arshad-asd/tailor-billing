@@ -159,7 +159,7 @@ export default function ServicesPage() {
       <section className="py-20 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose Tailor Pro?</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose Al Kharthoum?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               We combine traditional craftsmanship with modern techniques to deliver exceptional results
             </p>

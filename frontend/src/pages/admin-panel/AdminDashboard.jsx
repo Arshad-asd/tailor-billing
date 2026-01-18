@@ -179,7 +179,7 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tailor Pro Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Al Kharthoum Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">Monitor your tailoring business performance and job orders</p>
         </div>
         <div className="flex items-center space-x-3">

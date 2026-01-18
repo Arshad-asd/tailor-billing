@@ -37,7 +37,7 @@ export default function CustomerLayout({ children }) {
             <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <span className="text-2xl">✂️</span>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                Tailor Pro
+                Al Kharthoum
               </span>
             </Link>
 
@@ -241,7 +241,7 @@ export default function CustomerLayout({ children }) {
               <div className="flex items-center space-x-2">
                 <span className="text-2xl">✂️</span>
                 <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                  Tailor Pro
+                  Al Kharthoum
                 </span>
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed">
@@ -373,7 +373,7 @@ export default function CustomerLayout({ children }) {
           <div className="border-t pt-8 mt-8">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
               <p className="text-sm text-muted-foreground">
-                © {new Date().getFullYear()} Tailor Pro. All rights reserved.
+                © {new Date().getFullYear()} Al Kharthoum. All rights reserved.
               </p>
               <div className="flex flex-wrap justify-center md:justify-end gap-6">
                 <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">

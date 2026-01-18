@@ -320,7 +320,7 @@ const AdminLayout = ({ children }) => {
                   <Scissors className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">Tailor Pro</h1>
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">Al kharthoum</h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Management System</p>
                 </div>
               </div>
@@ -384,7 +384,7 @@ const AdminLayout = ({ children }) => {
                     <Scissors className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-lg font-bold text-gray-900 dark:text-white">Tailor Pro</h1>
+                    <h1 className="text-lg font-bold text-gray-900 dark:text-white">Al Kharthoum</h1>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Management System</p>
                   </div>
                 </div>
