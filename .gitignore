@@ -1,0 +1,19 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# (Optional) ignore compiled migrations cache explicitly
+backend/apps/**/migrations/__pycache__/*.pyc
+
+# Ignore all Django migration files (all apps)
+backend/apps/**/migrations/*.py
+
+# But keep __init__.py
+!backend/apps/**/migrations/__init__.py
+
+# Environment variables
+backend/core/.env
+
+# SQLite database
+*.sqlite3
+*.db
