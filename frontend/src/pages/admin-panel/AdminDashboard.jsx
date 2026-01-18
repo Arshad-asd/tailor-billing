@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table"
 import { Badge } from "../../components/ui/badge"
@@ -57,7 +58,7 @@ const AdminDashboard = () => {
         
         // Fetch stats and recent job orders in parallel
         const [statsResponse, recentResponse] = await Promise.all([
-          jobOrdersApi.getJobOrderStats(),
+          jobOrdersApi.getJobOrderStats(timeRange),
           jobOrdersApi.getRecentJobOrders(5)
         ])
         
@@ -96,7 +97,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Total Revenue",
-      value: `$${stats.total_revenue?.toFixed(2) || "0.00"}`,
+      value: `QAR ${stats.total_revenue?.toFixed(2) || "0.00"}`,
       change: "+25%",
       trend: "up",
       icon: DollarSign,
@@ -184,19 +185,28 @@ const AdminDashboard = () => {
         <div className="flex items-center space-x-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">Last 7 days</Button>
+              <Button variant="outline">
+                {timeRange === "all" ? "All time" :
+                 timeRange === "1d" ? "Last 24 hours" :
+                 timeRange === "7d" ? "Last 7 days" :
+                 timeRange === "30d" ? "Last 30 days" :
+                 timeRange === "90d" ? "Last 90 days" : "Last 7 days"}
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setTimeRange("all")}>All time</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("1d")}>Last 24 hours</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("7d")}>Last 7 days</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("30d")}>Last 30 days</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("90d")}>Last 90 days</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
-            New Job Order
-          </Button>
+          <Link to="/admin/job-orders">
+            <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+              <Plus className="w-4 h-4 mr-2" />
+              New Job Order
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -245,9 +255,11 @@ const AdminDashboard = () => {
                 <CardTitle>Recent Job Orders</CardTitle>
                 <CardDescription>Latest job orders and their status</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                View All
-              </Button>
+              <Link to="/admin/job-orders">
+                <Button variant="outline" size="sm">
+                  View All
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -302,7 +314,7 @@ const AdminDashboard = () => {
                             {jobOrder.balance_amount > 0 ? 'Outstanding' : 'Paid'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-medium">${parseFloat(jobOrder.total_amount).toFixed(2)}</TableCell>
+                        <TableCell className="font-medium">QAR {parseFloat(jobOrder.total_amount).toFixed(2)}</TableCell>
                         <TableCell>
                           <div className="text-sm">{new Date(jobOrder.delivery_date).toLocaleDateString()}</div>
                         </TableCell>
@@ -395,21 +407,21 @@ const AdminDashboard = () => {
                 <DollarSign className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium">Total Revenue</span>
               </div>
-              <span className="text-sm font-medium">${stats.total_revenue?.toFixed(2) || '0.00'}</span>
+              <span className="text-sm font-medium">QAR {stats.total_revenue?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <CreditCard className="w-4 h-4 text-orange-500" />
                 <span className="text-sm font-medium">Outstanding Balance</span>
               </div>
-              <span className="text-sm font-medium">${stats.total_balance?.toFixed(2) || '0.00'}</span>
+              <span className="text-sm font-medium">QAR {stats.total_balance?.toFixed(2) || '0.00'}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Recent Activity Feed */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Recent Activity</CardTitle>
           <CardDescription>Latest business activities and events</CardDescription>
@@ -485,65 +497,73 @@ const AdminDashboard = () => {
             })}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Plus className="w-5 h-5 text-blue-600" />
+        <Link to="/admin/job-orders">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">New Job Order</p>
+                  <p className="text-sm text-gray-500">Create new order</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">New Job Order</p>
-                <p className="text-sm text-gray-500">Create new order</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Ruler className="w-5 h-5 text-green-600" />
+        <Link to="/admin/materials">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Ruler className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">Measurements</p>
+                  <p className="text-sm text-gray-500">Record measurements</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Measurements</p>
-                <p className="text-sm text-gray-500">Record measurements</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-purple-600" />
+        <Link to="/admin/reports">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">Reports</p>
+                  <p className="text-sm text-gray-500">View reports</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Reports</p>
-                <p className="text-sm text-gray-500">View reports</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-orange-600" />
+        <Link to="/admin/inventory">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Package className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">Inventory</p>
+                  <p className="text-sm text-gray-500">Manage materials</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Inventory</p>
-                <p className="text-sm text-gray-500">Manage materials</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   )
