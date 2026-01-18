@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { Plus, Search, Printer, Edit, Trash2, DollarSign, TrendingUp, Users, Clock } from "lucide-react"
 import AddSaleModal from "../../components/modals/AddSaleModal"
 import EditSaleModal from "../../components/modals/EditSaleModal"
@@ -10,6 +11,8 @@ import { buildA5TailorInvoiceHTML } from "../../components/print/a5-tailor-invoi
 import { printHTMLInNewWindow } from "../../components/print/print"
 
 export default function Sales() {
+  const location = useLocation()
+  const navigate = useNavigate()
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0]
   
@@ -28,6 +31,26 @@ export default function Sales() {
   useEffect(() => {
     loadSales()
   }, [startDate, endDate])
+
+  // Check for search result navigation and open edit form
+  useEffect(() => {
+    if (location.state?.openEditForm && location.state?.editId) {
+      const editId = location.state.editId;
+      // Wait for sales to load, then find and open edit form
+      if (sales.length > 0) {
+        const sale = sales.find(s => s.id === editId);
+        if (sale) {
+          const timer = setTimeout(() => {
+            setEditingSale(sale);
+            setIsEditModalOpen(true);
+            // Clear the state to prevent reopening on re-render
+            navigate(location.pathname, { replace: true, state: {} });
+          }, 100);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [location.state, sales, navigate, location.pathname]);
 
   const loadSales = async () => {
     try {

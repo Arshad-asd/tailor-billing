@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, AlertCircle, DollarSign, Printer } from "lucide-react"
 import AddJobOrder from "../../components/forms/AddJobOrder"
 import EditJobOrder from "../../components/forms/EditJobOrder"
@@ -9,6 +10,8 @@ import { formatCurrency, safeParseFloat } from "../../utils/currencyUtils"
 import JobOrderA5 from "../../components/print/joborder-a5"
 
 export default function JobOrders() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [jobOrders, setJobOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -42,6 +45,23 @@ export default function JobOrders() {
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("")
+
+  // Check for search result navigation and open edit form
+  useEffect(() => {
+    if (location.state?.openEditForm && location.state?.editId && !isLoading) {
+      const editId = location.state.editId;
+      // Wait for job orders to load, then open edit form
+      if (jobOrders.length > 0 || editId) {
+        const timer = setTimeout(() => {
+          setEditingJobOrderId(editId);
+          setIsEditFormOpen(true);
+          // Clear the state to prevent reopening on re-render
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [location.state, isLoading, jobOrders.length, navigate, location.pathname]);
 
   const toIsoDate = (d) => {
     if (!d) return ""

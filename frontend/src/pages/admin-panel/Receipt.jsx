@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Receipt as ReceiptIcon, DollarSign, CheckCircle, Clock, Download } from 'lucide-react';
 import AddReceiptModal from '../../components/modals/AddReceiptModal';
 import EditReceiptModal from '../../components/modals/EditReceiptModal';
@@ -6,6 +7,8 @@ import { useNotification } from '../../hooks/useNotification';
 import receiptApi from '../../services/receiptApi';
 
 export default function ReceiptPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [receipts, setReceipts] = useState([]);
@@ -19,6 +22,26 @@ export default function ReceiptPage() {
   useEffect(() => {
     fetchReceipts();
   }, []);
+
+  // Check for search result navigation and open edit form
+  useEffect(() => {
+    if (location.state?.openEditForm && location.state?.editId) {
+      const editId = location.state.editId;
+      // Wait for receipts to load, then find and open edit form
+      if (receipts.length > 0) {
+        const receipt = receipts.find(r => r.id === editId);
+        if (receipt) {
+          const timer = setTimeout(() => {
+            setEditingReceipt(receipt);
+            setShowEditModal(true);
+            // Clear the state to prevent reopening on re-render
+            navigate(location.pathname, { replace: true, state: {} });
+          }, 100);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [location.state, receipts, navigate, location.pathname]);
 
   const fetchReceipts = async () => {
     setLoading(true);

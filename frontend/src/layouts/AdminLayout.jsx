@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { Outlet, Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, Scissors, Package, Package2, Truck, DollarSign, BarChart3, Settings, Users, Bell, Search, User, Menu, X, ChevronLeft, ChevronRight, LogOut, ClipboardList, Receipt, ShoppingCart, Ruler, ChevronDown, UserCircle, Shield, HelpCircle, FileText, Building2 } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from "react"
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom"
+import { LayoutDashboard, Scissors, Package, Package2, Truck, DollarSign, BarChart3, Settings, Users, Bell, Search, User, Menu, X, ChevronLeft, ChevronRight, LogOut, ClipboardList, Receipt, ShoppingCart, Ruler, ChevronDown, UserCircle, Shield, HelpCircle, FileText, Building2, Loader2 } from 'lucide-react'
 import useTokenExpiry from "../hooks/useTokenExpiry"
 import LogoutModal from "../components/modals/LogoutModal"
 import { useSettings } from "../contexts/SettingsContext"
+import settingsApi from "../services/settingsApi"
 
 // Icon mapping for dynamic sidebar items
 const iconMap = {
@@ -43,7 +44,15 @@ const AdminLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(!settings.sidebarCollapsed)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const desktopSearchRef = useRef(null)
+  const mobileSearchRef = useRef(null)
+  const searchTimeoutRef = useRef(null)
 
   // Token expiry hook
   const {
@@ -166,6 +175,112 @@ const AdminLayout = ({ children }) => {
   useEffect(() => {
     setSidebarOpen(!settings.sidebarCollapsed);
   }, [settings.sidebarCollapsed]);
+
+  // Global search function with debouncing
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If search query is empty, clear results
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setIsSearching(false);
+      return;
+    }
+
+    // Set loading state
+    setIsSearching(true);
+    setShowSearchResults(true);
+
+    // Debounce search - wait 300ms after user stops typing
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await settingsApi.globalSearch(searchQuery.trim(), 10);
+        setSearchResults(response.results || []);
+      } catch (error) {
+        console.error('Error performing global search:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isDesktopClick = desktopSearchRef.current && desktopSearchRef.current.contains(event.target);
+      const isMobileClick = mobileSearchRef.current && mobileSearchRef.current.contains(event.target);
+      
+      if (!isDesktopClick && !isMobileClick) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle search result click
+  const handleSearchResultClick = (result) => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+    
+    // Navigate to the appropriate page and open edit form
+    navigate(result.route, {
+      state: {
+        searchResult: result,
+        highlightId: result.id,
+        highlightType: result.type,
+        openEditForm: true, // Flag to open edit form
+        editId: result.id
+      }
+    });
+  };
+
+  // Get icon for search result type
+  const getResultIcon = (type) => {
+    switch (type) {
+      case 'job_order':
+        return ClipboardList;
+      case 'customer':
+        return Users;
+      case 'receipt':
+        return Receipt;
+      case 'sale':
+        return DollarSign;
+      default:
+        return FileText;
+    }
+  };
+
+  // Get type label
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'job_order':
+        return 'Job Order';
+      case 'customer':
+        return 'Customer';
+      case 'receipt':
+        return 'Receipt';
+      case 'sale':
+        return 'Sale';
+      default:
+        return 'Item';
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
@@ -366,13 +481,69 @@ const AdminLayout = ({ children }) => {
               {/* Center Section - Enhanced Search */}
               {settings.showSearchBar && (
                 <div className="hidden md:flex flex-1 max-w-lg mx-8">
-                  <div className="relative w-full">
+                  <div className="relative w-full" ref={desktopSearchRef}>
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search job orders, customers, materials..."
+                      placeholder="Search job orders, customers, receipts, sales..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => {
+                        if (searchResults.length > 0 || isSearching) {
+                          setShowSearchResults(true);
+                        }
+                      }}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
+                    
+                    {/* Search Results Dropdown */}
+                    {showSearchResults && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                        {isSearching ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Searching...</span>
+                          </div>
+                        ) : searchResults.length > 0 ? (
+                          <div className="py-2">
+                            {searchResults.map((result, index) => {
+                              const Icon = getResultIcon(result.type);
+                              return (
+                                <button
+                                  key={`${result.type}-${result.id}-${index}`}
+                                  onClick={() => handleSearchResultClick(result)}
+                                  className="w-full px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left flex items-start space-x-3 group"
+                                >
+                                  <div className="flex-shrink-0 mt-0.5">
+                                    <Icon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2">
+                                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {result.title}
+                                      </p>
+                                      <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                        {getTypeLabel(result.type)}
+                                      </span>
+                                    </div>
+                                    {result.subtitle && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                                        {result.subtitle}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : searchQuery.trim() ? (
+                          <div className="px-4 py-8 text-center">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">No results found</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try a different search term</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -470,13 +641,69 @@ const AdminLayout = ({ children }) => {
             {/* Mobile Search Bar */}
             {settings.showSearchBar && (
               <div className="md:hidden px-4 pb-3">
-                <div className="relative">
+                <div className="relative" ref={mobileSearchRef}>
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search..."
+                    placeholder="Search job orders, customers, receipts, sales..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (searchResults.length > 0 || isSearching) {
+                        setShowSearchResults(true);
+                      }
+                    }}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  
+                  {/* Mobile Search Results Dropdown */}
+                  {showSearchResults && (
+                    <div className="absolute top-full left-4 right-4 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                      {isSearching ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Searching...</span>
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        <div className="py-2">
+                          {searchResults.map((result, index) => {
+                            const Icon = getResultIcon(result.type);
+                            return (
+                              <button
+                                key={`${result.type}-${result.id}-${index}`}
+                                onClick={() => handleSearchResultClick(result)}
+                                className="w-full px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left flex items-start space-x-3 group"
+                              >
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <Icon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                      {result.title}
+                                    </p>
+                                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                      {getTypeLabel(result.type)}
+                                    </span>
+                                  </div>
+                                  {result.subtitle && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                                      {result.subtitle}
+                                    </p>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : searchQuery.trim() ? (
+                        <div className="px-4 py-8 text-center">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">No results found</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try a different search term</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
