@@ -89,11 +89,11 @@ const AdminLayout = ({ children }) => {
       href: "/admin/receipt",
       icon: Receipt,
     },
-    {
-      name: "Invoice",
-      href: "/admin/invoice",
-      icon: FileText,
-    },
+    // {
+    //   name: "Invoice",
+    //   href: "/admin/invoice",
+    //   icon: FileText,
+    // },
     {
       name: "Daily Report",
       href: "/admin/daily-report",
