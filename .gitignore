@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Ignore __pycache__ folders in all apps
+backend/apps/**/__pycache__/
+
 # (Optional) ignore compiled migrations cache explicitly
 backend/apps/**/migrations/__pycache__/*.pyc
 

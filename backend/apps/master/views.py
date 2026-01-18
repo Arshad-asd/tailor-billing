@@ -5,12 +5,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.db.models import Q
 from .models import CompanyDetails, SidebarItemConfiguration, PageBackgroundSettings
 from .serializers import (
     CompanyDetailsSerializer,
     SidebarItemConfigurationSerializer,
-    PageBackgroundSettingsSerializer
+    PageBackgroundSettingsSerializer,
+    GlobalSearchResultSerializer
 )
+from apps.joborder.models import JobOrder
+from apps.crm.models import Customer
+from apps.receipt.models import Receipt
+from apps.sale.models import Sale
 
 
 class CompanyDetailsViewSet(viewsets.ModelViewSet):
@@ -223,3 +229,137 @@ class PageBackgroundSettingsViewSet(viewsets.ModelViewSet):
             {'error': f'No background setting found for route: {full_route}'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+class GlobalSearchViewSet(viewsets.ViewSet):
+    """
+    ViewSet for global search across job orders, customers, and receipts.
+    
+    Provides:
+    - GET /api/master/global-search/?q=query - Search across all entities
+    """
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """
+        Global search across job orders, customers, and receipts.
+        
+        Query parameters:
+        - q: Search query string (required)
+        - limit: Maximum number of results per category (default: 10)
+        """
+        query = request.query_params.get('q', '').strip()
+        limit = int(request.query_params.get('limit', 10))
+        
+        if not query:
+            return Response(
+                {'error': 'Search query is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        results = []
+        
+        # Search Job Orders
+        job_orders = JobOrder.objects.filter(
+            Q(job_order_number__icontains=query) |
+            Q(customer__name__icontains=query) |
+            Q(customer__phone__icontains=query) |
+            Q(customer__customer_id__icontains=query) |
+            Q(remarks__icontains=query),
+            is_active=True
+        ).select_related('customer')[:limit]
+        
+        for job_order in job_orders:
+            results.append({
+                'id': job_order.id,
+                'type': 'job_order',
+                'title': job_order.job_order_number,
+                'subtitle': f"Customer: {job_order.customer.name} | Status: {job_order.status}",
+                'route': f'/admin/job-orders',
+                'metadata': {
+                    'job_order_id': job_order.id,
+                    'customer_name': job_order.customer.name,
+                    'status': job_order.status,
+                    'total_amount': str(job_order.total_amount),
+                }
+            })
+        
+        # Search Customers
+        customers = Customer.objects.filter(
+            Q(name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(customer_id__icontains=query),
+            is_active=True
+        )[:limit]
+        
+        for customer in customers:
+            results.append({
+                'id': customer.id,
+                'type': 'customer',
+                'title': customer.name,
+                'subtitle': f"ID: {customer.customer_id} | Phone: {customer.phone}",
+                'route': f'/admin/customers',
+                'metadata': {
+                    'customer_id': customer.id,
+                    'customer_code': customer.customer_id,
+                    'phone': customer.phone,
+                    'balance': str(customer.balance),
+                }
+            })
+        
+        # Search Receipts
+        receipts = Receipt.objects.filter(
+            Q(receipt_id__icontains=query) |
+            Q(job_order__job_order_number__icontains=query) |
+            Q(job_order__customer__name__icontains=query) |
+            Q(receipt_remarks__icontains=query),
+            is_active=True
+        ).select_related('job_order', 'job_order__customer')[:limit]
+        
+        for receipt in receipts:
+            results.append({
+                'id': receipt.id,
+                'type': 'receipt',
+                'title': receipt.receipt_id,
+                'subtitle': f"Job Order: {receipt.job_order.job_order_number} | Customer: {receipt.job_order.customer.name}",
+                'route': f'/admin/receipt',
+                'metadata': {
+                    'receipt_id': receipt.id,
+                    'job_order_number': receipt.job_order.job_order_number,
+                    'customer_name': receipt.job_order.customer.name,
+                    'amount': str(receipt.receipt_amount),
+                }
+            })
+        
+        # Search Sales
+        sales = Sale.objects.filter(
+            Q(sale_number__icontains=query) |
+            Q(customer_name__icontains=query) |
+            Q(notes__icontains=query),
+            is_active=True
+        )[:limit]
+        
+        for sale in sales:
+            results.append({
+                'id': sale.id,
+                'type': 'sale',
+                'title': sale.sale_number,
+                'subtitle': f"Customer: {sale.customer_name} | Amount: {sale.total_amount}",
+                'route': f'/admin/sales',
+                'metadata': {
+                    'sale_id': sale.id,
+                    'sale_number': sale.sale_number,
+                    'customer_name': sale.customer_name,
+                    'total_amount': str(sale.total_amount),
+                    'status': sale.status,
+                }
+            })
+        
+        # Serialize results
+        serializer = GlobalSearchResultSerializer(results, many=True)
+        return Response({
+            'query': query,
+            'results': serializer.data,
+            'count': len(results)
+        })

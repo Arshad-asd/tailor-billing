@@ -173,6 +173,30 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         """Get job order statistics"""
         queryset = self.get_queryset()
         
+        # Filter by time range if provided
+        time_range = request.query_params.get('time_range')
+        if time_range and time_range.lower() != 'all':
+            from datetime import timedelta
+            now = timezone.now()
+            
+            if time_range == '1d':
+                # Last 24 hours
+                start_date = now - timedelta(days=1)
+            elif time_range == '7d':
+                # Last 7 days
+                start_date = now - timedelta(days=7)
+            elif time_range == '30d':
+                # Last 30 days
+                start_date = now - timedelta(days=30)
+            elif time_range == '90d':
+                # Last 90 days
+                start_date = now - timedelta(days=90)
+            else:
+                start_date = None
+            
+            if start_date:
+                queryset = queryset.filter(created_at__gte=start_date)
+        
         stats = {
             'total_orders': queryset.count(),
             'pending': queryset.filter(status='pending').count(),

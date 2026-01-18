@@ -140,3 +140,13 @@ class PageBackgroundSettingsSerializer(serializers.ModelSerializer):
         
         return data
 
+
+class GlobalSearchResultSerializer(serializers.Serializer):
+    """Serializer for global search results"""
+    id = serializers.IntegerField()
+    type = serializers.CharField()  # 'job_order', 'customer', 'receipt'
+    title = serializers.CharField()
+    subtitle = serializers.CharField(required=False, allow_blank=True)
+    route = serializers.CharField()  # Route to navigate to
+    metadata = serializers.DictField(required=False)  # Additional metadata
+

@@ -110,9 +110,10 @@ export const jobOrdersApi = {
   },
 
   // Get job order statistics
-  getJobOrderStats: async () => {
+  getJobOrderStats: async (timeRange = null) => {
     try {
-      const response = await api.get(`${JOB_ORDERS_BASE_URL}stats/`);
+      const params = timeRange ? { time_range: timeRange } : {};
+      const response = await api.get(`${JOB_ORDERS_BASE_URL}stats/`, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching job order stats:', error);

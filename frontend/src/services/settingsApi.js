@@ -230,6 +230,19 @@ const settingsApi = {
       throw error;
     }
   },
+
+  // Global Search API
+  globalSearch: async (query, limit = 10) => {
+    try {
+      const response = await api.get('/master/global-search/search/', {
+        params: { q: query, limit }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error performing global search:', error);
+      throw error;
+    }
+  },
 };
 
 export default settingsApi;

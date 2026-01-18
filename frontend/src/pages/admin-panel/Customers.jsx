@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Users, Mail, Phone, MapPin, Calendar, DollarSign, Clock, Star, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
@@ -7,6 +8,8 @@ import customerApi from '../../services/customerApi';
 import { useNotification } from '../../hooks/useNotification';
 
 export default function Customers() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -64,6 +67,25 @@ export default function Customers() {
     setSelectedCustomer(customer);
     setIsDetailModalOpen(true);
   };
+
+  // Check for search result navigation and open detail view
+  useEffect(() => {
+    if (location.state?.openEditForm && location.state?.editId) {
+      const editId = location.state.editId;
+      // Wait for customers to load, then find and open detail view
+      if (customers.length > 0) {
+        const customer = customers.find(c => c.id === editId);
+        if (customer) {
+          const timer = setTimeout(() => {
+            openCustomerDetail(customer);
+            // Clear the state to prevent reopening on re-render
+            navigate(location.pathname, { replace: true, state: {} });
+          }, 100);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [location.state, customers, navigate, location.pathname]);
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
