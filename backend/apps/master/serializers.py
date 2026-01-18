@@ -3,6 +3,8 @@ from .models import CompanyDetails, SidebarItemConfiguration, PageBackgroundSett
 
 
 class CompanyDetailsSerializer(serializers.ModelSerializer):
+    company_logo_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = CompanyDetails
         fields = [
@@ -14,6 +16,7 @@ class CompanyDetailsSerializer(serializers.ModelSerializer):
             'company_email',
             'company_website',
             'company_logo',
+            'company_logo_url',
             'company_currency',
             'company_open_time',
             'company_close_time',
@@ -26,6 +29,15 @@ class CompanyDetailsSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'company_logo': {'required': False, 'allow_null': True},
         }
+
+    def get_company_logo_url(self, obj):
+        """Return the full URL for the company logo"""
+        if obj.company_logo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.company_logo.url)
+            return obj.company_logo.url
+        return None
 
     def validate_company_email(self, value):
         """Validate company email format"""

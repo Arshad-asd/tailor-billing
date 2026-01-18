@@ -42,6 +42,12 @@ class CompanyDetailsViewSet(viewsets.ModelViewSet):
     ordering_fields = ['company_created_at', 'company_updated_at', 'company_name']
     ordering = ['-company_created_at']
 
+    def get_serializer_context(self):
+        """Add request to serializer context for building absolute URLs"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def create(self, request, *args, **kwargs):
         """Override create to provide better error handling"""
         try:
@@ -185,7 +191,7 @@ class PageBackgroundSettingsViewSet(viewsets.ModelViewSet):
     - PUT /api/master/page-backgrounds/{id}/ - Update page background setting (full update)
     - PATCH /api/master/page-backgrounds/{id}/ - Update page background setting (partial update)
     - DELETE /api/master/page-backgrounds/{id}/ - Delete page background setting
-    - GET /api/master/page-backgrounds/active/ - Get only active page background settings
+    - GET /api/master/page-backgrounds/active/ - Get all active page background settings
     - GET /api/master/page-backgrounds/by-route/{route}/ - Get background setting for a specific route
     """
     queryset = PageBackgroundSettings.objects.all()

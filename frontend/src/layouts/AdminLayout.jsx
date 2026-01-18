@@ -7,6 +7,7 @@ import useTokenExpiry from "../hooks/useTokenExpiry"
 import LogoutModal from "../components/modals/LogoutModal"
 import { useSettings } from "../contexts/SettingsContext"
 import settingsApi from "../services/settingsApi"
+import companyDetailsApi from "../services/companyDetailsApi"
 
 // Icon mapping for dynamic sidebar items
 const iconMap = {
@@ -48,6 +49,8 @@ const AdminLayout = ({ children }) => {
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [companyDetails, setCompanyDetails] = useState(null)
+  const [isLoadingCompany, setIsLoadingCompany] = useState(true)
   const location = useLocation()
   const navigate = useNavigate()
   const desktopSearchRef = useRef(null)
@@ -129,6 +132,11 @@ const AdminLayout = ({ children }) => {
       href: "/admin/company-details",
       icon: Building2,
     },
+    {
+      name: "Settings",
+      href: "/admin/settings",
+      icon: Settings,
+    },
   ];
 
   // Build navigation items from settings or use defaults
@@ -175,6 +183,27 @@ const AdminLayout = ({ children }) => {
   useEffect(() => {
     setSidebarOpen(!settings.sidebarCollapsed);
   }, [settings.sidebarCollapsed]);
+
+  // Fetch default company details
+  useEffect(() => {
+    const fetchCompanyDetails = async () => {
+      try {
+        setIsLoadingCompany(true);
+        const company = await companyDetailsApi.getDefaultCompany();
+        setCompanyDetails(company);
+      } catch (error) {
+        console.error('Error fetching company details:', error);
+        // Set fallback values if API fails
+        setCompanyDetails({
+          company_name: 'Al kharthoum',
+          company_logo: null
+        });
+      } finally {
+        setIsLoadingCompany(false);
+      }
+    };
+    fetchCompanyDetails();
+  }, []);
 
   // Global search function with debouncing
   useEffect(() => {
@@ -316,12 +345,24 @@ const AdminLayout = ({ children }) => {
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             {sidebarOpen && (
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                  <Scissors className="w-5 h-5 text-white" />
-                </div>
+                {companyDetails?.company_logo_url || companyDetails?.company_logo ? (
+                  <img 
+                    src={companyDetails.company_logo_url || companyDetails.company_logo} 
+                    alt={companyDetails.company_name || 'Company Logo'}
+                    className="w-8 h-8 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+                    <Scissors className="w-5 h-5 text-white" />
+                  </div>
+                )}
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">Al kharthoum</h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Management System</p>
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {companyDetails?.company_name || 'Al kharthoum'}
+                  </h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {companyDetails?.company_name_ar || 'Management System'}
+                  </p>
                 </div>
               </div>
             )}
@@ -380,12 +421,24 @@ const AdminLayout = ({ children }) => {
               {/* Mobile Sidebar Header */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                    <Scissors className="w-5 h-5 text-white" />
-                  </div>
+                  {companyDetails?.company_logo_url || companyDetails?.company_logo ? (
+                    <img 
+                      src={companyDetails.company_logo_url || companyDetails.company_logo} 
+                      alt={companyDetails.company_name || 'Company Logo'}
+                      className="w-8 h-8 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+                      <Scissors className="w-5 h-5 text-white" />
+                    </div>
+                  )}
                   <div>
-                    <h1 className="text-lg font-bold text-gray-900 dark:text-white">Al Kharthoum</h1>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Management System</p>
+                    <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {companyDetails?.company_name || 'Al Kharthoum'}
+                    </h1>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {companyDetails?.company_name_ar || 'Management System'}
+                    </p>
                   </div>
                 </div>
                 <button onClick={toggleMobileMenu} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
