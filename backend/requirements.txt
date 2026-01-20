@@ -17,3 +17,4 @@ gunicorn
 whitenoise
 django-cors-headers
 dj-database-url
+Pillow
