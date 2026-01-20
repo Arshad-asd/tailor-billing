@@ -14,10 +14,25 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isEditCustomer, setIsEditCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // Separate state for customer number search
+  const [customerNoSearchQuery, setCustomerNoSearchQuery] = useState('');
+  const [customerNoSearchResults, setCustomerNoSearchResults] = useState([]);
+  const [showCustomerNoDropdown, setShowCustomerNoDropdown] = useState(false);
+  const [isSearchingCustomerNo, setIsSearchingCustomerNo] = useState(false);
+  // Separate state for customer name search
+  const [customerNameSearchQuery, setCustomerNameSearchQuery] = useState('');
+  const [customerNameSearchResults, setCustomerNameSearchResults] = useState([]);
+  const [showCustomerNameDropdown, setShowCustomerNameDropdown] = useState(false);
+  const [isSearchingCustomerName, setIsSearchingCustomerName] = useState(false);
   const [isMaterialSearchOpen, setIsMaterialSearchOpen] = useState(false);
   const [materialSearchType, setMaterialSearchType] = useState('measurement'); // 'measurement' or 'bill'
   const [linkingItemSl, setLinkingItemSl] = useState(null); // Track which item is being linked to a material
   const [selectedMaterials, setSelectedMaterials] = useState([]);
+  // State for material name search in measurement section
+  const [materialNameSearchQuery, setMaterialNameSearchQuery] = useState('');
+  const [materialNameSearchResults, setMaterialNameSearchResults] = useState([]);
+  const [showMaterialNameDropdown, setShowMaterialNameDropdown] = useState(false);
+  const [isSearchingMaterialName, setIsSearchingMaterialName] = useState(false);
   const [billItems, setBillItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -206,6 +221,122 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     setIsCustomerSearchOpen(true);
   };
 
+  // Handle customer number search query change with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      if (customerNoSearchQuery.trim() === '') {
+        setCustomerNoSearchResults([]);
+        setShowCustomerNoDropdown(false);
+        return;
+      }
+
+      setIsSearchingCustomerNo(true);
+      try {
+        const results = await customerApi.searchCustomers(customerNoSearchQuery);
+        setCustomerNoSearchResults(results || []);
+        setShowCustomerNoDropdown(true);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        setCustomerNoSearchResults([]);
+      } finally {
+        setIsSearchingCustomerNo(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [customerNoSearchQuery]);
+
+  // Handle customer name search query change with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      if (customerNameSearchQuery.trim() === '') {
+        setCustomerNameSearchResults([]);
+        setShowCustomerNameDropdown(false);
+        return;
+      }
+
+      setIsSearchingCustomerName(true);
+      try {
+        const results = await customerApi.searchCustomers(customerNameSearchQuery);
+        setCustomerNameSearchResults(results || []);
+        setShowCustomerNameDropdown(true);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        setCustomerNameSearchResults([]);
+      } finally {
+        setIsSearchingCustomerName(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [customerNameSearchQuery]);
+
+  // Handle customer number input change
+  const handleCustomerNoInputChange = (value) => {
+    setCustomerNoSearchQuery(value);
+    handleFormChange('customer', 'customerNo', value);
+    if (value.trim() === '') {
+      // Clear selected customer if input is cleared
+      setSelectedCustomer(null);
+      setFormData(prev => ({
+        ...prev,
+        customer: {
+          ...prev.customer,
+          customerName: '',
+          customerReference: '',
+          mobileNo: '',
+          currentBalance: 0.00
+        }
+      }));
+    }
+  };
+
+  // Handle customer selection from dropdown (for customer number field)
+  const handleCustomerNoSelectFromDropdown = (customer) => {
+    setCustomerNoSearchQuery(customer.customer_id || '');
+    setCustomerNameSearchQuery(customer.name || ''); // Also update name field
+    handleSelectCustomer(customer);
+    setShowCustomerNoDropdown(false);
+    setCustomerNoSearchResults([]);
+  };
+
+  // Handle customer selection from dropdown (for customer name field)
+  const handleCustomerNameSelectFromDropdown = (customer) => {
+    setCustomerNoSearchQuery(customer.customer_id || ''); // Also update number field
+    setCustomerNameSearchQuery(customer.name || '');
+    handleSelectCustomer(customer);
+    setShowCustomerNameDropdown(false);
+    setCustomerNameSearchResults([]);
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.customer-no-search-container')) {
+        setShowCustomerNoDropdown(false);
+      }
+      if (!event.target.closest('.customer-name-search-container')) {
+        setShowCustomerNameDropdown(false);
+      }
+      if (!event.target.closest('.material-name-search-container')) {
+        setShowMaterialNameDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Sync customer search queries when customer is selected via modal
+  useEffect(() => {
+    if (selectedCustomer) {
+      setCustomerNoSearchQuery(selectedCustomer.customer_id || formData.customer.customerNo);
+      setCustomerNameSearchQuery(selectedCustomer.name || formData.customer.customerName);
+    }
+  }, [selectedCustomer]);
+
   const handleSelectCustomer = (customer) => {
     setSelectedCustomer(customer);
     setFormData(prev => ({
@@ -251,6 +382,74 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const handleMaterialSearch = () => {
     setMaterialSearchType('measurement');
     setIsMaterialSearchOpen(true);
+  };
+
+  // Handle material name search query change with debounce (for measurement section)
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      if (materialNameSearchQuery.trim() === '') {
+        setMaterialNameSearchResults([]);
+        setShowMaterialNameDropdown(false);
+        return;
+      }
+
+      setIsSearchingMaterialName(true);
+      try {
+        const results = await materialsApi.searchMaterials(materialNameSearchQuery);
+        // Filter for materials that require measurements
+        const filteredResults = (results || []).filter(material => material.is_measurement_required === true);
+        setMaterialNameSearchResults(filteredResults);
+        setShowMaterialNameDropdown(true);
+      } catch (error) {
+        console.error('Error searching materials:', error);
+        setMaterialNameSearchResults([]);
+      } finally {
+        setIsSearchingMaterialName(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [materialNameSearchQuery]);
+
+  // Handle material selection from dropdown (for measurement section)
+  const handleMaterialNameSelectFromDropdown = (material) => {
+    // Check if material is already selected
+    const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
+    
+    if (!isAlreadySelected) {
+      const measurementItem = {
+        id: material.id,
+        material_id: material.id,
+        material_name: material.name,
+        material_price: material.price,
+        measurements: {
+          thool: material.thool || 0,
+          kethet: material.kethet || 0,
+          thool_kum: material.thool_kum || 0,
+          ardh_f_kum: material.ardh_f_kum || 0,
+          jamba: material.jamba || 0,
+          ragab: material.ragab || 0
+        },
+        custom_thool: material.thool || 0,
+        custom_kethet: material.kethet || 0,
+        custom_thool_kum: material.thool_kum || 0,
+        custom_ardh_f_kum: material.ardh_f_kum || 0,
+        custom_jamba: material.jamba || 0,
+        custom_ragab: material.ragab || 0,
+        note1: '',
+        note2: '',
+        note3: '',
+        note4: '',
+        is_customized: false
+      };
+      
+      const newMaterials = [...selectedMaterials, measurementItem];
+      handleMaterialsChange(newMaterials);
+    }
+    
+    setMaterialNameSearchQuery('');
+    setShowMaterialNameDropdown(false);
+    setMaterialNameSearchResults([]);
   };
 
   // Bill item material search
@@ -529,10 +728,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         {/* Customer Section */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <User className="w-5 h-5" />
-              <span>Customer</span>
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={handleCreateCustomer}
@@ -556,6 +751,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 <span>Find</span>
               </button>
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <User className="w-5 h-5" />
+              <span>Customer</span>
+            </h3>
           </div>
           
           {/* Selected Customer Indicator */}
@@ -570,23 +769,121 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           )}
 
           <div className="grid grid-cols-6 gap-4">
-            <div>
+            <div className="relative customer-no-search-container">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">No</label>
-              <input
-                type="text"
-                value={formData.customer.customerNo}
-                onChange={(e) => handleFormChange('customer', 'customerNo', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerNoSearchQuery || formData.customer.customerNo}
+                  onChange={(e) => handleCustomerNoInputChange(e.target.value)}
+                  onFocus={() => {
+                    if (customerNoSearchQuery.trim() && customerNoSearchResults.length > 0) {
+                      setShowCustomerNoDropdown(true);
+                    }
+                  }}
+                  placeholder="Search customer number..."
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {isSearchingCustomerNo && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+                {/* Customer Dropdown for Customer No */}
+                {showCustomerNoDropdown && customerNoSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {customerNoSearchResults.map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerNoSelectFromDropdown(customer)}
+                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {customer.name}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              ID: {customer.customer_id} | {customer.phone}
+                            </div>
+                          </div>
+                          <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            ${formatCurrency(customer.balance || 0)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showCustomerNoDropdown && customerNoSearchResults.length === 0 && customerNoSearchQuery.trim() !== '' && !isSearchingCustomerNo && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                      No customers found. Try a different search or create a new customer.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
+            <div className="relative customer-name-search-container">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Name</label>
-              <input
-                type="text"
-                value={formData.customer.customerName}
-                onChange={(e) => handleFormChange('customer', 'customerName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerNameSearchQuery || formData.customer.customerName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCustomerNameSearchQuery(value);
+                    handleFormChange('customer', 'customerName', value);
+                  }}
+                  onFocus={() => {
+                    if (customerNameSearchQuery.trim() && customerNameSearchResults.length > 0) {
+                      setShowCustomerNameDropdown(true);
+                    }
+                  }}
+                  placeholder="Search customer name..."
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {isSearchingCustomerName && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+                {/* Customer Dropdown for Customer Name */}
+                {showCustomerNameDropdown && customerNameSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {customerNameSearchResults.map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerNameSelectFromDropdown(customer)}
+                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {customer.name}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              ID: {customer.customer_id} | {customer.phone}
+                            </div>
+                          </div>
+                          <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            ${formatCurrency(customer.balance || 0)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showCustomerNameDropdown && customerNameSearchResults.length === 0 && customerNameSearchQuery.trim() !== '' && !isSearchingCustomerName && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                      No customers found. Try a different search or create a new customer.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Reference</label>
@@ -625,15 +922,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         {/* Measurement Section */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <Ruler className="w-5 h-5" />
-              <span>Measurement</span>
-              {selectedMaterials.length > 0 && (
-                <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2 py-1 rounded-full">
-                  {selectedMaterials.length} material{selectedMaterials.length !== 1 ? 's' : ''} selected
-                </span>
-              )}
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={() => selectedMaterials.length > 0 && handleMaterialsChange([])}
@@ -649,6 +937,87 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
               </button>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <Ruler className="w-5 h-5" />
+              <span>Measurement</span>
+              {selectedMaterials.length > 0 && (
+                <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2 py-1 rounded-full">
+                  {selectedMaterials.length} material{selectedMaterials.length !== 1 ? 's' : ''} selected
+                </span>
+              )}
+            </h3>
+          </div>
+
+          {/* Material Name Search Input */}
+          <div className="mb-4 relative material-name-search-container">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Search Material Name
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={materialNameSearchQuery}
+                onChange={(e) => setMaterialNameSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (materialNameSearchQuery.trim() && materialNameSearchResults.length > 0) {
+                    setShowMaterialNameDropdown(true);
+                  }
+                }}
+                placeholder="Search material name to add..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {isSearchingMaterialName && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                </div>
+              )}
+              {/* Material Dropdown */}
+              {showMaterialNameDropdown && materialNameSearchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {materialNameSearchResults.map((material) => {
+                    const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
+                    return (
+                      <div
+                        key={material.id}
+                        onClick={() => !isAlreadySelected && handleMaterialNameSelectFromDropdown(material)}
+                        className={`px-4 py-3 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 ${
+                          isAlreadySelected 
+                            ? 'bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed' 
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {material.name}
+                              {isAlreadySelected && (
+                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(Already added)</span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              Price: {formatCurrency(material.price || 0)}
+                            </div>
+                          </div>
+                          {material.is_measurement_required && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                              Measurement Required
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {showMaterialNameDropdown && materialNameSearchResults.length === 0 && materialNameSearchQuery.trim() !== '' && !isSearchingMaterialName && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                    No materials found. Try a different search or use the "Add Item" button.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           
@@ -828,15 +1197,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         {/* Bill Section */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <Calculator className="w-5 h-5" />
-              <span>BILL</span>
-              {billItems.length > 0 && (
-                <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2 py-1 rounded-full">
-                  {billItems.length} item{billItems.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={handleAddBillItem}
@@ -860,6 +1220,15 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 <span>Clear All</span>
               </button>
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <Calculator className="w-5 h-5" />
+              <span>BILL</span>
+              {billItems.length > 0 && (
+                <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2 py-1 rounded-full">
+                  {billItems.length} item{billItems.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </h3>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

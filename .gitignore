@@ -17,5 +17,7 @@ backend/apps/**/migrations/*.py
 # Environment variables
 backend/core/.env
 
-# Ignore SQLite database
-backend/db.sqlite3
+
+# SQLite database
+*.sqlite3
+*.db
