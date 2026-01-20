@@ -256,7 +256,7 @@ export default function Sales() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalRevenue.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -278,7 +278,7 @@ export default function Sales() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${pendingRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{pendingRevenue.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -425,7 +425,7 @@ export default function Sales() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        ${Number.parseFloat(sale.total_amount || sale.amount || 0).toFixed(2)}
+                        {Number.parseFloat(sale.total_amount || sale.amount || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

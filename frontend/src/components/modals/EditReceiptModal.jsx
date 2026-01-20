@@ -152,18 +152,18 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl w-full p-0 max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Receipt</DialogTitle>
-            <DialogDescription>
+      <DialogContent className="!w-[600px] !max-w-[90vw] !h-auto !max-h-[85vh] p-0 overflow-hidden">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
+          <DialogHeader className="pb-2 flex-shrink-0">
+            <DialogTitle className="text-xl">Edit Receipt</DialogTitle>
+            <DialogDescription className="text-sm mt-1">
               Update the receipt details below. Receipt ID: {editingReceipt.receipt_id}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="receipt_id">Receipt ID</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="receipt_id" className="text-sm">Receipt ID</Label>
               <Input
                 id="receipt_id"
                 value={editingReceipt.receipt_id}
@@ -173,8 +173,8 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
               <p className="text-xs text-gray-500 dark:text-gray-400">Receipt ID cannot be changed</p>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="job_order">Job Order</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="job_order" className="text-sm">Job Order</Label>
               
               {/* Searchable Select Component */}
               <div className="relative job-order-dropdown">
@@ -233,8 +233,8 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="receipt_amount">Receipt Amount</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="receipt_amount" className="text-sm">Receipt Amount</Label>
               <Input
                 id="receipt_amount"
                 name="receipt_amount"
@@ -254,8 +254,8 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="receipt_date">Receipt Date</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="receipt_date" className="text-sm">Receipt Date</Label>
               <Input
                 id="receipt_date"
                 name="receipt_date"
@@ -266,20 +266,21 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="receipt_remarks">Remarks</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="receipt_remarks" className="text-sm">Remarks</Label>
               <Textarea
                 id="receipt_remarks"
                 name="receipt_remarks"
                 value={form.receipt_remarks}
                 onChange={handleChange}
                 placeholder="Enter any additional remarks"
-                rows={3}
+                rows={2}
+                className="text-sm"
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="is_active">Status</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="is_active" className="text-sm">Status</Label>
               <Select 
                 value={editingReceipt.is_active ? "active" : "inactive"} 
                 onValueChange={(value) => {
@@ -299,9 +300,9 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
           </div>
 
           {selectedJobOrder && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Job Order Details</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mt-2">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 text-sm">Job Order Details</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-blue-700 dark:text-blue-300">Order Number:</span>
                   <span className="ml-2 text-blue-900 dark:text-blue-100">{selectedJobOrder.job_order_number}</span>
@@ -322,9 +323,9 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
             </div>
           )}
 
-          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Receipt Information</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg mt-2">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2 text-sm">Receipt Information</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Created:</span>
                 <span className="ml-2 text-gray-900 dark:text-gray-100">
@@ -340,7 +341,7 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2 border-t border-gray-200 dark:border-gray-700">
             <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancel
             </Button>

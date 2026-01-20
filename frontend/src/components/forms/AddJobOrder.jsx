@@ -430,12 +430,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           jamba: material.jamba || 0,
           ragab: material.ragab || 0
         },
-        custom_thool: material.thool || 0,
-        custom_kethet: material.kethet || 0,
-        custom_thool_kum: material.thool_kum || 0,
-        custom_ardh_f_kum: material.ardh_f_kum || 0,
-        custom_jamba: material.jamba || 0,
-        custom_ragab: material.ragab || 0,
+        custom_thool: '',
+        custom_kethet: '',
+        custom_thool_kum: '',
+        custom_ardh_f_kum: '',
+        custom_jamba: '',
+        custom_ragab: '',
         note1: '',
         note2: '',
         note3: '',
@@ -524,12 +524,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           jamba: material.jamba,
           ragab: material.ragab
         },
-        custom_thool: material.thool,
-        custom_kethet: material.kethet,
-        custom_thool_kum: material.thool_kum,
-        custom_ardh_f_kum: material.ardh_f_kum,
-        custom_jamba: material.jamba,
-        custom_ragab: material.ragab,
+        custom_thool: '',
+        custom_kethet: '',
+        custom_thool_kum: '',
+        custom_ardh_f_kum: '',
+        custom_jamba: '',
+        custom_ragab: '',
         note1: '',
         note2: '',
         note3: '',
@@ -553,7 +553,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         material.id === materialId 
           ? { 
               ...material, 
-              [field]: value,
+              [field]: value === '' ? '' : (isNaN(value) ? value : parseFloat(value) || ''),
               is_customized: true
             }
           : material
@@ -567,12 +567,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         material.id === materialId 
           ? { 
               ...material, 
-              custom_thool: material.measurements.thool,
-              custom_kethet: material.measurements.kethet,
-              custom_thool_kum: material.measurements.thool_kum,
-              custom_ardh_f_kum: material.measurements.ardh_f_kum,
-              custom_jamba: material.measurements.jamba,
-              custom_ragab: material.measurements.ragab,
+              custom_thool: '',
+              custom_kethet: '',
+              custom_thool_kum: '',
+              custom_ardh_f_kum: '',
+              custom_jamba: '',
+              custom_ragab: '',
               is_customized: false
             }
           : material
@@ -631,14 +631,19 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           if (!materialId || isNaN(materialId)) {
             throw new Error(`Invalid material ID for measurement: ${material.material_name}`);
           }
+          // Helper function to convert empty string to 0, otherwise parse float
+          const parseMeasurement = (value) => {
+            if (value === '' || value === null || value === undefined) return 0;
+            return parseFloat(value) || 0;
+          };
           return {
             material: materialId,
-            thool: material.custom_thool || 0,
-            kethet: material.custom_kethet || 0,
-            thool_kum: material.custom_thool_kum || 0,
-            ardh_f_kum: material.custom_ardh_f_kum || 0,
-            jamba: material.custom_jamba || 0,
-            ragab: material.custom_ragab || 0,
+            thool: parseMeasurement(material.custom_thool),
+            kethet: parseMeasurement(material.custom_kethet),
+            thool_kum: parseMeasurement(material.custom_thool_kum),
+            ardh_f_kum: parseMeasurement(material.custom_ardh_f_kum),
+            jamba: parseMeasurement(material.custom_jamba),
+            ragab: parseMeasurement(material.custom_ragab),
             note1: material.note1 || '',
             note2: material.note2 || '',
             note3: material.note3 || '',
@@ -1058,7 +1063,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_thool || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
@@ -1068,7 +1073,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_kethet || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
@@ -1078,7 +1083,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_thool_kum || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
@@ -1088,7 +1093,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_ardh_f_kum || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
@@ -1098,7 +1103,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_jamba || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
@@ -1108,7 +1113,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           type="number"
                           step="0.01"
                           value={material.custom_ragab || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>

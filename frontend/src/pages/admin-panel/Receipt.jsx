@@ -167,7 +167,7 @@ export default function ReceiptPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Paid Amount</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalPaid.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR{totalPaid.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function ReceiptPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Amount</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${pendingAmount.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR{pendingAmount.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -189,7 +189,7 @@ export default function ReceiptPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${(totalPaid + pendingAmount).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR{(totalPaid + pendingAmount).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -286,7 +286,7 @@ export default function ReceiptPage() {
                       <div className="text-sm text-gray-900 dark:text-white">{receipt.job_order_number}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">${parseFloat(receipt.receipt_amount || 0).toFixed(2)}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">QAR{parseFloat(receipt.receipt_amount || 0).toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
