@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar } from 'lucide-react';
 import CustomerSearchModal from '../modals/CustomerSearchModal';
 import CustomerModal from '../modals/CustomerModal';
@@ -19,11 +19,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const [customerNoSearchResults, setCustomerNoSearchResults] = useState([]);
   const [showCustomerNoDropdown, setShowCustomerNoDropdown] = useState(false);
   const [isSearchingCustomerNo, setIsSearchingCustomerNo] = useState(false);
-  // Separate state for customer name search
-  const [customerNameSearchQuery, setCustomerNameSearchQuery] = useState('');
-  const [customerNameSearchResults, setCustomerNameSearchResults] = useState([]);
-  const [showCustomerNameDropdown, setShowCustomerNameDropdown] = useState(false);
-  const [isSearchingCustomerName, setIsSearchingCustomerName] = useState(false);
   const [isMaterialSearchOpen, setIsMaterialSearchOpen] = useState(false);
   const [materialSearchType, setMaterialSearchType] = useState('measurement'); // 'measurement' or 'bill'
   const [linkingItemSl, setLinkingItemSl] = useState(null); // Track which item is being linked to a material
@@ -36,6 +31,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const [billItems, setBillItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  
+  // Refs for customer input fields
+  const customerNameInputRef = useRef(null);
+  const customerReferenceInputRef = useRef(null);
+  const customerMobileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     customer: {
@@ -246,30 +247,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     return () => clearTimeout(timeoutId);
   }, [customerNoSearchQuery]);
 
-  // Handle customer name search query change with debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(async () => {
-      if (customerNameSearchQuery.trim() === '') {
-        setCustomerNameSearchResults([]);
-        setShowCustomerNameDropdown(false);
-        return;
-      }
-
-      setIsSearchingCustomerName(true);
-      try {
-        const results = await customerApi.searchCustomers(customerNameSearchQuery);
-        setCustomerNameSearchResults(results || []);
-        setShowCustomerNameDropdown(true);
-      } catch (error) {
-        console.error('Error searching customers:', error);
-        setCustomerNameSearchResults([]);
-      } finally {
-        setIsSearchingCustomerName(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [customerNameSearchQuery]);
 
   // Handle customer number input change
   const handleCustomerNoInputChange = (value) => {
@@ -288,25 +265,18 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           currentBalance: 0.00
         }
       }));
+    } else if (selectedCustomer && selectedCustomer.customer_id !== value) {
+      // Clear selected customer if user manually changes the number
+      setSelectedCustomer(null);
     }
   };
 
   // Handle customer selection from dropdown (for customer number field)
   const handleCustomerNoSelectFromDropdown = (customer) => {
     setCustomerNoSearchQuery(customer.customer_id || '');
-    setCustomerNameSearchQuery(customer.name || ''); // Also update name field
     handleSelectCustomer(customer);
     setShowCustomerNoDropdown(false);
     setCustomerNoSearchResults([]);
-  };
-
-  // Handle customer selection from dropdown (for customer name field)
-  const handleCustomerNameSelectFromDropdown = (customer) => {
-    setCustomerNoSearchQuery(customer.customer_id || ''); // Also update number field
-    setCustomerNameSearchQuery(customer.name || '');
-    handleSelectCustomer(customer);
-    setShowCustomerNameDropdown(false);
-    setCustomerNameSearchResults([]);
   };
 
   // Close dropdowns when clicking outside
@@ -314,9 +284,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.customer-no-search-container')) {
         setShowCustomerNoDropdown(false);
-      }
-      if (!event.target.closest('.customer-name-search-container')) {
-        setShowCustomerNameDropdown(false);
       }
       if (!event.target.closest('.material-name-search-container')) {
         setShowMaterialNameDropdown(false);
@@ -333,7 +300,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   useEffect(() => {
     if (selectedCustomer) {
       setCustomerNoSearchQuery(selectedCustomer.customer_id || formData.customer.customerNo);
-      setCustomerNameSearchQuery(selectedCustomer.name || formData.customer.customerName);
     }
   }, [selectedCustomer]);
 
@@ -369,6 +335,98 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       handleSelectCustomer(savedCustomer);
     } catch (error) {
       console.error('Error handling saved customer:', error);
+    }
+  };
+
+  // Function to save/update customer when Enter is pressed on mobile number field
+  const handleSaveCustomerOnEnter = async () => {
+    // Check if all required fields are filled
+    if (!formData.customer.customerName.trim() || !formData.customer.mobileNo.trim()) {
+      setError('Please fill in customer name and mobile number before saving.');
+      return;
+    }
+
+    setIsSavingCustomer(true);
+    setError(null);
+
+    try {
+      const customerData = {
+        customer_id: formData.customer.customerNo || undefined,
+        name: formData.customer.customerName,
+        phone: formData.customer.mobileNo,
+        balance: formData.customer.currentBalance || 0,
+        points: selectedCustomer?.points || 0,
+        is_active: true
+      };
+
+      let savedCustomer;
+      
+      // If customer is already selected, update the existing customer
+      if (selectedCustomer && selectedCustomer.id) {
+        savedCustomer = await customerApi.updateCustomer(selectedCustomer.id, customerData);
+      } else {
+        // Otherwise, create a new customer
+        savedCustomer = await customerApi.createCustomer(customerData);
+      }
+
+      // Update the selected customer with the saved data
+      setSelectedCustomer(savedCustomer);
+      handleSelectCustomer(savedCustomer);
+      
+      // Update search query
+      setCustomerNoSearchQuery(savedCustomer.customer_id || '');
+      
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      setError(error.response?.data?.error || error.message || 'Failed to save customer');
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  // Handle Enter key press on customer number field
+  const handleCustomerNoKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // If dropdown is open and has results, don't navigate
+      if (showCustomerNoDropdown && customerNoSearchResults.length > 0) {
+        return;
+      }
+      // Navigate to customer name field
+      setTimeout(() => {
+        customerNameInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  // Handle Enter key press on customer name field
+  const handleCustomerNameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Navigate to customer reference field
+      setTimeout(() => {
+        customerReferenceInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  // Handle Enter key press on customer reference field
+  const handleCustomerReferenceKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Navigate to mobile number field
+      setTimeout(() => {
+        customerMobileInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  // Handle Enter key press on mobile number field
+  const handleCustomerMobileKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Save customer if all fields are filled
+      handleSaveCustomerOnEnter();
     }
   };
 
@@ -782,6 +840,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                   type="text"
                   value={customerNoSearchQuery || formData.customer.customerNo}
                   onChange={(e) => handleCustomerNoInputChange(e.target.value)}
+                  onKeyDown={handleCustomerNoKeyDown}
                   onFocus={() => {
                     if (customerNoSearchQuery.trim() && customerNoSearchResults.length > 0) {
                       setShowCustomerNoDropdown(true);
@@ -830,82 +889,48 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 )}
               </div>
             </div>
-            <div className="relative customer-name-search-container">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Name</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={customerNameSearchQuery || formData.customer.customerName}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setCustomerNameSearchQuery(value);
-                    handleFormChange('customer', 'customerName', value);
-                  }}
-                  onFocus={() => {
-                    if (customerNameSearchQuery.trim() && customerNameSearchResults.length > 0) {
-                      setShowCustomerNameDropdown(true);
-                    }
-                  }}
-                  placeholder="Search customer name..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {isSearchingCustomerName && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  </div>
-                )}
-                {/* Customer Dropdown for Customer Name */}
-                {showCustomerNameDropdown && customerNameSearchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {customerNameSearchResults.map((customer) => (
-                      <div
-                        key={customer.id}
-                        onClick={() => handleCustomerNameSelectFromDropdown(customer)}
-                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium text-gray-900 dark:text-white">
-                              {customer.name}
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              ID: {customer.customer_id} | {customer.phone}
-                            </div>
-                          </div>
-                          <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                            ${formatCurrency(customer.balance || 0)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showCustomerNameDropdown && customerNameSearchResults.length === 0 && customerNameSearchQuery.trim() !== '' && !isSearchingCustomerName && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                      No customers found. Try a different search or create a new customer.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Reference</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Name</label>
               <input
+                ref={customerNameInputRef}
                 type="text"
-                value={formData.customer.customerReference}
-                onChange={(e) => handleFormChange('customer', 'customerReference', e.target.value)}
+                value={formData.customer.customerName}
+                onChange={(e) => handleFormChange('customer', 'customerName', e.target.value)}
+                onKeyDown={handleCustomerNameKeyDown}
+                placeholder="Customer name"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mobile No</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Reference</label>
               <input
+                ref={customerReferenceInputRef}
+                type="text"
+                value={formData.customer.customerReference}
+                onChange={(e) => handleFormChange('customer', 'customerReference', e.target.value)}
+                onKeyDown={handleCustomerReferenceKeyDown}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Mobile No {isSavingCustomer && <span className="text-blue-600 text-xs">(Saving...)</span>}
+              </label>
+              <input
+                ref={customerMobileInputRef}
                 type="text"
                 value={formData.customer.mobileNo}
-                onChange={(e) => handleFormChange('customer', 'mobileNo', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  handleFormChange('customer', 'mobileNo', e.target.value);
+                  // Clear selected customer if user manually changes the mobile number
+                  if (selectedCustomer && selectedCustomer.phone !== e.target.value) {
+                    setSelectedCustomer(null);
+                  }
+                }}
+                onKeyDown={handleCustomerMobileKeyDown}
+                disabled={isSavingCustomer}
+                placeholder="Press Enter to save customer"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div>
