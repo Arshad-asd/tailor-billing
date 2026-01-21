@@ -102,29 +102,22 @@ export default function Customers() {
     setEditingCustomer(null);
   };
 
-  const handleSubmitCustomer = async (formData, customerId) => {
+  const handleSubmitCustomer = async (savedCustomer) => {
     try {
-      setSubmitting(true);
-      
-      if (customerId) {
-        // Update existing customer
-        await customerApi.updateCustomer(customerId, formData);
+      // Show success notification
+      if (editingCustomer) {
         showNotification('Customer updated successfully', 'success');
       } else {
-        // Create new customer
-        await customerApi.createCustomer(formData);
         showNotification('Customer created successfully', 'success');
       }
       
       // Reload customers list
       await loadCustomers();
-      handleCloseCustomerModal();
+      // Note: CustomerModal will handle closing via onClose()
     } catch (error) {
-      console.error('Error submitting customer:', error);
-      const errorMessage = error.message || 'Failed to save customer';
+      console.error('Error after saving customer:', error);
+      const errorMessage = error.message || 'Failed to process customer save';
       showNotification(errorMessage, 'error');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -524,10 +517,11 @@ export default function Customers() {
 
       {/* Customer Add/Edit Modal */}
       <CustomerModal
-        open={showCustomerModal}
+        isOpen={showCustomerModal}
         onClose={handleCloseCustomerModal}
-        onSubmit={handleSubmitCustomer}
-        editingCustomer={editingCustomer}
+        onSave={handleSubmitCustomer}
+        customer={editingCustomer}
+        isEdit={!!editingCustomer}
       />
     </div>
   );
