@@ -26,7 +26,7 @@ import jobOrdersApi from "../../services/jobOrdersApi"
 import { formatCurrency } from "../../utils/currencyUtils"
 
 export default function Materials() {
-  const [activeTab, setActiveTab] = useState("materials") // 'materials' or 'measurements'
+  const [activeTab, setActiveTab] = useState("measurements") // 'materials' or 'measurements'
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -435,17 +435,51 @@ export default function Materials() {
     try {
       setLoading(true)
       
-      // STEP 1: Open all print windows IMMEDIATELY while user gesture is active
-      // This prevents browser from blocking popups as non-user-initiated
-      const printWindows = []
+      // Prepare job order list
+      const jobOrderList = []
       for (let i = 0; i < selectedJobOrders.length; i++) {
         const jobOrderId = selectedJobOrders[i]
         const jobOrder = jobOrders.find(jo => jo.id === jobOrderId)
-        
         if (jobOrder) {
-          const printWindow = window.open("", `print_${jobOrder.id}_${i}_${Date.now()}`, "width=800,height=600")
-          if (printWindow) {
-            // Write a loading placeholder
+          jobOrderList.push({ jobOrder, index: i })
+        }
+      }
+
+      if (jobOrderList.length === 0) {
+        alert("No valid job orders found.")
+        setLoading(false)
+        return
+      }
+
+      // STEP 1: Open ONE window immediately (synchronously, before any async)
+      // We'll reuse this single window for all prints to avoid popup blocking
+      console.log(`\n=== Opening single print window ===`)
+      let printWindow = window.open("", "print_window", "width=800,height=600,scrollbars=yes")
+      
+      if (!printWindow) {
+        alert(`Popup blocked! Please allow popups to print job orders.`)
+        setLoading(false)
+        return
+      }
+      
+      console.log(`✓ Print window opened successfully\n`)
+
+      // STEP 2: Process each job order sequentially using the same window
+      for (let i = 0; i < jobOrderList.length; i++) {
+        const { jobOrder, index } = jobOrderList[i]
+        
+        console.log(`\n=== Processing print ${i + 1} of ${jobOrderList.length}: ${jobOrder.job_order_number} ===`)
+        
+        // Check if window is still open
+        if (!printWindow || printWindow.closed) {
+          console.error(`❌ Print window closed, cannot continue`)
+          break
+        }
+        
+        try {
+          // Show loading message
+          try {
+            printWindow.document.open()
             printWindow.document.write(`
               <!DOCTYPE html>
               <html>
@@ -454,283 +488,460 @@ export default function Materials() {
                   <div style="padding: 20px; text-align: center; font-family: Arial;">
                     <h2>Loading measurements...</h2>
                     <p>Preparing ${jobOrder.job_order_number} for printing...</p>
+                    <p>Print ${i + 1} of ${jobOrderList.length}</p>
                   </div>
                 </body>
               </html>
             `)
             printWindow.document.close()
-            printWindows.push({ window: printWindow, jobOrder, index: i })
-          } else {
-            console.error('Popup blocked for job order:', jobOrder.job_order_number)
-            alert(`Popup blocked! Please allow popups to print ${jobOrder.job_order_number}`)
+            console.log(`✓ Loading message shown for ${jobOrder.job_order_number}`)
+          } catch (e) {
+            console.error(`Error writing loading message:`, e)
           }
-        }
-      }
-      
-      // STEP 2: Now populate and print each window sequentially
-      for (let i = 0; i < printWindows.length; i++) {
-        const { window: printWindow, jobOrder, index } = printWindows[i]
-        
-        if (printWindow && !printWindow.closed) {
-          console.log('Fetching measurements for job order:', jobOrder.id)
-          const measurements = await jobOrdersApi.getJobOrderMeasurements(jobOrder.id)
-          console.log('Measurements received:', measurements)
+
+          // Fetch measurements
+          console.log(`Fetching measurements ${i + 1} of ${jobOrderList.length}: ${jobOrder.job_order_number}`)
+          let measurements
+          try {
+            measurements = await jobOrdersApi.getJobOrderMeasurements(jobOrder.id)
+            console.log(`✓ Measurements fetched for ${jobOrder.job_order_number}:`, measurements?.length || 0, 'items')
+          } catch (e) {
+            console.error(`❌ Error fetching measurements for ${jobOrder.job_order_number}:`, e)
+            continue
+          }
           
-          if (measurements && measurements.length > 0) {
-            const printContent = `
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <title>Job Order Measurement - ${jobOrder.job_order_number}</title>
-                  <style>
-                    /* Page + base */
-                    @page {
-                      size: A5 portrait;
-                      margin: 10mm;
-                    }
-                    html, body {
-                      height: auto;
-                      overflow: visible;
-                    }
-                    body {
-                      font-family: Arial, sans-serif;
-                      font-size: 9px;
-                      line-height: 1.25;
-                      margin: 0;
-                      padding: 0;
-                      color: #111;
-                    }
-                    .a5 {
-                      width: 100%;
-                    }
+          if (!measurements || measurements.length === 0) {
+            console.log(`⚠ No measurements found for job order: ${jobOrder.job_order_number}`)
+            continue
+          }
 
-                    /* Header */
-                    .header {
-                      display: flex;
-                      justify-content: space-between;
-                      align-items: flex-start;
-                      gap: 8px;
-                      margin-bottom: 8mm;
-                      border-bottom: 1px solid #000;
-                      padding-bottom: 4mm;
-                    }
-                    .customer-info, .job-info {
-                      flex: 1;
-                      max-width: 35%;
-                    }
-                    .customer-id-center {
-                      flex: 1;
-                      text-align: center;
-                      max-width: 30%;
-                    }
-                    .header h1 {
-                      margin: 0 0 2px 0;
-                      font-size: 14px;
-                      color: #111;
-                    }
-                    .header p {
-                      margin: 1px 0;
-                      font-size: 9px;
-                      color: #444;
-                    }
-
-                    /* Table */
-                    .measurements-table {
-                      width: 100%;
-                      border-collapse: collapse;
-                      table-layout: fixed; /* ensure columns fit on A5 */
-                    }
-                    .measurements-table th,
-                    .measurements-table td {
-                      border: 0.6px solid #000;
-                      padding: 3px 2px;
-                      text-align: center;
-                      vertical-align: top;
-                    }
-                    .measurements-table th {
-                      background-color: #f2f2f2;
-                      font-weight: 700;
-                      font-size: 8.5px;
-                    }
-                    .measurements-table td {
-                      font-size: 8.5px;
-                    }
-                    .material-column {
-                      text-align: left;
-                      font-weight: 600;
-                      overflow-wrap: anywhere;
-                    }
-                    .measurement-column {
-                      white-space: nowrap; /* keep numbers tidy */
-                    }
-                    .note-column {
-                      text-align: left;
-                      font-size: 7.5px;
-                      overflow-wrap: anywhere;
-                    }
-
-                    /* Footer */
-                    .footer {
-                      margin-top: 6mm;
-                      text-align: center;
-                      font-size: 8px;
-                      color: #555;
-                      border-top: 0.6px solid #bbb;
-                      padding-top: 3mm;
-                    }
-
-                    /* Print-specific tweaks */
-                    @media print {
-                      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                      tr, td, th { page-break-inside: avoid; }
-                    }
-                  </style>
-                </head>
-                <body>
-                  <div class="a5">
-                    <div class="header">
-                      <div class="customer-info">
-                        <h1>${jobOrder.customer_name}</h1>
-                        <p>Mobile: ${jobOrder.customer_phone}</p>
-                      </div>
-                      <div class="customer-id-center">
-                        <h1>ID: ${jobOrder.customer_id || 'N/A'}</h1>
-                      </div>
-                      <div class="job-info">
-                        <h1>${jobOrder.job_order_number}</h1>
-                        <p>Delivery: ${new Date(jobOrder.delivery_date).toLocaleDateString()}</p>
-                      </div>
+          // STEP 4: Create and populate print content
+          const printContent = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Job Order Measurement - ${jobOrder.job_order_number}</title>
+                <style>
+                  @page {
+                    size: A5 portrait;
+                    margin: 10mm;
+                  }
+                  html, body {
+                    height: auto;
+                    overflow: visible;
+                  }
+                  body {
+                    font-family: Arial, sans-serif;
+                    font-size: 9px;
+                    line-height: 1.25;
+                    margin: 0;
+                    padding: 0;
+                    color: #111;
+                  }
+                  .a5 {
+                    width: 100%;
+                  }
+                  .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 8px;
+                    margin-bottom: 8mm;
+                    border-bottom: 1px solid #000;
+                    padding-bottom: 4mm;
+                  }
+                  .customer-info, .job-info {
+                    flex: 1;
+                    max-width: 35%;
+                  }
+                  .customer-id-center {
+                    flex: 1;
+                    text-align: center;
+                    max-width: 30%;
+                  }
+                  .header h1 {
+                    margin: 0 0 2px 0;
+                    font-size: 14px;
+                    color: #111;
+                  }
+                  .header p {
+                    margin: 1px 0;
+                    font-size: 9px;
+                    color: #444;
+                  }
+                  .measurements-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                  }
+                  .measurements-table th,
+                  .measurements-table td {
+                    border: 0.6px solid #000;
+                    padding: 3px 2px;
+                    text-align: center;
+                    vertical-align: top;
+                  }
+                  .measurements-table th {
+                    background-color: #f2f2f2;
+                    font-weight: 700;
+                    font-size: 8.5px;
+                  }
+                  .measurements-table td {
+                    font-size: 8.5px;
+                  }
+                  .material-column {
+                    text-align: left;
+                    font-weight: 600;
+                    overflow-wrap: anywhere;
+                  }
+                  .measurement-column {
+                    white-space: nowrap;
+                  }
+                  .note-column {
+                    text-align: left;
+                    font-size: 7.5px;
+                    overflow-wrap: anywhere;
+                  }
+                  .footer {
+                    margin-top: 6mm;
+                    text-align: center;
+                    font-size: 8px;
+                    color: #555;
+                    border-top: 0.6px solid #bbb;
+                    padding-top: 3mm;
+                  }
+                  @media print {
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    tr, td, th { page-break-inside: avoid; }
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="a5">
+                  <div class="header">
+                    <div class="customer-info">
+                      <h1>${jobOrder.customer_name}</h1>
+                      <p>Mobile: ${jobOrder.customer_phone}</p>
                     </div>
+                    <div class="customer-id-center">
+                      <h1>ID: ${jobOrder.customer_id || 'N/A'}</h1>
+                    </div>
+                    <div class="job-info">
+                      <h1>${jobOrder.job_order_number}</h1>
+                      <p>Delivery: ${new Date(jobOrder.delivery_date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
 
-                    <table class="measurements-table">
-                      <thead>
+                  <table class="measurements-table">
+                    <thead>
+                      <tr>
+                        <th>Material</th>
+                        <th>Thool</th>
+                        <th>Kethef</th>
+                        <th>Thool Kum</th>
+                        <th>Ardh F. Kum</th>
+                        <th>Jamba</th>
+                        <th>Ragab</th>
+                        <th>Cutter</th>
+                        <th>Stitching</th>
+                        <th>Note 1</th>
+                        <th>Note 2</th>
+                        <th>Note 3</th>
+                        <th>Note 4</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${measurements.map(measurement => `
                         <tr>
-                          <th>Material</th>
-                          <th>Thool</th>
-                          <th>Kethef</th>
-                          <th>Thool Kum</th>
-                          <th>Ardh F. Kum</th>
-                          <th>Jamba</th>
-                          <th>Ragab</th>
-                          <th>Cutter</th>
-                          <th>Stitching</th>
-                          <th>Note 1</th>
-                          <th>Note 2</th>
-                          <th>Note 3</th>
-                          <th>Note 4</th>
+                          <td class="material-column">${measurement.material_name || "Material"}</td>
+                          <td class="measurement-column">${measurement.thool ?? ""}</td>
+                          <td class="measurement-column">${measurement.kethet ?? ""}</td>
+                          <td class="measurement-column">${measurement.thool_kum ?? ""}</td>
+                          <td class="measurement-column">${measurement.ardh_f_kum ?? ""}</td>
+                          <td class="measurement-column">${measurement.jamba ?? ""}</td>
+                          <td class="measurement-column">${measurement.ragab ?? ""}</td>
+                          <td class="note-column"></td>
+                          <td class="note-column"></td>
+                          <td class="note-column">${measurement.note1 || ""}</td>
+                          <td class="note-column">${measurement.note2 || ""}</td>
+                          <td class="note-column">${measurement.note3 || ""}</td>
+                          <td class="note-column">${measurement.note4 || ""}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        ${measurements.map(measurement => `
-                          <tr>
-                            <td class="material-column">${measurement.material_name || "Material"}</td>
-                            <td class="measurement-column">${measurement.thool ?? ""}</td>
-                            <td class="measurement-column">${measurement.kethet ?? ""}</td>
-                            <td class="measurement-column">${measurement.thool_kum ?? ""}</td>
-                            <td class="measurement-column">${measurement.ardh_f_kum ?? ""}</td>
-                            <td class="measurement-column">${measurement.jamba ?? ""}</td>
-                            <td class="measurement-column">${measurement.ragab ?? ""}</td>
-                            <td class="note-column"></td>
-                            <td class="note-column"></td>
-                            <td class="note-column">${measurement.note1 || ""}</td>
-                            <td class="note-column">${measurement.note2 || ""}</td>
-                            <td class="note-column">${measurement.note3 || ""}</td>
-                            <td class="note-column">${measurement.note4 || ""}</td>
-                          </tr>
-                        `).join('')}
-                      </tbody>
-                    </table>
+                      `).join('')}
+                    </tbody>
+                  </table>
 
                   <div class="footer">
                     Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
                   </div>
                 </div>
                 <script>
-                  window.onload = function() {
-                    // Trigger print after content is loaded
-                    setTimeout(function() {
-                      if (window) {
-                        window.focus();
-                        window.print();
+                  (function() {
+                    var printIndex = ${index};
+                    var printTriggered = false;
+                    var dialogClosed = false;
+                    var printDialogOpen = false;
+                    
+                    // Monitor for print dialog close
+                    var afterPrint = function() {
+                      if (dialogClosed) return;
+                      dialogClosed = true;
+                      
+                      console.log('Print dialog closed detected for index ' + printIndex);
+                      
+                      try {
+                        if (window.opener) {
+                          window.opener.postMessage('printDialogClosed_' + printIndex, '*');
+                        }
+                      } catch(e) {
+                        console.log('Could not send message to opener');
                       }
-                    }, 300);
-                  };
+                      
+                      // Don't close window - we're reusing it for multiple prints
+                    };
+                    
+                    // Track when print is called
+                    var originalPrint = window.print;
+                    window.print = function() {
+                      printTriggered = true;
+                      printDialogOpen = true;
+                      console.log('Print called for index ' + printIndex);
+                      originalPrint.apply(window, arguments);
+                      
+                      // Set a flag that dialog is open
+                      setTimeout(function() {
+                        printDialogOpen = false;
+                      }, 100);
+                    };
+                    
+                    // Use afterprint event (most reliable)
+                    window.addEventListener('afterprint', function() {
+                      console.log('afterprint event fired for index ' + printIndex);
+                      afterPrint();
+                    });
+                    
+                    // Use beforeprint to track
+                    window.addEventListener('beforeprint', function() {
+                      printDialogOpen = true;
+                      console.log('beforeprint event fired for index ' + printIndex);
+                    });
+                    
+                    // Fallback: Use matchMedia for print detection
+                    if (window.matchMedia) {
+                      var mediaQueryList = window.matchMedia('print');
+                      var handleChange = function(mql) {
+                        console.log('matchMedia change: matches=' + mql.matches + ' for index ' + printIndex);
+                        if (!mql.matches && printTriggered) {
+                          setTimeout(function() {
+                            afterPrint();
+                          }, 100);
+                        }
+                      };
+                      
+                      if (mediaQueryList.addEventListener) {
+                        mediaQueryList.addEventListener('change', handleChange);
+                      } else {
+                        mediaQueryList.addListener(handleChange);
+                      }
+                    }
+                    
+                    // Aggressive fallback: Monitor window focus
+                    var hadFocus = false;
+                    var focusCheckCount = 0;
+                    var focusCheckInterval = setInterval(function() {
+                      try {
+                        focusCheckCount++;
+                        var hasFocus = window.document.hasFocus();
+                        
+                        // If we had focus, lost it (print dialog opened), then regained it (dialog closed)
+                        if (hasFocus && !hadFocus && printTriggered && focusCheckCount > 5) {
+                          // Wait a bit to confirm dialog is really closed
+                          setTimeout(function() {
+                            if (!dialogClosed && window.document.hasFocus()) {
+                              console.log('Focus regained, dialog likely closed for index ' + printIndex);
+                              afterPrint();
+                            }
+                          }, 800);
+                        }
+                        
+                        hadFocus = hasFocus;
+                      } catch(e) {
+                        clearInterval(focusCheckInterval);
+                      }
+                    }, 200);
+                    
+                    // Cleanup after 2 minutes
+                    setTimeout(function() {
+                      clearInterval(focusCheckInterval);
+                    }, 120000);
+                  })();
                 </script>
               </body>
             </html>
           `
 
-            // Window is already open from STEP 1, now populate it with content
-            console.log(`Populating print window ${index + 1} of ${printWindows.length} for ${jobOrder.job_order_number}`)
+          // STEP 4: Populate window with content (shows preview)
+          console.log(`Populating window with content for ${jobOrder.job_order_number}...`)
+          if (printWindow && !printWindow.closed) {
+            try {
+              printWindow.document.open()
+              printWindow.document.write(printContent)
+              printWindow.document.close()
+              console.log(`✓ Content populated for ${jobOrder.job_order_number}`)
+            } catch (e) {
+              console.error(`❌ Error populating content for ${jobOrder.job_order_number}:`, e)
+              if (printWindow && !printWindow.closed) {
+                printWindow.close()
+              }
+              continue
+            }
             
-            // Replace the loading content with actual print content
-            printWindow.document.open()
-            printWindow.document.write(printContent)
-            printWindow.document.close()
+            // Wait a moment for content to render
+            console.log(`Waiting for content to render for ${jobOrder.job_order_number}...`)
+            await new Promise(resolve => setTimeout(resolve, 500))
             
-            // Wait for window to be ready and print dialog to be handled
+            // Check if window is still open before printing
+            if (printWindow.closed) {
+              console.error(`❌ Window closed before print for ${jobOrder.job_order_number}`)
+              continue
+            }
+            
+            // STEP 5: Trigger print dialog
+            console.log(`Triggering print ${i + 1} of ${jobOrderList.length}: ${jobOrder.job_order_number}`)
+            try {
+              printWindow.focus()
+              printWindow.print()
+              console.log(`✓ Print dialog triggered for ${jobOrder.job_order_number}`)
+            } catch (e) {
+              console.error(`❌ Error triggering print for ${jobOrder.job_order_number}:`, e)
+              if (printWindow && !printWindow.closed) {
+                printWindow.close()
+              }
+              continue
+            }
+            
+            // STEP 6: Wait for print dialog to be closed (saved or cancelled)
             await new Promise((resolve) => {
-              // Wait for document to be ready
-              const waitForReady = () => {
-                try {
-                  if (printWindow.document.readyState === 'complete') {
-                    // Document is ready, wait for print dialog to appear
-                    // Give it enough time (5 seconds) for user to see and interact with dialog
-                    setTimeout(() => {
-                      try {
-                        if (printWindow && !printWindow.closed) {
-                          printWindow.close()
-                        }
-                      } catch (e) {
-                        console.log('Could not close window')
-                      }
-                      resolve()
-                    }, 5000) // 5 second delay to ensure print dialog appears
-                  } else {
-                    // Check again in 100ms
-                    setTimeout(waitForReady, 100)
-                  }
-                } catch (e) {
-                  // If we can't check readyState, just wait and resolve
-                  setTimeout(() => {
-                    try {
-                      if (printWindow && !printWindow.closed) {
-                        printWindow.close()
-                      }
-                    } catch (e) {}
-                    resolve()
-                  }, 5000)
+              let resolved = false
+              let checkCount = 0
+              const maxChecks = 600 // 120 seconds max (600 * 200ms)
+              let lastFocusState = null
+              let focusStableCount = 0
+              
+              console.log(`Waiting for print dialog to close for ${jobOrder.job_order_number}`)
+              
+              // Listen for message from print window
+              const messageHandler = (event) => {
+                if (event.data === 'printDialogClosed_' + index && !resolved) {
+                  resolved = true
+                  clearInterval(checkInterval)
+                  window.removeEventListener('message', messageHandler)
+                  console.log(`✓ Print dialog closed (via message) for ${jobOrder.job_order_number}`)
+                  resolve()
                 }
               }
+              window.addEventListener('message', messageHandler)
               
-              waitForReady()
-              
-              // Maximum timeout - resolve after 8 seconds no matter what
-              setTimeout(() => {
+              // Aggressive polling to detect print dialog close
+              const checkInterval = setInterval(() => {
+                checkCount++
+                
                 try {
-                  if (printWindow && !printWindow.closed) {
-                    printWindow.close()
+                  // Check if window is closed
+                  if (printWindow.closed) {
+                    if (!resolved) {
+                      resolved = true
+                      clearInterval(checkInterval)
+                      window.removeEventListener('message', messageHandler)
+                      console.log(`✓ Print window closed for ${jobOrder.job_order_number}`)
+                      resolve()
+                    }
+                    return
                   }
-                } catch (e) {}
-                resolve()
-              }, 8000)
+                  
+                  // Check if window has focus (indicates print dialog might be closed)
+                  try {
+                    const hasFocus = printWindow.document.hasFocus()
+                    
+                    // Track focus stability - if focus is stable for a few checks, dialog is likely closed
+                    if (lastFocusState === hasFocus) {
+                      focusStableCount++
+                    } else {
+                      focusStableCount = 0
+                      lastFocusState = hasFocus
+                    }
+                    
+                    // If window has focus and it's been stable for a while, dialog is likely closed
+                    if (hasFocus && focusStableCount >= 5 && checkCount > 20) {
+                      if (!resolved) {
+                        resolved = true
+                        clearInterval(checkInterval)
+                        window.removeEventListener('message', messageHandler)
+                        console.log(`✓ Print dialog closed (via focus stability) for ${jobOrder.job_order_number}`)
+                        resolve()
+                      }
+                    }
+                  } catch (e) {
+                    // Can't check focus, might be cross-origin or closed
+                  }
+                  
+                  // Timeout fallback
+                  if (checkCount >= maxChecks) {
+                    if (!resolved) {
+                      resolved = true
+                      clearInterval(checkInterval)
+                      window.removeEventListener('message', messageHandler)
+                      console.log(`⚠ Timeout waiting for print dialog for ${jobOrder.job_order_number}`)
+                      try {
+                        if (!printWindow.closed) {
+                          printWindow.close()
+                        }
+                      } catch (e) {}
+                      resolve()
+                    }
+                  }
+                } catch (e) {
+                  // Window might be closed or inaccessible
+                  if (!resolved) {
+                    resolved = true
+                    clearInterval(checkInterval)
+                    window.removeEventListener('message', messageHandler)
+                    console.log(`⚠ Window check error for ${jobOrder.job_order_number}`)
+                    resolve()
+                  }
+                }
+              }, 200) // Check every 200ms
             })
             
-            console.log(`Completed print ${index + 1} of ${printWindows.length}`)
+            console.log(`✓ Completed waiting for ${jobOrder.job_order_number}, moving to next...`)
+            
+            console.log(`✓✓✓ Completed print ${i + 1} of ${jobOrderList.length}: ${jobOrder.job_order_number} ✓✓✓\n`)
           } else {
-            console.log('No measurements found for job order:', jobOrder.job_order_number)
-            if (printWindow && !printWindow.closed) {
-              printWindow.close()
-            }
+            console.error(`❌ Window is closed or null for ${jobOrder.job_order_number}`)
           }
-        } else {
-          console.log('Print window was closed before content could be loaded')
+        } catch (error) {
+          console.error(`❌❌❌ Error printing job order ${jobOrder.job_order_number}:`, error)
+          console.error(`Error stack:`, error.stack)
+          // Continue with next job order even if this one fails
         }
       }
       
-      // Clear selection after all prints are queued
+      console.log(`\n=== All prints completed! ===`)
+      
+      // Close the print window after all prints are done
+      if (printWindow && !printWindow.closed) {
+        try {
+          printWindow.close()
+          console.log(`✓ Print window closed`)
+        } catch (e) {
+          console.log(`Could not close print window:`, e)
+        }
+      }
+      
+      // Clear selection after all prints are completed
       setSelectedJobOrders([])
       setSelectAll(false)
+      
     } catch (error) {
       console.error("Error printing measurements:", error)
       console.error("Error details:", {
