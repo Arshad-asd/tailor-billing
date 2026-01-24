@@ -40,15 +40,23 @@ export default function Materials() {
   const [selectedJobOrder, setSelectedJobOrder] = useState(null)
   const [selectedJobOrders, setSelectedJobOrders] = useState([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // Date filter state - default to today
+  const getTodayDate = () => {
+    const today = new Date()
+    return today.toISOString().split('T')[0] // Format: YYYY-MM-DD
+  }
+  const [fromDate, setFromDate] = useState(getTodayDate())
+  const [toDate, setToDate] = useState(getTodayDate())
 
-  // Load data on component mount
+  // Load data on component mount and when dates change
   useEffect(() => {
     if (activeTab === "materials") {
       loadMaterials()
     } else {
       loadJobOrders()
     }
-  }, [activeTab])
+  }, [activeTab, fromDate, toDate])
 
   const loadMaterials = async () => {
     setLoading(true)
@@ -69,7 +77,17 @@ export default function Materials() {
     setLoading(true)
     setError(null)
     try {
-      const data = await jobOrdersApi.getJobOrders()
+      const params = {}
+      
+      // Only add date filters if dates are valid
+      if (fromDate) {
+        params.from_date = fromDate
+      }
+      if (toDate) {
+        params.to_date = toDate
+      }
+      
+      const data = await jobOrdersApi.getJobOrders(params)
       setJobOrders(data || [])
     } catch (error) {
       console.error("Error loading job orders:", error)
@@ -1159,49 +1177,88 @@ export default function Materials() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder={activeTab === "materials" ? "Search materials..." : "Search job orders..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder={activeTab === "materials" ? "Search materials..." : "Search job orders..."}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              {activeTab === "materials" && (
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="Fabric">Fabric</option>
+                  <option value="Hardware">Hardware</option>
+                  <option value="Sewing">Sewing</option>
+                </select>
+              )}
+              {activeTab === "measurements" && (
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              )}
+              <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <Filter className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            {activeTab === "materials" && (
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          {/* Date Filters - Only show for measurements tab */}
+          {activeTab === "measurements" && (
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1 sm:flex-initial">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div className="flex-1 sm:flex-initial">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const today = getTodayDate()
+                  setFromDate(today)
+                  setToDate(today)
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
               >
-                <option value="all">All Categories</option>
-                <option value="Fabric">Fabric</option>
-                <option value="Hardware">Hardware</option>
-                <option value="Sewing">Sewing</option>
-              </select>
-            )}
-            {activeTab === "measurements" && (
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="delivered">Delivered</option>
-              </select>
-            )}
-            <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <Filter className="w-4 h-4" />
-            </button>
-          </div>
+                Reset to Today
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

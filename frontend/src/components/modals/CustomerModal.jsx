@@ -1,15 +1,19 @@
-import { useState, useEffect } from 'react';
-import { X, Save, User, Phone, DollarSign, Star } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Save, User, Phone, DollarSign, Star, Hash } from 'lucide-react';
 import customerApi from '../../services/customerApi';
 
 export default function CustomerModal({ isOpen, onClose, onSave, customer = null, isEdit = false }) {
   const [formData, setFormData] = useState({
+    customer_id: '',
     name: '',
     phone: '',
     balance: 0.00,
     points: 0,
     is_active: true
   });
+  const customerIdRef = useRef(null);
+  const nameRef = useRef(null);
+  const phoneRef = useRef(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -17,6 +21,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
     if (isOpen) {
       if (customer && isEdit) {
         setFormData({
+          customer_id: customer.customer_id || '',
           name: customer.name || '',
           phone: customer.phone || '',
           balance: customer.balance || 0.00,
@@ -25,6 +30,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
         });
       } else {
         setFormData({
+          customer_id: '',
           name: '',
           phone: '',
           balance: 0.00,
@@ -35,6 +41,14 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
       setErrors({});
     }
   }, [isOpen, customer, isEdit]);
+
+  // Focus first input when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => customerIdRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -62,16 +76,20 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
       newErrors.phone = 'Phone number is required';
     }
     
-    if (formData.balance < 0) {
-      newErrors.balance = 'Balance cannot be negative';
-    }
-    
-    if (formData.points < 0) {
-      newErrors.points = 'Points cannot be negative';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // Enter: move to next field; on last field (phone) save the form (balance/points are view-only)
+  const handleKeyDown = (field, e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const next = {
+      customer_id: () => nameRef.current?.focus(),
+      name: () => phoneRef.current?.focus(),
+      phone: () => handleSave()
+    };
+    next[field]?.();
   };
 
   const handleSave = async () => {
@@ -81,18 +99,32 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
     
     setLoading(true);
     try {
+      const payload = { ...formData };
+      if (!isEdit && !payload.customer_id?.trim()) delete payload.customer_id; // omit to let backend auto-gen on create
       let savedCustomer;
       if (isEdit && customer) {
-        savedCustomer = await customerApi.updateCustomer(customer.id, formData);
+        savedCustomer = await customerApi.updateCustomer(customer.id, payload);
       } else {
-        savedCustomer = await customerApi.createCustomer(formData);
+        savedCustomer = await customerApi.createCustomer(payload);
       }
       
       await onSave(savedCustomer);
       onClose();
     } catch (error) {
       console.error('Error saving customer:', error);
-      // You might want to show an error message to the user here
+      const data = error.response?.data;
+      const details = data?.details ?? data;
+      if (details && typeof details === 'object' && !Array.isArray(details)) {
+        const fieldErrors = {};
+        for (const [field, messages] of Object.entries(details)) {
+          if (Array.isArray(messages) && messages.length) {
+            fieldErrors[field] = messages[0];
+          } else if (typeof messages === 'string') {
+            fieldErrors[field] = messages;
+          }
+        }
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
     } finally {
       setLoading(false);
     }
@@ -128,6 +160,26 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
 
         {/* Form Content */}
         <div className="p-6 space-y-6">
+          {/* Customer ID */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Hash className="w-4 h-4 inline mr-2" />
+              Customer ID
+            </label>
+            <input
+              ref={customerIdRef}
+              type="text"
+              value={formData.customer_id}
+              onChange={(e) => handleInputChange('customer_id', e.target.value)}
+              onKeyDown={(e) => handleKeyDown('customer_id', e)}
+              className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.customer_id ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
+              placeholder="Optional - leave blank to auto-generate"
+            />
+            {errors.customer_id && <p className="text-red-500 text-sm mt-1">{errors.customer_id}</p>}
+          </div>
+
           {/* Customer Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -135,9 +187,11 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               Customer Name *
             </label>
             <input
+              ref={nameRef}
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
+              onKeyDown={(e) => handleKeyDown('name', e)}
               className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
@@ -153,9 +207,11 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               Phone Number *
             </label>
             <input
+              ref={phoneRef}
               type="tel"
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
+              onKeyDown={(e) => handleKeyDown('phone', e)}
               className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.phone ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
@@ -164,24 +220,16 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
             {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
           </div>
 
-          {/* Balance and Points */}
+          {/* Balance and Points (view only) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <DollarSign className="w-4 h-4 inline mr-2" />
                 Balance
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.balance}
-                onChange={(e) => handleInputChange('balance', parseFloat(e.target.value) || 0)}
-                className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                }`}
-                placeholder="0.00"
-              />
-              {errors.balance && <p className="text-red-500 text-sm mt-1">{errors.balance}</p>}
+              <div className="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600/50 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 cursor-default">
+                {typeof formData.balance === 'number' ? formData.balance.toFixed(2) : parseFloat(formData.balance || 0).toFixed(2)}
+              </div>
             </div>
 
             <div>
@@ -189,16 +237,9 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
                 <Star className="w-4 h-4 inline mr-2" />
                 Points
               </label>
-              <input
-                type="number"
-                value={formData.points}
-                onChange={(e) => handleInputChange('points', parseInt(e.target.value) || 0)}
-                className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.points ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                }`}
-                placeholder="0"
-              />
-              {errors.points && <p className="text-red-500 text-sm mt-1">{errors.points}</p>}
+              <div className="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600/50 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 cursor-default">
+                {formData.points ?? 0}
+              </div>
             </div>
           </div>
 
