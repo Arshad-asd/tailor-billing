@@ -36,6 +36,8 @@ export default function JobOrders() {
 
   // Print state and helpers
   const [printOrder, setPrintOrder] = useState(null)
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+  const [pendingPrintOrder, setPendingPrintOrder] = useState(null)
 
   // Date filter states
   const [dateFilter, setDateFilter] = useState({
@@ -124,14 +126,24 @@ export default function JobOrders() {
         advance: advanceAmount, 
         balance: balanceAmount 
       },
-      deliveryDate: toDMY(order?.delivery_date),
+      deliveryDate: toIsoDate(order?.delivery_date),
     }
   }
 
   const handlePrintOrder = (order) => {
     const a5 = mapToA5(order)
+    setPendingPrintOrder(a5)
+    setIsPrintModalOpen(true)
+  }
+
+  const executePrint = (copyType) => {
+    if (!pendingPrintOrder) return
+    
+    const a5 = pendingPrintOrder
     setPrintOrder(a5)
-    // Print directly without confirmation
+    setIsPrintModalOpen(false)
+    
+    // Print with copy type
     setTimeout(() => {
       // Create a new window for printing
       const printWindow = window.open('', '_blank', 'width=800,height=600')
@@ -143,9 +155,12 @@ export default function JobOrders() {
               @page { size: A5 portrait; margin: 8mm; }
               body { margin: 0; padding: 0; font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; }
               .a5-sheet { width: 148mm; height: 210mm; background: #fff; color: #111827; padding: 8mm; }
-              .hdr { border-bottom: 1px solid #d1d5db; padding-bottom: 4mm; margin-bottom: 4mm; }
-              .hdr-top { display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: center; margin-bottom: 2mm; }
-              .brand { font-weight: 700; text-align: center; font-size: 14pt; }
+              .hdr { padding-bottom: 4mm; margin-bottom: 4mm; }
+              .hdr-top { margin-bottom: 2mm; }
+              .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 2mm; gap: 4mm; direction: ltr; }
+              .hdr-phone-left { text-align: left; justify-self: start; }
+              .hdr-phone-right { text-align: right; justify-self: end; }
+              .brand { font-weight: 700; text-align: right; font-size: 14pt; }
               .small { font-size: 9pt; color: #4b5563; }
               .left { text-align: left; }
               .right { text-align: right; }
@@ -154,21 +169,22 @@ export default function JobOrders() {
               .row .cell.left { text-align: left; }
               .row .cell.center { text-align: center; }
               .title { font-weight: 700; font-size: 12pt; }
-              .submeta { grid-template-columns: 2fr 1fr; }
+              .submeta { grid-template-columns: 1fr 2fr; direction: ltr; }
+              .submeta .cell.left { text-align: left; justify-self: start; }
+              .submeta .cell:not(.left) { text-align: right; justify-self: end; }
               table.items { width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; }
-              table.items th, table.items td { border: 1px solid #9ca3af; padding: 6px 8px; vertical-align: middle; }
-              table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; }
+              table.items th, table.items td { border: none; padding: 6px 8px; vertical-align: middle; }
+              table.items thead tr { border-bottom: 1px solid #9ca3af; }
+              table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; white-space: nowrap; }
+              table.items thead th.col-qty { text-align: center; }
+              table.items thead th.col-unit { text-align: center; }
               .col-details { width: 55%; }
               .col-qty { width: 15%; text-align: center; }
-              .col-unit { width: 15%; text-align: right; }
+              .col-unit { width: 15%; text-align: center; }
               .col-amt { width: 15%; text-align: right; }
-              .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; margin-top: 6mm; }
-              .delivery { align-self: end; font-size: 11pt; }
-              .sum { justify-self: end; min-width: 45mm; font-size: 11pt; }
-              .sum .row { grid-template-columns: auto 1fr; gap: 6mm; margin: 0; }
-              .sum .label { text-align: right; }
-              .sum .value { text-align: right; min-width: 30mm; }
-              .ftr { border-top: 1px solid #d1d5db; margin-top: 6mm; padding-top: 3mm; font-size: 9.5pt; color: #374151; }
+              table.items tfoot td { padding: 6px 8px; vertical-align: middle; }
+              table.items tfoot .totals-separator td { padding: 4px 8px; }
+              .ftr { margin-top: 6mm; padding-top: 3mm; font-size: 9.5pt; color: #374151; }
               .hours { text-align: center; }
             </style>
           </head>
@@ -176,26 +192,31 @@ export default function JobOrders() {
             <div class="a5-sheet">
               <div class="hdr" dir="rtl">
                 <div class="hdr-top">
-                  <div class="left small">SINCE 1987</div>
-                  <div class="center brand">أم درمان للخياطة والأقمشة السودانية - الدوحة</div>
-                  <div class="right small"><span>جوال:</span> 5071516122</div>
+                  <div class="right brand">أم درمان للخياطة والأقمشة السودانية - الدوحة</div>
                 </div>
-                <div class="row meta">
-                  <div class="cell">
-                    <span>الرقم فاتورة:</span> <strong>${a5.invoiceNumber}</strong>
+                <div class="hdr-phone small">
+                  <div class="hdr-phone-left">
+                  <strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span> 
+
                   </div>
-                  <div class="cell center title">فاتورة الخياطة</div>
-                  <div class="cell left">
-                    <span>التاريخ:</span> <strong>${a5.date}</strong>
+                  <div class="hdr-phone-right">
+                    <span>جوال:</span> 5071516122
                   </div>
                 </div>
+                <div style="text-align: left; direction: ltr; margin-top: 2mm; font-size: 10.5pt;">
+                  <span>التاريخ:</span> <strong>${a5.date}</strong>
+                </div>
+                <div style="text-align: center; margin-top: 2mm; margin-bottom: 2mm;">
+                  <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
+                </div>
+
                 <div class="row submeta">
-                  <div class="cell">
-                    <span>اسم الزبون:</span> <strong>${a5.customerName}</strong>
-                    ${a5.customerPhone ? ` - ${a5.customerPhone}` : ''}
-                  </div>
-                  <div class="cell right">
+                  <div class="cell left">
                     <span>رقم العميل:</span> <strong>${a5.customerNumber}</strong>
+                  </div>
+                  <div class="cell">
+                    <strong>${a5.customerName}</strong>
+                    ${a5.customerPhone ? ` - ${a5.customerPhone}` : ''}<span>:اسم الزبون</span> 
                   </div>
                 </div>
               </div>
@@ -230,25 +251,40 @@ export default function JobOrders() {
                       </tr>
                     `).join('')}
                   </tbody>
+                  <tfoot>
+                    <tr class="totals-separator">
+                      <td colspan="4" style="border-top: 1px solid #9ca3af; padding: 4px 8px;"></td>
+                    </tr>
+                    <tr>
+                      <td class="col-details"></td>
+                      <td class="col-qty" style="text-align: right; font-weight: 700;">المجموع:</td>
+                      <td class="col-unit"></td>
+                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.total.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td class="col-details"></td>
+                      <td class="col-qty" style="text-align: right; font-weight: 700;">مقدماً:</td>
+                      <td class="col-unit"></td>
+                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.advance.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td class="col-details"></td>
+                      <td class="col-qty" style="text-align: right; font-weight: 700;">الباقي:</td>
+                      <td class="col-unit"></td>
+                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.balance.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td class="col-details" style="text-align: right;">
+                        <span>تاريخ تسليم:</span> <strong>${a5.deliveryDate}</strong>
+                      </td>
+                      <td class="col-qty"></td>
+                      <td class="col-unit"></td>
+                      <td class="col-amt"></td>
+                    </tr>
+                  </tfoot>
                 </table>
-                <div class="totals">
-                  <div class="delivery">
-                    <span>تاريخ تسليم:</span> <strong>${a5.deliveryDate}</strong>
-                  </div>
-                  <div class="sum">
-                    <div class="row">
-                      <div class="label">المجموع:</div>
-                      <div class="value">${a5.totals.total.toFixed(2)}</div>
-                    </div>
-                    <div class="row">
-                      <div class="label">مقدماً:</div>
-                      <div class="value">${a5.totals.advance.toFixed(2)}</div>
-                    </div>
-                    <div class="row">
-                      <div class="label">الباقي:</div>
-                      <div class="value">${a5.totals.balance.toFixed(2)}</div>
-                    </div>
-                  </div>
+                <div style="text-align: center; margin-top: 4mm; font-size: 10pt; font-weight: 700;">
+                  (${copyType === 'customer' ? 'customer copy' : 'file copy'})
                 </div>
               </div>
               <div class="ftr" dir="rtl">
@@ -265,6 +301,7 @@ export default function JobOrders() {
       printWindow.print()
       printWindow.close()
       setPrintOrder(null)
+      setPendingPrintOrder(null)
     }, 100)
   }
 
@@ -611,6 +648,38 @@ export default function JobOrders() {
       {/* Edit Job Order Form */}
       {isEditFormOpen && editingJobOrderId && (
         <EditJobOrder jobOrderId={editingJobOrderId} onClose={handleFormClose} onSuccess={handleFormSuccess} />
+      )}
+
+      {/* Print Modal */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Print Copy</h3>
+            <div className="flex gap-4">
+              <button
+                onClick={() => executePrint('customer')}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+              >
+                Customer Copy
+              </button>
+              <button
+                onClick={() => executePrint('file')}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+              >
+                File Copy
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setIsPrintModalOpen(false)
+                setPendingPrintOrder(null)
+              }}
+              className="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Job Orders List */}
