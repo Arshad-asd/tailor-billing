@@ -336,6 +336,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       };
       
       if (section === 'bill' && field === 'advance') {
+        // Store as text, but parse for calculations
         const advance = parseFloat(value) || 0;
         const total = prev.bill.total;
         newFormData.bill.balance = total - advance;
@@ -947,7 +948,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         status: 'pending',
         delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate).toISOString() : null,
         total_amount: formData.bill.total,
-        advance_amount: formData.bill.advance,
+        advance_amount: parseFloat(formData.bill.advance) || 0,
         balance_amount: formData.bill.balance,
         payment_method: formData.bill.paymentMethod,
         cash_amount: formData.bill.cashAmount,
@@ -1026,7 +1027,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           orderReference: '',
           deliveryDate: '',
           total: 0,
-          advance: 0,
+          advance: '',
           balance: 0,
           paymentMethod: 'cash',
           cashAmount: 0,
@@ -1750,9 +1751,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Advance (-)</label>
                 <input
-                  type="number"
-                  value={formData.bill.advance}
-                  onChange={(e) => handleFormChange('bill', 'advance', parseFloat(e.target.value) || 0)}
+                  type="text"
+                  value={formData.bill.advance === 0 || formData.bill.advance === '' ? '' : String(formData.bill.advance)}
+                  onChange={(e) => handleFormChange('bill', 'advance', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
