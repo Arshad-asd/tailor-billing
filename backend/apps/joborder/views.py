@@ -15,6 +15,8 @@ from .serializers import (
 )
 from apps.crm.models import Customer
 from apps.materials.models import Material
+from apps.accounts.views import TransactionViewSet
+from .utils import sync_customer_measurements, update_customer_balance, update_customer_points
 
 
 class JobOrderViewSet(viewsets.ModelViewSet):
@@ -101,6 +103,11 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 job_order = serializer.save()
+                # Create transaction for the job order
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=False)
+                # Update customer balance and points
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
                 response_serializer = JobOrderListSerializer(job_order)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -118,7 +125,16 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
+                old_customer = instance.customer
                 job_order = serializer.save()
+                # Update transaction for the job order
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=True)
+                # Update customer balance and points (handle customer change if it happened)
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
+                if old_customer != job_order.customer:
+                    update_customer_balance(old_customer)
+                    update_customer_points(old_customer)
                 response_serializer = JobOrderListSerializer(job_order)
                 return Response(response_serializer.data)
         except Exception as e:
@@ -130,8 +146,12 @@ class JobOrderViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """Soft delete a job order"""
         instance = self.get_object()
+        customer = instance.customer
         instance.is_active = False
         instance.save()
+        # Update customer balance and points after soft delete
+        update_customer_balance(customer)
+        update_customer_points(customer)
         return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=True, methods=['post'])
@@ -250,6 +270,13 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                     job_order.status = new_status
                 
                 job_order.save()
+                
+                # Update transaction for the job order (especially if delivery_amount changed)
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=True)
+                
+                # Update customer balance and points
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
                 
                 serializer = JobOrderListSerializer(job_order)
                 return Response(serializer.data)
@@ -379,6 +406,9 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                         **measurement_data_copy
                     )
                 
+                # Sync job order measurements to customer measurements
+                sync_customer_measurements(job_order)
+                
                 serializer = JobOrderListSerializer(job_order)
                 return Response(serializer.data)
         except Exception as e:
@@ -435,6 +465,9 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                         setattr(measurement, field, request.data[field])
                 
                 measurement.save()
+                
+                # Sync job order measurements to customer measurements
+                sync_customer_measurements(job_order)
                 
                 serializer = JobOrderMeasurementSerializer(measurement)
                 return Response(serializer.data)
@@ -548,6 +581,13 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 for attr, value in bill_data.items():
                     setattr(job_order, attr, value)
                 job_order.save()
+                
+                # Update transaction for the job order (especially if advance_amount changed)
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=True)
+                
+                # Update customer balance and points
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
                 
                 # Update job order items if provided
                 if job_order_items_data is not None:

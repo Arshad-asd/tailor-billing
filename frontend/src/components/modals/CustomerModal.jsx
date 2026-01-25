@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Save, User, Phone, DollarSign, Star, Hash } from 'lucide-react';
+import { X, Save, User, Phone, Hash } from 'lucide-react';
 import customerApi from '../../services/customerApi';
 
 export default function CustomerModal({ isOpen, onClose, onSave, customer = null, isEdit = false }) {
@@ -29,14 +29,31 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
           is_active: customer.is_active !== undefined ? customer.is_active : true
         });
       } else {
-        setFormData({
-          customer_id: '',
-          name: '',
-          phone: '',
-          balance: 0.00,
-          points: 0,
-          is_active: true
-        });
+        // Fetch next customer ID for new customers
+        const fetchNextCustomerId = async () => {
+          try {
+            const response = await customerApi.getNextCustomerId();
+            setFormData({
+              customer_id: response.next_customer_id || '',
+              name: '',
+              phone: '',
+              balance: 0.00,
+              points: 0,
+              is_active: true
+            });
+          } catch (error) {
+            // If fetching fails, just use empty string
+            setFormData({
+              customer_id: '',
+              name: '',
+              phone: '',
+              balance: 0.00,
+              points: 0,
+              is_active: true
+            });
+          }
+        };
+        fetchNextCustomerId();
       }
       setErrors({});
     }
@@ -80,7 +97,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
     return Object.keys(newErrors).length === 0;
   };
 
-  // Enter: move to next field; on last field (phone) save the form (balance/points are view-only)
+  // Enter: move to next field; on last field (phone) save the form
   const handleKeyDown = (field, e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -218,29 +235,6 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               placeholder="Enter phone number"
             />
             {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-          </div>
-
-          {/* Balance and Points (view only) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <DollarSign className="w-4 h-4 inline mr-2" />
-                Balance
-              </label>
-              <div className="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600/50 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 cursor-default">
-                {typeof formData.balance === 'number' ? formData.balance.toFixed(2) : parseFloat(formData.balance || 0).toFixed(2)}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <Star className="w-4 h-4 inline mr-2" />
-                Points
-              </label>
-              <div className="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600/50 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 cursor-default">
-                {formData.points ?? 0}
-              </div>
-            </div>
           </div>
 
           {/* Active Status */}

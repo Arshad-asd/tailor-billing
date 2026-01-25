@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer
+from .models import Customer, CustomerMeasurement
 from django.db.models import Count, Sum, Max
 from apps.joborder.models import JobOrder
 from apps.sale.models import Sale
@@ -138,3 +138,28 @@ class CustomerReportSerializer(serializers.ModelSerializer):
     def get_email(self, obj):
         """Return empty string for email since it's not in the model"""
         return ""
+
+
+class CustomerMeasurementSerializer(serializers.ModelSerializer):
+    material_name = serializers.CharField(source='material.name', read_only=True)
+    material_id = serializers.IntegerField(source='material.id', read_only=True)
+    
+    class Meta:
+        model = CustomerMeasurement
+        fields = [
+            'id',
+            'customer',
+            'material',
+            'material_id',
+            'material_name',
+            'thool',
+            'kethet',
+            'thool_kum',
+            'ardh_f_kum',
+            'jamba',
+            'ragab',
+            'created_at',
+            'updated_at',
+            'is_active'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

@@ -273,7 +273,7 @@ const AdminDashboard = () => {
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Due Date</TableHead>
+                    <TableHead>Delivery Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
                           <div>
                             <div className="font-medium">{jobOrder.job_order_number}</div>
                             <div className="text-sm text-gray-500">
-                              Due {new Date(jobOrder.delivery_date).toLocaleDateString()}
+                              Delivery {new Date(jobOrder.delivery_date).toLocaleDateString()}
                             </div>
                           </div>
                         </TableCell>

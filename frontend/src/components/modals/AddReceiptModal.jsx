@@ -56,8 +56,12 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
       // Handle both paginated and non-paginated responses
       const jobOrdersData = response.results || response;
       const jobOrdersArray = Array.isArray(jobOrdersData) ? jobOrdersData : [];
-      setJobOrders(jobOrdersArray);
-      setFilteredJobOrders(jobOrdersArray);
+      // Filter to only show job orders with balance_amount > 0
+      const filteredByBalance = jobOrdersArray.filter(
+        jobOrder => parseFloat(jobOrder.balance_amount || 0) > 0
+      );
+      setJobOrders(filteredByBalance);
+      setFilteredJobOrders(filteredByBalance);
     } catch (error) {
       console.error('Error fetching job orders:', error);
       showNotification('Error fetching job orders', 'error');
@@ -94,12 +98,14 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
     setShowJobOrderDropdown(true);
     
     if (!searchTerm.trim()) {
+      // Already filtered by balance > 0 in fetchJobOrders
       setFilteredJobOrders(jobOrders);
     } else {
       const filtered = jobOrders.filter(jobOrder => 
-        jobOrder.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (jobOrder.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         jobOrder.customer_phone?.includes(searchTerm) ||
-        jobOrder.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        jobOrder.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        parseFloat(jobOrder.balance_amount || 0) > 0
       );
       setFilteredJobOrders(filtered);
     }
@@ -239,7 +245,6 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
                 placeholder="Enter receipt amount"
                 required
                 min="0.01"
-                max={selectedJobOrder?.balance_amount || undefined}
               />
               {selectedJobOrder && form.receipt_amount && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">

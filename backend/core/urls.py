@@ -28,6 +28,6 @@ urlpatterns = [
     path('api/materials/', include('apps.materials.urls')),
     path('api/sales/', include('apps.sale.urls')),
     path('api/master/', include('apps.master.urls')),
-    # path('api/transactions/', include('apps.transactions.urls')),
+    path('api/accounts/', include('apps.accounts.urls')),
     # path('api/services/', include('apps.service.urls')),
 ]

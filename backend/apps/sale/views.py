@@ -6,6 +6,7 @@ from django.utils import timezone
 from .models import Sale, SaleItem
 from .serializers import SaleSerializer, SaleListSerializer, SaleItemSerializer
 from apps.inventory.models import Item
+from apps.accounts.views import TransactionViewSet
 import random
 import string
 
@@ -91,6 +92,9 @@ class SaleViewSet(viewsets.ModelViewSet):
                     sale.total_amount = total_amount
                     sale.amount = total_amount
                     sale.save()
+                
+                # Create transaction for the sale
+                TransactionViewSet.transaction_create_or_update_sales(sale)
                 
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
                 

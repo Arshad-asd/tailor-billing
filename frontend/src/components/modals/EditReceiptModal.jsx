@@ -65,8 +65,18 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
       // Handle both paginated and non-paginated responses
       const jobOrdersData = response.results || response;
       const jobOrdersArray = Array.isArray(jobOrdersData) ? jobOrdersData : [];
-      setJobOrders(jobOrdersArray);
-      setFilteredJobOrders(jobOrdersArray);
+      // Filter to only show job orders with balance_amount > 0
+      // But include the current job order even if balance is 0 (for editing existing receipts)
+      const currentJobOrderId = editingReceipt?.job_order?.id || editingReceipt?.job_order;
+      const filteredByBalance = jobOrdersArray.filter(
+        jobOrder => {
+          const balance = parseFloat(jobOrder.balance_amount || 0);
+          // Include if balance > 0 OR if it's the current job order being edited
+          return balance > 0 || jobOrder.id === currentJobOrderId;
+        }
+      );
+      setJobOrders(filteredByBalance);
+      setFilteredJobOrders(filteredByBalance);
     } catch (error) {
       console.error('Error fetching job orders:', error);
       showNotification('Error fetching job orders', 'error');
@@ -102,14 +112,20 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
     setJobOrderSearchTerm(searchTerm);
     setShowJobOrderDropdown(true);
     
+    const currentJobOrderId = editingReceipt?.job_order?.id || editingReceipt?.job_order;
+    
     if (!searchTerm.trim()) {
+      // Already filtered by balance > 0 in fetchJobOrders (or current job order)
       setFilteredJobOrders(jobOrders);
     } else {
-      const filtered = jobOrders.filter(jobOrder => 
-        jobOrder.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        jobOrder.customer_phone?.includes(searchTerm) ||
-        jobOrder.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const filtered = jobOrders.filter(jobOrder => {
+        const matchesSearch = jobOrder.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          jobOrder.customer_phone?.includes(searchTerm) ||
+          jobOrder.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+        const hasBalance = parseFloat(jobOrder.balance_amount || 0) > 0;
+        const isCurrentJobOrder = jobOrder.id === currentJobOrderId;
+        return matchesSearch && (hasBalance || isCurrentJobOrder);
+      });
       setFilteredJobOrders(filtered);
     }
   };
@@ -245,7 +261,6 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
                 placeholder="Enter receipt amount"
                 required
                 min="0.01"
-                max={selectedJobOrder?.balance_amount || undefined}
               />
               {selectedJobOrder && form.receipt_amount && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">

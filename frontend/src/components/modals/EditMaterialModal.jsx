@@ -7,12 +7,7 @@ import { Label } from "../ui/label";
 export default function EditMaterialModal({ open, onClose, onSubmit, editingMaterial = null, loading = false }) {
   const [form, setForm] = useState({
     name: "",
-    thool: "",
-    kethet: "",
-    thool_kum: "",
-    ardh_f_kum: "",
-    jamba: "",
-    ragab: "",
+    material_number: "",
     price: "",
     is_measurement_required: false,
   });
@@ -21,12 +16,7 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
     if (editingMaterial) {
       setForm({
         name: editingMaterial.name || "",
-        thool: editingMaterial.thool?.toString() || "",
-        kethet: editingMaterial.kethet?.toString() || "",
-        thool_kum: editingMaterial.thool_kum?.toString() || "",
-        ardh_f_kum: editingMaterial.ardh_f_kum?.toString() || "",
-        jamba: editingMaterial.jamba?.toString() || "",
-        ragab: editingMaterial.ragab?.toString() || "",
+        material_number: editingMaterial.material_number || "",
         price: editingMaterial.price?.toString() || "",
         is_measurement_required: editingMaterial.is_measurement_required || false,
       });
@@ -43,27 +33,10 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
     e.preventDefault();
     const formData = {
       name: form.name,
+      material_number: form.material_number || null,
       price: parseFloat(form.price) || 0,
       is_measurement_required: form.is_measurement_required,
     };
-    
-    // Only include measurement fields if is_measurement_required is true
-    if (form.is_measurement_required) {
-      formData.thool = parseFloat(form.thool) || 0;
-      formData.kethet = parseFloat(form.kethet) || 0;
-      formData.thool_kum = parseFloat(form.thool_kum) || 0;
-      formData.ardh_f_kum = parseFloat(form.ardh_f_kum) || 0;
-      formData.jamba = parseFloat(form.jamba) || 0;
-      formData.ragab = parseFloat(form.ragab) || 0;
-    } else {
-      // Set to null if measurement is not required
-      formData.thool = null;
-      formData.kethet = null;
-      formData.thool_kum = null;
-      formData.ardh_f_kum = null;
-      formData.jamba = null;
-      formData.ragab = null;
-    }
     
     onSubmit(formData, editingMaterial?.id);
   };
@@ -99,6 +72,17 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
             </div>
 
             <div className="flex flex-col gap-2">
+              <Label htmlFor="material_number">Material Number</Label>
+              <Input
+                id="material_number"
+                name="material_number"
+                value={form.material_number}
+                onChange={handleChange}
+                placeholder="Enter material number (optional)"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
               <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
@@ -113,7 +97,7 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
               />
             </div>
 
-            <div className="flex flex-col gap-2 md:col-span-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="is_measurement_required">Is Measurement Required?</Label>
               <select
                 id="is_measurement_required"
@@ -127,100 +111,6 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
                 <option value="true">Yes</option>
               </select>
             </div>
-
-            {form.is_measurement_required && (
-              <>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="thool">Thool</Label>
-                  <Input
-                    id="thool"
-                    name="thool"
-                    type="number"
-                    step="0.01"
-                    value={form.thool}
-                    onChange={handleChange}
-                    placeholder="Enter thool measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="kethet">Kethef</Label>
-                  <Input
-                    id="kethet"
-                    name="kethet"
-                    type="number"
-                    step="0.01"
-                    value={form.kethet}
-                    onChange={handleChange}
-                    placeholder="Enter kethet measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="thool_kum">Thool Kum</Label>
-                  <Input
-                    id="thool_kum"
-                    name="thool_kum"
-                    type="number"
-                    step="0.01"
-                    value={form.thool_kum}
-                    onChange={handleChange}
-                    placeholder="Enter thool kum measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="ardh_f_kum">Ardh F. Kum</Label>
-                  <Input
-                    id="ardh_f_kum"
-                    name="ardh_f_kum"
-                    type="number"
-                    step="0.01"
-                    value={form.ardh_f_kum}
-                    onChange={handleChange}
-                    placeholder="Enter ardh f. kum measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="jamba">Jamba</Label>
-                  <Input
-                    id="jamba"
-                    name="jamba"
-                    type="number"
-                    step="0.01"
-                    value={form.jamba}
-                    onChange={handleChange}
-                    placeholder="Enter jamba measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="ragab">Ragab</Label>
-                  <Input
-                    id="ragab"
-                    name="ragab"
-                    type="number"
-                    step="0.01"
-                    value={form.ragab}
-                    onChange={handleChange}
-                    placeholder="Enter ragab measurement"
-                    required
-                    min="0"
-                  />
-                </div>
-              </>
-            )}
           </div>
 
           <DialogFooter>

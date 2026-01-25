@@ -83,46 +83,18 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     }
   });
 
-  // Function to update bill items based on selected materials
-  const updateBillItemsFromMaterials = (materials) => {
-    const newBillItems = materials.map((material, index) => {
-      const qty = 1;
-      const fees = 0; // User will enter fees manually, not from material price
-      const amount = ''; // User will enter amount manually as text
-      return {
-        sl: index + 1,
-        itemName: material.material_name,
-        remarks: formData.measurement.remarks || 'Custom tailoring service',
-        qty: qty,
-        fees: fees,
-        amount: amount,
-        material_id: material.material_id || material.id
-      };
-    });
-    
-    setBillItems(newBillItems);
-    updateBillTotal(newBillItems);
-    // Initialize search queries for items created from materials
-    const newQueries = {};
-    newBillItems.forEach(item => {
-      newQueries[item.sl] = item.itemName;
-    });
-    setBillItemNameSearchQueries(prev => ({ ...prev, ...newQueries }));
-  };
-
-  // Function to update bill items when materials change
+  // Function to update materials (no longer auto-creates bill items)
   const handleMaterialsChange = (newMaterials) => {
     setSelectedMaterials(newMaterials);
-    updateBillItemsFromMaterials(newMaterials);
+    // Bill items are now optional and must be added manually by the user
   };
 
   // Function to update bill item quantity
   const handleBillItemQtyChange = (itemSl, newQty) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const qty = parseInt(newQty) || 1;
-        // Keep amount as is - user enters amount manually, not calculated from fees * qty
-        return { ...item, qty: qty };
+        // Keep qty as text input - user can enter any value
+        return { ...item, qty: newQty };
       }
       return item;
     });
@@ -218,7 +190,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       sl: billItems.length + 1,
       itemName: '',
       remarks: '',
-      qty: 1,
+      qty: '', // Empty string for text input
       fees: 0,
       amount: '' // Empty string for text input, no default 0
     };
@@ -495,7 +467,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     }
   }, [selectedCustomer]);
 
-  const handleSelectCustomer = (customer) => {
+  const handleSelectCustomer = async (customer) => {
     setSelectedCustomer(customer);
     setFormData(prev => ({
       ...prev,
@@ -507,6 +479,65 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         currentBalance: safeParseFloat(customer.balance, 0)
       }
     }));
+
+    // Fetch customer measurements and auto-populate materials
+    if (customer.id) {
+      try {
+        const measurements = await customerApi.getCustomerMeasurements(customer.id);
+        if (measurements && measurements.length > 0) {
+          // Fetch material details for each measurement to get price and other info
+          const materialsFromMeasurements = await Promise.all(
+            measurements.map(async (measurement) => {
+              const materialId = measurement.material_id || measurement.material;
+              let materialPrice = 0;
+              let materialName = measurement.material_name;
+              
+              // Try to fetch material details to get price
+              try {
+                const materialDetails = await materialsApi.getMaterial(materialId);
+                materialPrice = materialDetails.price || 0;
+                materialName = materialDetails.name || materialName;
+              } catch (error) {
+                console.warn(`Could not fetch material details for ID ${materialId}:`, error);
+                // Use the material_name from measurement if material fetch fails
+              }
+              
+              return {
+                id: materialId,
+                material_id: materialId,
+                material_name: materialName,
+                material_price: materialPrice,
+                measurements: {
+                  thool: measurement.thool || 0,
+                  kethet: measurement.kethet || 0,
+                  thool_kum: measurement.thool_kum || 0,
+                  ardh_f_kum: measurement.ardh_f_kum || 0,
+                  jamba: measurement.jamba || 0,
+                  ragab: measurement.ragab || 0
+                },
+                custom_thool: measurement.thool ? Math.round(parseFloat(measurement.thool)).toString() : '',
+                custom_kethet: measurement.kethet ? Math.round(parseFloat(measurement.kethet)).toString() : '',
+                custom_thool_kum: measurement.thool_kum ? Math.round(parseFloat(measurement.thool_kum)).toString() : '',
+                custom_ardh_f_kum: measurement.ardh_f_kum ? Math.round(parseFloat(measurement.ardh_f_kum)).toString() : '',
+                custom_jamba: measurement.jamba ? Math.round(parseFloat(measurement.jamba)).toString() : '',
+                custom_ragab: measurement.ragab ? Math.round(parseFloat(measurement.ragab)).toString() : '',
+                note1: '',
+                note2: '',
+                note3: '',
+                note4: '',
+                is_customized: false
+              };
+            })
+          );
+          
+          // Set the materials
+          handleMaterialsChange(materialsFromMeasurements);
+        }
+      } catch (error) {
+        console.error('Error fetching customer measurements:', error);
+        // Don't show error to user, just log it - it's okay if measurements don't exist
+      }
+    }
   };
 
   const handleEditCustomer = (customer) => {
@@ -730,6 +761,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         updateBillTotal(updatedBillItems);
         setLinkingItemSl(null);
         setIsMaterialSearchOpen(false);
+        
+        // Focus on remarks field after linking material
+        setTimeout(() => {
+          billItemInputRefs.current[linkingItemSl]?.remarks?.focus();
+        }, 100);
+        
         return;
       }
       
@@ -752,6 +789,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       setBillItems(updatedBillItems);
       updateBillTotal(updatedBillItems);
       setIsMaterialSearchOpen(false);
+      
+      // Focus on remarks field after adding item
+      setTimeout(() => {
+        billItemInputRefs.current[newBillItem.sl]?.remarks?.focus();
+      }, 100);
+      
       return;
     }
 
@@ -802,7 +845,8 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         material.id === materialId 
           ? { 
               ...material, 
-              [field]: value === '' ? '' : (isNaN(value) ? value : parseFloat(value) || ''),
+              // Allow text input for all fields
+              [field]: value,
               is_customized: true
             }
           : material
@@ -810,7 +854,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     );
   };
 
-  // On Enter: jump to next measurement input; on last input (note4) save material and open add material modal
+  // On Enter: jump to next measurement input; on last input (note4) save material
   const handleMeasurementKeyDown = (materialId, field, e) => {
     if (e.key !== 'Enter') return;
     if (lockedMaterialIds.includes(materialId)) return;
@@ -820,10 +864,8 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     if (nextField) {
       materialInputRefs.current[materialId]?.[nextField]?.focus();
     } else {
-      // On last input (Note4): save the current material first, then open material selection modal
+      // On last input (Note4): save the current material
       handleLockMaterial(materialId);
-      setMaterialSearchType('measurement');
-      setIsMaterialSearchOpen(true);
     }
   };
 
@@ -861,12 +903,15 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     setError(null);
 
     try {
-      // Validate bill items have material_id
-      const itemsWithoutMaterial = billItems.filter(item => !item.material_id);
-      if (itemsWithoutMaterial.length > 0) {
-        setError(`Please select materials for all bill items. ${itemsWithoutMaterial.length} item(s) missing material.`);
-        setIsLoading(false);
-        return;
+      // Validate bill items only if they exist - bill items are optional
+      if (billItems.length > 0) {
+        // Validate bill items have material_id only if bill items are provided
+        const itemsWithoutMaterial = billItems.filter(item => !item.material_id);
+        if (itemsWithoutMaterial.length > 0) {
+          setError(`Please select materials for all bill items. ${itemsWithoutMaterial.length} item(s) missing material.`);
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Prepare job order payload
@@ -891,26 +936,33 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         cash_amount: formData.bill.cashAmount,
         card_amount: formData.bill.cardAmount,
         remarks: formData.measurement.remarks,
-        job_order_items: billItems.map(item => {
-          const materialId = parseInt(item.material_id);
-          if (!materialId || isNaN(materialId)) {
-            throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
-          }
-          return {
-            material: materialId,
-            quantity: parseInt(item.qty) || 1,
-            fees: parseFloat(item.fees) || 0
-          };
+        // Only include job_order_items if bill items exist (optional)
+        ...(billItems.length > 0 && {
+          job_order_items: billItems.map(item => {
+            const materialId = parseInt(item.material_id);
+            if (!materialId || isNaN(materialId)) {
+              throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
+            }
+            return {
+              material: materialId,
+              quantity: parseInt(item.qty) || 1,
+              fees: parseFloat(item.fees) || 0
+            };
+          })
         }),
         job_order_measurements: selectedMaterials.map(material => {
           const materialId = parseInt(material.material_id || material.id);
           if (!materialId || isNaN(materialId)) {
             throw new Error(`Invalid material ID for measurement: ${material.material_name}`);
           }
-          // Helper function to convert empty string to 0, otherwise parse float
+          // Helper function to convert text input to number for backend
+          // Allows text input in UI but converts to number when saving
           const parseMeasurement = (value) => {
             if (value === '' || value === null || value === undefined) return 0;
-            return parseFloat(value) || 0;
+            // Try to extract numeric value from text
+            const num = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+            if (isNaN(num)) return 0;
+            return Math.round(num); // Convert to integer, removing decimal point
           };
           return {
             material: materialId,
@@ -1204,7 +1256,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           {/* Material Name Search Input */}
           <div className="mb-4 relative material-name-search-container">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Search Material Name
+              Search Material (Name or Number)
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -1217,7 +1269,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     setShowMaterialNameDropdown(true);
                   }
                 }}
-                placeholder="Search material name to add..."
+                placeholder="Search by material name or number..."
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {isSearchingMaterialName && (
@@ -1249,6 +1301,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                               )}
                             </div>
                             <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {material.material_number && (
+                                <span>Number: {material.material_number} | </span>
+                              )}
                               Price: {formatCurrency(material.price || 0)}
                             </div>
                           </div>
@@ -1308,8 +1363,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Thool</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_thool = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_thool || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool', e)}
@@ -1321,8 +1375,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Kethef</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_kethet = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_kethet || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_kethet', e)}
@@ -1334,8 +1387,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Thool Kum</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_thool_kum = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_thool_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool_kum', e)}
@@ -1347,8 +1399,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ardh F Kum</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_ardh_f_kum = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_ardh_f_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ardh_f_kum', e)}
@@ -1360,8 +1411,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Jamba</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_jamba = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_jamba || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_jamba', e)}
@@ -1373,8 +1423,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ragab</label>
                         <input
                           ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_ragab = el; } }}
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={material.custom_ragab || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ragab', e)}
@@ -1436,7 +1485,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note4', e)}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
-                            placeholder="Note 4 (Enter: add another material)"
+                            placeholder="Note 4 (Enter: save material)"
                           />
                         </div>
                       </div>
@@ -1492,13 +1541,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
               >
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
-              </button>
-              <button 
-                onClick={handleBillItemMaterialSearch}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
-              >
-                <Search className="w-3 h-3" />
-                <span>Find</span>
               </button>
               <button 
                 onClick={() => setBillItems([])}
@@ -1597,6 +1639,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                                         {material.name}
                                       </div>
                                       <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                        {material.material_number && (
+                                          <span>Number: {material.material_number} | </span>
+                                        )}
                                         Price: {formatCurrency(material.price || 0)}
                                       </div>
                                     </div>
@@ -1619,10 +1664,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           <td className="px-4 py-4 text-center">
                             <input
                               ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].qty = el; } }}
-                              type="number"
-                              min="1"
+                              type="text"
                               value={item.qty}
-                              onChange={(e) => handleBillItemQtyChange(item.sl, parseInt(e.target.value) || 1)}
+                              onChange={(e) => handleBillItemQtyChange(item.sl, e.target.value)}
                               onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'qty', e)}
                               className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
@@ -1640,15 +1684,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           </td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
-                              {!item.material_id && (
-                                <button
-                                  onClick={() => handleBillItemMaterialSearch(item.sl)}
-                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1"
-                                  title="Link material to this item"
-                                >
-                                  <Search className="w-4 h-4" />
-                                </button>
-                              )}
                               <button
                                 onClick={() => handleRemoveBillItem(item.sl)}
                                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
@@ -1663,7 +1698,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     ) : (
                       <tr>
                         <td colSpan="6" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                          No items in bill. Select materials in the measurement section to auto-populate bill items.
+                          No items in bill. Click "Add Item" to manually add bill items (optional).
                         </td>
                       </tr>
                     )}
@@ -1680,18 +1715,6 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.bill.deliveryDate}
-                    onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
                     className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -1735,6 +1758,18 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                   <option value="card">Card</option>
                   <option value="cash_card">Cash Card</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formData.bill.deliveryDate}
+                    onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
               </div>
               {formData.bill.paymentMethod === 'cash_card' && (
                 <>
@@ -1813,7 +1848,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         onSelectMaterial={handleSelectMaterial}
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
-        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : false}
+        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : null}
       />
     </div>
   );

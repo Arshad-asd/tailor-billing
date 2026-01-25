@@ -133,6 +133,28 @@ const customerApi = {
       console.error('Error fetching customer report:', error);
       throw error;
     }
+  },
+
+  // Get customer measurements
+  getCustomerMeasurements: async (customerId) => {
+    try {
+      const response = await api.get(`/crm/customers/${customerId}/measurements/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching customer measurements:', error);
+      throw error;
+    }
+  },
+
+  // Get next customer ID
+  getNextCustomerId: async () => {
+    try {
+      const response = await api.get('/crm/customers/next_customer_id/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching next customer ID:', error);
+      throw error;
+    }
   }
 };
 

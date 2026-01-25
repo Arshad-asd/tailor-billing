@@ -77,19 +77,16 @@ const AdminLayout = ({ children }) => {
       name: "Job Orders",
       href: "/admin/job-orders",
       icon: ClipboardList,
-      badge: "12",
     },
     {
       name: "Materials",
       href: "/admin/materials",
       icon: Package,
-      badge: "8",
     },
     {
       name: "Delivery",
       href: "/admin/delivery",
       icon: Truck,
-      badge: "5",
     },
     {
       name: "Sales",
@@ -120,7 +117,6 @@ const AdminLayout = ({ children }) => {
       name: "Inventory",
       href: "/admin/inventory",
       icon: Package2,
-      badge: "5",
     },
     {
       name: "Customers",

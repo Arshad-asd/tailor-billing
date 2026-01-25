@@ -81,10 +81,11 @@ class ReceiptSerializer(serializers.ModelSerializer):
         receipt_amount = data.get('receipt_amount')
         
         if job_order and receipt_amount:
-            # Check if receipt amount doesn't exceed job order balance
-            if receipt_amount > job_order.balance_amount:
+            # Allow receipt amount to be greater than balance (will result in 0 balance)
+            # Just ensure the receipt amount is positive
+            if receipt_amount <= 0:
                 raise serializers.ValidationError(
-                    f"Receipt amount ({receipt_amount}) cannot exceed job order balance ({job_order.balance_amount})"
+                    "Receipt amount must be greater than 0"
                 )
         
         return data
@@ -158,10 +159,11 @@ class ReceiptCreateSerializer(serializers.ModelSerializer):
         receipt_amount = data.get('receipt_amount')
         
         if job_order and receipt_amount:
-            # Check if receipt amount doesn't exceed job order balance
-            if receipt_amount > job_order.balance_amount:
+            # Allow receipt amount to be greater than balance (will result in 0 balance)
+            # Just ensure the receipt amount is positive
+            if receipt_amount <= 0:
                 raise serializers.ValidationError(
-                    f"Receipt amount ({receipt_amount}) cannot exceed job order balance ({job_order.balance_amount})"
+                    "Receipt amount must be greater than 0"
                 )
         
         return data

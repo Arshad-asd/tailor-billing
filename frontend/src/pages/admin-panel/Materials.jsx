@@ -133,7 +133,8 @@ export default function Materials() {
   const filteredMaterials = materials.filter((material) => {
     const matchesSearch =
       material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      material.id.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      material.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (material.material_number && material.material_number.toLowerCase().includes(searchTerm.toLowerCase()))
     // Note: API materials don't have category field, so we'll skip category filtering for now
     return matchesSearch
   })
@@ -1273,7 +1274,7 @@ export default function Materials() {
                     Material
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Measurements
+                    Material Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Price
@@ -1326,23 +1327,12 @@ export default function Materials() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {material.is_measurement_required ? (
-                          <>
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              Thool: {material.thool ?? "N/A"} | Kethef: {material.kethet ?? "N/A"}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              ThoolKum: {material.thool_kum ?? "N/A"} | ArdhF.Kum: {material.ardh_f_kum ?? "N/A"}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Jamba: {material.jamba ?? "N/A"} | Ragab: {material.ragab ?? "N/A"}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                            Measurements not required
-                          </div>
-                        )}
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {material.material_number ? `Number: ${material.material_number}` : "No material number"}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {material.is_measurement_required ? "Measurement Required" : "No measurement required"}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">

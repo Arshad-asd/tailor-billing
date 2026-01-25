@@ -6,8 +6,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
+from django.db import transaction as db_transaction
+from decimal import Decimal
 from .models import Receipt
 from .serializers import ReceiptSerializer, ReceiptCreateSerializer
+from apps.accounts.views import TransactionViewSet
+from apps.joborder.models import JobOrder
+from apps.joborder.utils import update_customer_balance
 
 
 class ReceiptViewSet(viewsets.ModelViewSet):
@@ -41,9 +46,32 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         return ReceiptSerializer
 
     def create(self, request, *args, **kwargs):
-        """Override create to provide better error handling"""
+        """Override create to provide better error handling and update job order balance"""
         try:
-            return super().create(request, *args, **kwargs)
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            with db_transaction.atomic():
+                receipt = serializer.save()
+                job_order = receipt.job_order
+                
+                # Update job order balance by reducing it by receipt amount
+                receipt_amount = Decimal(str(receipt.receipt_amount))
+                current_balance = Decimal(str(job_order.balance_amount))
+                
+                # Calculate new balance (ensure it doesn't go below 0)
+                new_balance = max(Decimal('0'), current_balance - receipt_amount)
+                job_order.balance_amount = new_balance
+                job_order.save()
+                
+                # Create transaction for the receipt
+                TransactionViewSet.transaction_create_or_update_receipt(receipt)
+                
+                # Update customer balance
+                update_customer_balance(job_order.customer)
+                
+            response_serializer = ReceiptSerializer(receipt)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         except ValidationError as e:
             return Response(
                 {'error': 'Validation failed', 'details': e.detail},
@@ -56,9 +84,47 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
-        """Override update to provide better error handling"""
+        """Override update to provide better error handling and update job order balance"""
         try:
-            return super().update(request, *args, **kwargs)
+            receipt = self.get_object()
+            old_amount = Decimal(str(receipt.receipt_amount))
+            old_job_order = receipt.job_order
+            
+            serializer = self.get_serializer(receipt, data=request.data, partial=kwargs.get('partial', False))
+            serializer.is_valid(raise_exception=True)
+            
+            with db_transaction.atomic():
+                # Get new amount before saving
+                new_amount = Decimal(str(serializer.validated_data.get('receipt_amount', old_amount)))
+                new_job_order = serializer.validated_data.get('job_order', old_job_order)
+                
+                # If job order changed, restore balance to old job order and reduce new job order
+                if new_job_order != old_job_order:
+                    # Restore balance to old job order
+                    old_job_order.balance_amount = Decimal(str(old_job_order.balance_amount)) + old_amount
+                    old_job_order.save()
+                    
+                    # Reduce balance from new job order
+                    new_job_order.balance_amount = max(Decimal('0'), Decimal(str(new_job_order.balance_amount)) - new_amount)
+                    new_job_order.save()
+                else:
+                    # Same job order, adjust balance based on amount difference
+                    amount_diff = new_amount - old_amount
+                    current_balance = Decimal(str(new_job_order.balance_amount))
+                    new_balance = max(Decimal('0'), current_balance - amount_diff)
+                    new_job_order.balance_amount = new_balance
+                    new_job_order.save()
+                
+                # Save the receipt
+                receipt = serializer.save()
+                
+                # Update customer balance (handle job order change if it happened)
+                update_customer_balance(new_job_order.customer)
+                if old_job_order != new_job_order:
+                    update_customer_balance(old_job_order.customer)
+                
+            response_serializer = ReceiptSerializer(receipt)
+            return Response(response_serializer.data)
         except ValidationError as e:
             return Response(
                 {'error': 'Validation failed', 'details': e.detail},
@@ -71,9 +137,25 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             )
 
     def destroy(self, request, *args, **kwargs):
-        """Override destroy to provide better error handling"""
+        """Override destroy to provide better error handling and restore job order balance"""
         try:
-            return super().destroy(request, *args, **kwargs)
+            receipt = self.get_object()
+            job_order = receipt.job_order
+            receipt_amount = Decimal(str(receipt.receipt_amount))
+            
+            with db_transaction.atomic():
+                # Restore balance to job order
+                current_balance = Decimal(str(job_order.balance_amount))
+                job_order.balance_amount = current_balance + receipt_amount
+                job_order.save()
+                
+                # Delete the receipt
+                receipt.delete()
+                
+                # Update customer balance
+                update_customer_balance(job_order.customer)
+                
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response(
                 {'error': 'Failed to delete receipt', 'details': str(e)},
@@ -184,9 +266,29 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'])
     def toggle_status(self, request, pk=None):
-        """Toggle receipt active status"""
+        """Toggle receipt active status and adjust job order balance accordingly"""
         receipt = self.get_object()
-        receipt.is_active = not receipt.is_active
-        receipt.save()
+        job_order = receipt.job_order
+        receipt_amount = Decimal(str(receipt.receipt_amount))
+        was_active = receipt.is_active
+        
+        with db_transaction.atomic():
+            receipt.is_active = not receipt.is_active
+            receipt.save()
+            
+            # If deactivating, restore balance; if activating, reduce balance
+            current_balance = Decimal(str(job_order.balance_amount))
+            if was_active and not receipt.is_active:
+                # Receipt was active, now inactive - restore balance
+                job_order.balance_amount = current_balance + receipt_amount
+            elif not was_active and receipt.is_active:
+                # Receipt was inactive, now active - reduce balance
+                job_order.balance_amount = max(Decimal('0'), current_balance - receipt_amount)
+            
+            job_order.save()
+            
+            # Update customer balance
+            update_customer_balance(job_order.customer)
+        
         serializer = self.get_serializer(receipt)
         return Response(serializer.data)

@@ -1,5 +1,5 @@
 from django.db import models
-
+from apps.materials.models import Material
 # Create your models here.
 class Customer(models.Model):
     customer_id = models.CharField(max_length=255, unique=True, blank=True)
@@ -30,3 +30,23 @@ class Customer(models.Model):
 
     def __str__(self): 
         return self.name
+
+class CustomerMeasurement(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    thool = models.DecimalField(max_digits=10, decimal_places=2)
+    kethet = models.DecimalField(max_digits=10, decimal_places=2)
+    thool_kum = models.DecimalField(max_digits=10, decimal_places=2)
+    ardh_f_kum = models.DecimalField(max_digits=10, decimal_places=2)
+    jamba = models.DecimalField(max_digits=10, decimal_places=2)
+    ragab = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        unique_together = [['customer', 'material']]
+    
+    def __str__(self):
+        return self.customer.name + ' - ' + self.material.name
+    

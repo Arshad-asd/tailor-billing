@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.exceptions import ValidationError
-from .models import Customer
-from .serializers import CustomerSerializer, CustomerReportSerializer
+from .models import Customer, CustomerMeasurement
+from .serializers import CustomerSerializer, CustomerReportSerializer, CustomerMeasurementSerializer
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -194,3 +194,18 @@ class CustomerViewSet(viewsets.ModelViewSet):
         
         serializer = CustomerReportSerializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def measurements(self, request, pk=None):
+        """Get all measurements for a specific customer"""
+        customer = self.get_object()
+        measurements = CustomerMeasurement.objects.filter(customer=customer, is_active=True)
+        serializer = CustomerMeasurementSerializer(measurements, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def next_customer_id(self, request):
+        """Get the next auto-generated customer_id (total count + 1)"""
+        total_count = Customer.objects.count()
+        next_id = str(total_count + 1)
+        return Response({'next_customer_id': next_id})

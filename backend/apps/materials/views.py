@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.exceptions import ValidationError
+from django.db.models import Q
 from .models import Material
 from .serializers import MaterialSerializer
 
@@ -27,8 +28,8 @@ class MaterialViewSet(viewsets.ModelViewSet):
     serializer_class = MaterialSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['is_active', 'name', 'is_measurement_required']
-    search_fields = ['name']
+    filterset_fields = ['is_active', 'name', 'is_measurement_required', 'material_number']
+    search_fields = ['name', 'material_number']
     ordering_fields = ['created_at', 'updated_at', 'name', 'price']
     ordering = ['-created_at']
 
@@ -97,11 +98,11 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def search(self, request):
-        """Search materials by name"""
+        """Search materials by name and material_number"""
         query = request.query_params.get('q', '')
         if query:
             materials = self.get_queryset().filter(
-                name__icontains=query
+                Q(name__icontains=query) | Q(material_number__icontains=query)
             )
             serializer = self.get_serializer(materials, many=True)
             return Response(serializer.data)

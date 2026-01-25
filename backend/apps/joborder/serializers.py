@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import JobOrder, jobOrderItem, jobOrderMeasurement
 from apps.crm.models import Customer
 from apps.materials.models import Material
+from .utils import sync_customer_measurements
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -117,41 +118,42 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
         # Create job order
         job_order = JobOrder.objects.create(**validated_data)
         
-        # Create job order items
-        for item_data in job_order_items_data:
-            # Handle material field - it could be an ID or a Material object
-            material_field = item_data.get('material')
-            if material_field is None:
-                raise serializers.ValidationError("Material field is required for job order items")
-            
-            if isinstance(material_field, Material):
-                material_id = material_field.id
-            else:
-                material_id = material_field
-            
-            # Ensure material_id is a valid integer
-            try:
-                material_id = int(material_id)
-            except (ValueError, TypeError):
-                raise serializers.ValidationError(f"Invalid material ID: {material_id}. Expected an integer, got {type(material_id).__name__}")
-            
-            quantity = item_data['quantity']
-            fees = item_data['fees']
-            total_amount = quantity * fees
-            
-            # Get the Material object
-            try:
-                material = Material.objects.get(id=material_id)
-            except Material.DoesNotExist:
-                raise serializers.ValidationError(f"Material with ID {material_id} does not exist")
-            
-            jobOrderItem.objects.create(
-                job_order=job_order,
-                material=material,
-                quantity=quantity,
-                fees=fees,
-                total_amount=total_amount
-            )
+        # Create job order items (optional - only if provided)
+        if job_order_items_data:
+            for item_data in job_order_items_data:
+                # Handle material field - it could be an ID or a Material object
+                material_field = item_data.get('material')
+                if material_field is None:
+                    raise serializers.ValidationError("Material field is required for job order items")
+                
+                if isinstance(material_field, Material):
+                    material_id = material_field.id
+                else:
+                    material_id = material_field
+                
+                # Ensure material_id is a valid integer
+                try:
+                    material_id = int(material_id)
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(f"Invalid material ID: {material_id}. Expected an integer, got {type(material_id).__name__}")
+                
+                quantity = item_data['quantity']
+                fees = item_data['fees']
+                total_amount = quantity * fees
+                
+                # Get the Material object
+                try:
+                    material = Material.objects.get(id=material_id)
+                except Material.DoesNotExist:
+                    raise serializers.ValidationError(f"Material with ID {material_id} does not exist")
+                
+                jobOrderItem.objects.create(
+                    job_order=job_order,
+                    material=material,
+                    quantity=quantity,
+                    fees=fees,
+                    total_amount=total_amount
+                )
         
         # Create job order measurements
         for measurement_data in job_order_measurements_data:
@@ -186,6 +188,9 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
                 material=material,
                 **measurement_data_copy
             )
+        
+        # Sync job order measurements to customer measurements
+        sync_customer_measurements(job_order)
         
         return job_order
 
@@ -327,6 +332,9 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                     material=material,
                     **measurement_data_copy
                 )
+            
+            # Sync job order measurements to customer measurements
+            sync_customer_measurements(instance)
         
         return instance
 

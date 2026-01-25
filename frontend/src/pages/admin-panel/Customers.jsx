@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Users, Mail, Phone, MapPin, Calendar, DollarSign, Clock, Star, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
@@ -254,7 +256,10 @@ export default function Customers() {
                     Contact Info
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Balance & Points
+                    Balance
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Points
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Total Orders
@@ -276,7 +281,7 @@ export default function Customers() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="9" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       No customers found
                     </td>
                   </tr>
@@ -300,7 +305,10 @@ export default function Customers() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">${parseFloat(customer.balance || 0).toFixed(2)}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{customer.points || 0} points</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{customer.points || 0}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">points</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{customer.total_orders || 0}</div>
@@ -522,7 +530,7 @@ export default function Customers() {
         onSave={handleSubmitCustomer}
         customer={editingCustomer}
         isEdit={!!editingCustomer}
-      />
+      /> 
     </div>
   );
-} 
+}
