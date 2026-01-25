@@ -516,6 +516,9 @@ export default function Delivery() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Balance Amount
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Total Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -529,7 +532,7 @@ export default function Delivery() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredDeliveries.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="10" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       No deliveries found
                     </td>
                   </tr>
@@ -651,6 +654,11 @@ export default function Delivery() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(delivery.balanceAmount || 0)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {formatCurrency(delivery.totalAmount || 0)}
                     </div>
                   </td>
@@ -732,6 +740,13 @@ export default function Delivery() {
                   <tr className="bg-gray-50 dark:bg-gray-700 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
                     <td colSpan="6" className="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
                       Grand Total:
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(
+                        filteredDeliveries.reduce((sum, delivery) => 
+                          sum + safeParseFloat(delivery.balanceAmount, 0), 0
+                        )
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900 dark:text-white">
                       {formatCurrency(
