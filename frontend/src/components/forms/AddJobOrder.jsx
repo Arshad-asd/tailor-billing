@@ -961,10 +961,14 @@ export default function AddJobOrder({ onClose, onSuccess }) {
             if (!materialId || isNaN(materialId)) {
               throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
             }
+            const quantity = parseInt(item.qty) || 1;
+            const amount = parseFloat(item.amount) || 0;
+            // Calculate fees from amount: fees = amount / quantity
+            const fees = quantity > 0 ? amount / quantity : 0;
             return {
               material: materialId,
-              quantity: parseInt(item.qty) || 1,
-              fees: parseFloat(item.fees) || 0
+              quantity: quantity,
+              fees: fees
             };
           })
         }),
