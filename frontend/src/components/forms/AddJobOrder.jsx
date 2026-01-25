@@ -50,6 +50,9 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   // Refs for bill item inputs (itemName, remarks, qty, amount)
   const billItemInputRefs = useRef({});
   
+  // Ref for order date field (to move focus after last item)
+  const orderDateInputRef = useRef(null);
+  
   // State for bill item name search
   const [billItemNameSearchQueries, setBillItemNameSearchQueries] = useState({}); // { itemSl: searchQuery }
   const [billItemNameSearchResults, setBillItemNameSearchResults] = useState({}); // { itemSl: results[] }
@@ -290,8 +293,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     e.preventDefault();
     
     if (field === 'itemName') {
-      // If dropdown is open and has results, don't navigate
+      // If dropdown is open and has results, select the first result
       if (showBillItemNameDropdowns[itemSl] && billItemNameSearchResults[itemSl]?.length > 0) {
+        const firstResult = billItemNameSearchResults[itemSl][0];
+        handleBillItemNameSelect(itemSl, firstResult);
         return;
       }
       // Move to remarks
@@ -303,8 +308,20 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       // Move to amount
       billItemInputRefs.current[itemSl]?.amount?.focus();
     } else if (field === 'amount') {
-      // Create new item and focus on its itemName
-      handleAddBillItem();
+      // Move to next item's itemName if it exists, otherwise move to order date
+      const currentItemIndex = billItems.findIndex(item => item.sl === itemSl);
+      const nextItem = billItems[currentItemIndex + 1];
+      if (nextItem) {
+        // Focus on next item's itemName
+        setTimeout(() => {
+          billItemInputRefs.current[nextItem.sl]?.itemName?.focus();
+        }, 100);
+      } else {
+        // Last item: move focus to order date field
+        setTimeout(() => {
+          orderDateInputRef.current?.focus();
+        }, 100);
+      }
     }
   };
 
@@ -1712,6 +1729,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Order Date</label>
                 <div className="relative">
                   <input
+                    ref={orderDateInputRef}
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}

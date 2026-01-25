@@ -421,6 +421,13 @@ export default function JobOrders() {
     setSearchTerm("")
   }
 
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && searchTerm.trim() && jobOrders.length > 0) {
+      // Open the first result in edit mode
+      handleEditJobOrder(jobOrders[0])
+    }
+  }
+
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
@@ -507,6 +514,7 @@ export default function JobOrders() {
                 id="search"
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 placeholder="Enter job order number, customer name, phone, or customer ID..."
                 className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               />

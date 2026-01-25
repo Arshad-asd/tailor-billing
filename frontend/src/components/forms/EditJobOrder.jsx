@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar, Edit, AlertCircle } from 'lucide-react';
 import CustomerSearchModal from '../modals/CustomerSearchModal';
 import CustomerModal from '../modals/CustomerModal';
@@ -14,10 +14,45 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isEditCustomer, setIsEditCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // Separate state for customer number search
+  const [customerNoSearchQuery, setCustomerNoSearchQuery] = useState('');
+  const [customerNoSearchResults, setCustomerNoSearchResults] = useState([]);
+  const [showCustomerNoDropdown, setShowCustomerNoDropdown] = useState(false);
+  const [isSearchingCustomerNo, setIsSearchingCustomerNo] = useState(false);
   const [isMaterialSearchOpen, setIsMaterialSearchOpen] = useState(false);
   const [materialSearchType, setMaterialSearchType] = useState('measurement'); // 'measurement' or 'bill'
+  const [linkingItemSl, setLinkingItemSl] = useState(null); // Track which item is being linked to a material
   const [selectedMaterials, setSelectedMaterials] = useState([]);
+  // State for material name search in measurement section
+  const [materialNameSearchQuery, setMaterialNameSearchQuery] = useState('');
+  const [materialNameSearchResults, setMaterialNameSearchResults] = useState([]);
+  const [showMaterialNameDropdown, setShowMaterialNameDropdown] = useState(false);
+  const [isSearchingMaterialName, setIsSearchingMaterialName] = useState(false);
   const [billItems, setBillItems] = useState([]);
+  // Material measurement cards: when Save is clicked, inputs become read-only until Edit is clicked
+  const [lockedMaterialIds, setLockedMaterialIds] = useState([]);
+  
+  // Refs for customer input fields
+  const customerNameInputRef = useRef(null);
+  const customerReferenceInputRef = useRef(null);
+  const customerMobileInputRef = useRef(null);
+
+  // Refs for material measurement inputs (focus flow: first input on select, Enter jumps to next, Enter on last opens add material modal)
+  const materialInputRefs = useRef({});
+  const prevMaterialsLengthRef = useRef(0);
+  const MEASUREMENT_FIELD_ORDER = ['custom_thool', 'custom_kethet', 'custom_thool_kum', 'custom_ardh_f_kum', 'custom_jamba', 'custom_ragab', 'note1', 'note2', 'note3', 'note4'];
+
+  // Refs for bill item inputs (itemName, remarks, qty, amount)
+  const billItemInputRefs = useRef({});
+  
+  // Ref for order date field (to move focus after last item)
+  const orderDateInputRef = useRef(null);
+  
+  // State for bill item name search
+  const [billItemNameSearchQueries, setBillItemNameSearchQueries] = useState({}); // { itemSl: searchQuery }
+  const [billItemNameSearchResults, setBillItemNameSearchResults] = useState({}); // { itemSl: results[] }
+  const [showBillItemNameDropdowns, setShowBillItemNameDropdowns] = useState({}); // { itemSl: boolean }
+  const [isSearchingBillItemName, setIsSearchingBillItemName] = useState({}); // { itemSl: boolean }
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState(null);
@@ -125,15 +160,21 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
             return {
               sl: index + 1,
               itemName: item.material_name || 'Item',
-              remarks: 'Custom tailoring service',
-              qty: qty,
+              remarks: item.remarks || 'Custom tailoring service',
+              qty: qty.toString(), // Convert to string for text input
               fees: fees,
-              amount: amount,
+              amount: amount === 0 ? '' : amount.toString(), // Convert to string, empty if 0
               material_id: item.material
             };
           });
           setBillItems(items);
           updateBillTotal(items);
+          // Initialize search queries for bill items
+          const searchQueries = {};
+          items.forEach(item => {
+            searchQueries[item.sl] = item.itemName;
+          });
+          setBillItemNameSearchQueries(searchQueries);
         }
 
         // Set measurements
@@ -201,12 +242,12 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                   jamba: measurement.jamba || 0,
                   ragab: measurement.ragab || 0
                 },
-                custom_thool: measurement.thool || 0,
-                custom_kethet: measurement.kethet || 0,
-                custom_thool_kum: measurement.thool_kum || 0,
-                custom_ardh_f_kum: measurement.ardh_f_kum || 0,
-                custom_jamba: measurement.jamba || 0,
-                custom_ragab: measurement.ragab || 0,
+                custom_thool: measurement.thool ? Math.round(parseFloat(measurement.thool)).toString() : '',
+                custom_kethet: measurement.kethet ? Math.round(parseFloat(measurement.kethet)).toString() : '',
+                custom_thool_kum: measurement.thool_kum ? Math.round(parseFloat(measurement.thool_kum)).toString() : '',
+                custom_ardh_f_kum: measurement.ardh_f_kum ? Math.round(parseFloat(measurement.ardh_f_kum)).toString() : '',
+                custom_jamba: measurement.jamba ? Math.round(parseFloat(measurement.jamba)).toString() : '',
+                custom_ragab: measurement.ragab ? Math.round(parseFloat(measurement.ragab)).toString() : '',
                 note1: measurement.note1 || '',
                 note2: measurement.note2 || '',
                 note3: measurement.note3 || '',
@@ -239,41 +280,18 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     loadJobOrderData();
   }, [jobOrderId]);
 
-  // Function to update bill items based on selected materials
-  const updateBillItemsFromMaterials = (materials) => {
-    const newBillItems = materials.map((material, index) => {
-      const qty = 1;
-      const fees = parseFloat(material.material_price) || 0;
-      const amount = fees * qty;
-      return {
-        sl: index + 1,
-        itemName: material.material_name,
-        remarks: formData.measurement.remarks || 'Custom tailoring service',
-        qty: qty,
-        fees: fees,
-        amount: amount,
-        material_id: material.material_id
-      };
-    });
-    
-    setBillItems(newBillItems);
-    updateBillTotal(newBillItems);
-  };
-
-  // Function to update bill items when materials change
+  // Function to update materials (no longer auto-creates bill items)
   const handleMaterialsChange = (newMaterials) => {
     setSelectedMaterials(newMaterials);
-    updateBillItemsFromMaterials(newMaterials);
+    // Bill items are now optional and must be added manually by the user
   };
 
   // Function to update bill item quantity
   const handleBillItemQtyChange = (itemSl, newQty) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        const fees = parseFloat(item.fees) || 0;
-        const qty = parseInt(newQty) || 1;
-        const newAmount = fees * qty;
-        return { ...item, qty: qty, amount: newAmount };
+        // Keep qty as text input - user can enter any value
+        return { ...item, qty: newQty };
       }
       return item;
     });
@@ -282,7 +300,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     updateBillTotal(updatedBillItems);
   };
 
-  // Function to update bill item fees
+  // Function to update bill item fees (kept for backward compatibility, but fees are hidden)
   const handleBillItemFeesChange = (itemSl, newFees) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
@@ -290,6 +308,20 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         const qty = parseInt(item.qty) || 1;
         const newAmount = fees * qty;
         return { ...item, fees: fees, amount: newAmount };
+      }
+      return item;
+    });
+    
+    setBillItems(updatedBillItems);
+    updateBillTotal(updatedBillItems);
+  };
+
+  // Function to update bill item amount (user enters amount directly as text)
+  const handleBillItemAmountChange = (itemSl, newAmount) => {
+    const updatedBillItems = billItems.map(item => {
+      if (item.sl === itemSl) {
+        // Store as string to allow text input, will be parsed for calculations
+        return { ...item, amount: newAmount === '' ? '' : newAmount };
       }
       return item;
     });
@@ -326,22 +358,48 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     }));
     setBillItems(renumberedItems);
     updateBillTotal(renumberedItems);
+    // Clean up search state for removed item
+    setBillItemNameSearchQueries(prev => {
+      const newQueries = { ...prev };
+      delete newQueries[itemSl];
+      return newQueries;
+    });
+    setBillItemNameSearchResults(prev => {
+      const newResults = { ...prev };
+      delete newResults[itemSl];
+      return newResults;
+    });
+    setShowBillItemNameDropdowns(prev => {
+      const newDropdowns = { ...prev };
+      delete newDropdowns[itemSl];
+      return newDropdowns;
+    });
+    setIsSearchingBillItemName(prev => {
+      const newSearching = { ...prev };
+      delete newSearching[itemSl];
+      return newSearching;
+    });
   };
 
   // Function to add a new bill item
   const handleAddBillItem = () => {
     const newItem = {
       sl: billItems.length + 1,
-      itemName: 'New Item',
-      remarks: 'Custom item',
-      qty: 1,
+      itemName: '',
+      remarks: '',
+      qty: '', // Empty string for text input
       fees: 0,
-      amount: 0,
-      material_id: null
+      amount: '' // Empty string for text input, no default 0
     };
     const updatedBillItems = [...billItems, newItem];
     setBillItems(updatedBillItems);
     updateBillTotal(updatedBillItems);
+    // Initialize search query for new item
+    setBillItemNameSearchQueries(prev => ({ ...prev, [newItem.sl]: '' }));
+    // Focus on itemName input of the new item
+    setTimeout(() => {
+      billItemInputRefs.current[newItem.sl]?.itemName?.focus();
+    }, 50);
   };
 
   const handleFormChange = (section, field, value) => {
@@ -392,9 +450,219 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     });
   };
 
+  // Handle bill item name search query change
+  useEffect(() => {
+    const timeouts = {};
+    Object.keys(billItemNameSearchQueries).forEach(itemSl => {
+      const query = billItemNameSearchQueries[itemSl];
+      timeouts[itemSl] = setTimeout(async () => {
+        if (query.trim() === '') {
+          setBillItemNameSearchResults(prev => ({ ...prev, [itemSl]: [] }));
+          setShowBillItemNameDropdowns(prev => ({ ...prev, [itemSl]: false }));
+          return;
+        }
+
+        setIsSearchingBillItemName(prev => ({ ...prev, [itemSl]: true }));
+        try {
+          const results = await materialsApi.searchMaterials(query);
+          setBillItemNameSearchResults(prev => ({ ...prev, [itemSl]: results || [] }));
+          setShowBillItemNameDropdowns(prev => ({ ...prev, [itemSl]: true }));
+        } catch (error) {
+          console.error('Error searching materials for bill item:', error);
+          setBillItemNameSearchResults(prev => ({ ...prev, [itemSl]: [] }));
+        } finally {
+          setIsSearchingBillItemName(prev => ({ ...prev, [itemSl]: false }));
+        }
+      }, 300);
+    });
+
+    return () => {
+      Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
+    };
+  }, [billItemNameSearchQueries]);
+
+  // Handle bill item name change
+  const handleBillItemNameChange = (itemSl, value) => {
+    const updatedBillItems = billItems.map(item => {
+      if (item.sl === itemSl) {
+        return { ...item, itemName: value };
+      }
+      return item;
+    });
+    setBillItems(updatedBillItems);
+    setBillItemNameSearchQueries(prev => ({ ...prev, [itemSl]: value }));
+  };
+
+  // Handle bill item name select from dropdown
+  const handleBillItemNameSelect = (itemSl, material) => {
+    const materialId = material.id || material.material_id;
+    const materialName = material.name;
+    const updatedBillItems = billItems.map(item => {
+      if (item.sl === itemSl) {
+        return {
+          ...item,
+          itemName: materialName,
+          material_id: materialId
+        };
+      }
+      return item;
+    });
+    setBillItems(updatedBillItems);
+    // Set search query to selected material name so it displays in the input
+    setBillItemNameSearchQueries(prev => ({ ...prev, [itemSl]: materialName }));
+    setShowBillItemNameDropdowns(prev => ({ ...prev, [itemSl]: false }));
+    setBillItemNameSearchResults(prev => ({ ...prev, [itemSl]: [] }));
+    // Focus on remarks input after dropdown closes
+    setTimeout(() => {
+      billItemInputRefs.current[itemSl]?.remarks?.focus();
+    }, 100);
+  };
+
+  // Handle bill item remarks change
+  const handleBillItemRemarksChange = (itemSl, value) => {
+    const updatedBillItems = billItems.map(item => {
+      if (item.sl === itemSl) {
+        return { ...item, remarks: value };
+      }
+      return item;
+    });
+    setBillItems(updatedBillItems);
+  };
+
+  // Handle Enter key navigation in bill items
+  const handleBillItemKeyDown = (itemSl, field, e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    
+    if (field === 'itemName') {
+      // If dropdown is open and has results, select the first result
+      if (showBillItemNameDropdowns[itemSl] && billItemNameSearchResults[itemSl]?.length > 0) {
+        const firstResult = billItemNameSearchResults[itemSl][0];
+        handleBillItemNameSelect(itemSl, firstResult);
+        return;
+      }
+      // Move to remarks
+      billItemInputRefs.current[itemSl]?.remarks?.focus();
+    } else if (field === 'remarks') {
+      // Move to qty
+      billItemInputRefs.current[itemSl]?.qty?.focus();
+    } else if (field === 'qty') {
+      // Move to amount
+      billItemInputRefs.current[itemSl]?.amount?.focus();
+    } else if (field === 'amount') {
+      // Move to next item's itemName if it exists, otherwise move to order date
+      const currentItemIndex = billItems.findIndex(item => item.sl === itemSl);
+      const nextItem = billItems[currentItemIndex + 1];
+      if (nextItem) {
+        // Focus on next item's itemName
+        setTimeout(() => {
+          billItemInputRefs.current[nextItem.sl]?.itemName?.focus();
+        }, 100);
+      } else {
+        // Last item: move focus to order date field
+        setTimeout(() => {
+          orderDateInputRef.current?.focus();
+        }, 100);
+      }
+    }
+  };
+
   // Customer search and management functions
   const handleCustomerSearch = () => {
     setIsCustomerSearchOpen(true);
+  };
+
+  // Handle customer number search query change with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      if (customerNoSearchQuery.trim() === '') {
+        setCustomerNoSearchResults([]);
+        setShowCustomerNoDropdown(false);
+        return;
+      }
+
+      setIsSearchingCustomerNo(true);
+      try {
+        const results = await customerApi.searchCustomers(customerNoSearchQuery);
+        setCustomerNoSearchResults(results || []);
+        setShowCustomerNoDropdown(true);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        setCustomerNoSearchResults([]);
+      } finally {
+        setIsSearchingCustomerNo(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [customerNoSearchQuery]);
+
+  // Handle customer number input change
+  const handleCustomerNoInputChange = (value) => {
+    setCustomerNoSearchQuery(value);
+    handleFormChange('customer', 'customerNo', value);
+    if (value.trim() === '') {
+      // Clear selected customer if input is cleared
+      setSelectedCustomer(null);
+      setFormData(prev => ({
+        ...prev,
+        customer: {
+          ...prev.customer,
+          customerName: '',
+          customerReference: '',
+          mobileNo: '',
+          currentBalance: 0.00
+        }
+      }));
+    } else if (selectedCustomer && selectedCustomer.customer_id !== value) {
+      // Clear selected customer if user manually changes the number
+      setSelectedCustomer(null);
+    }
+  };
+
+  // Handle customer selection from dropdown (for customer number field)
+  const handleCustomerNoSelectFromDropdown = (customer) => {
+    setCustomerNoSearchQuery(customer.customer_id || '');
+    handleSelectCustomer(customer);
+    setShowCustomerNoDropdown(false);
+    setCustomerNoSearchResults([]);
+  };
+
+  // Handle Enter key press on customer number field
+  const handleCustomerNoKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // If dropdown is open and has results, don't navigate
+      if (showCustomerNoDropdown && customerNoSearchResults.length > 0) {
+        return;
+      }
+      // Navigate to customer name field
+      setTimeout(() => {
+        customerNameInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  // Handle Enter key press on customer name field
+  const handleCustomerNameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Navigate to customer reference field
+      setTimeout(() => {
+        customerReferenceInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  // Handle Enter key press on customer reference field
+  const handleCustomerReferenceKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Navigate to mobile number field
+      setTimeout(() => {
+        customerMobileInputRef.current?.focus();
+      }, 0);
+    }
   };
 
   const handleSelectCustomer = (customer) => {
@@ -438,24 +706,171 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     setIsEditCustomer(false);
   };
 
+  // When materials are selected/added, focus the first measurement input of the newly added material
+  useEffect(() => {
+    if (selectedMaterials.length > prevMaterialsLengthRef.current) {
+      prevMaterialsLengthRef.current = selectedMaterials.length;
+      const lastMaterial = selectedMaterials[selectedMaterials.length - 1];
+      if (lastMaterial) {
+        setTimeout(() => {
+          materialInputRefs.current[lastMaterial.id]?.custom_thool?.focus();
+        }, 50);
+      }
+    } else if (selectedMaterials.length < prevMaterialsLengthRef.current) {
+      prevMaterialsLengthRef.current = selectedMaterials.length;
+    }
+  }, [selectedMaterials]);
+
+  // When a material is removed, remove its id from lockedMaterialIds
+  useEffect(() => {
+    setLockedMaterialIds(prev => prev.filter(id => selectedMaterials.some(m => m.id === id)));
+  }, [selectedMaterials]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.customer-no-search-container')) {
+        setShowCustomerNoDropdown(false);
+      }
+      if (!event.target.closest('.material-name-search-container')) {
+        setShowMaterialNameDropdown(false);
+      }
+      // Close all bill item name dropdowns if clicking outside any of them
+      const billItemNameContainer = event.target.closest('.bill-item-name-search-container');
+      if (!billItemNameContainer) {
+        setShowBillItemNameDropdowns({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Sync customer search queries when customer is selected via modal
+  useEffect(() => {
+    if (selectedCustomer) {
+      setCustomerNoSearchQuery(selectedCustomer.customer_id || formData.customer.customerNo);
+    }
+  }, [selectedCustomer]);
+
   // Material search and management functions
   const handleMaterialSearch = () => {
     setMaterialSearchType('measurement');
     setIsMaterialSearchOpen(true);
   };
 
+  // Handle material name search query change with debounce (for measurement section)
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      if (materialNameSearchQuery.trim() === '') {
+        setMaterialNameSearchResults([]);
+        setShowMaterialNameDropdown(false);
+        return;
+      }
+
+      setIsSearchingMaterialName(true);
+      try {
+        const results = await materialsApi.searchMaterials(materialNameSearchQuery);
+        // Filter for materials that require measurements
+        const filteredResults = (results || []).filter(material => material.is_measurement_required === true);
+        setMaterialNameSearchResults(filteredResults);
+        setShowMaterialNameDropdown(true);
+      } catch (error) {
+        console.error('Error searching materials:', error);
+        setMaterialNameSearchResults([]);
+      } finally {
+        setIsSearchingMaterialName(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [materialNameSearchQuery]);
+
+  // Handle material selection from dropdown (for measurement section)
+  const handleMaterialNameSelectFromDropdown = (material) => {
+    // Check if material is already selected
+    const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
+    
+    if (!isAlreadySelected) {
+      const measurementItem = {
+        id: material.id,
+        material_id: material.id,
+        material_name: material.name,
+        material_price: material.price,
+        measurements: {
+          thool: material.thool || 0,
+          kethet: material.kethet || 0,
+          thool_kum: material.thool_kum || 0,
+          ardh_f_kum: material.ardh_f_kum || 0,
+          jamba: material.jamba || 0,
+          ragab: material.ragab || 0
+        },
+        custom_thool: '',
+        custom_kethet: '',
+        custom_thool_kum: '',
+        custom_ardh_f_kum: '',
+        custom_jamba: '',
+        custom_ragab: '',
+        note1: '',
+        note2: '',
+        note3: '',
+        note4: '',
+        is_customized: false
+      };
+      
+      const newMaterials = [...selectedMaterials, measurementItem];
+      handleMaterialsChange(newMaterials);
+    }
+    
+    setMaterialNameSearchQuery('');
+    setShowMaterialNameDropdown(false);
+    setMaterialNameSearchResults([]);
+  };
+
   // Bill item material search
-  const handleBillItemMaterialSearch = () => {
+  const handleBillItemMaterialSearch = (itemSl = null) => {
     setMaterialSearchType('bill');
+    setLinkingItemSl(itemSl); // Set which item to link if provided
     setIsMaterialSearchOpen(true);
   };
 
   const handleSelectMaterial = (material) => {
     if (materialSearchType === 'bill') {
-      // Handle bill item material selection
+      // Check if we're linking to an existing item
+      if (linkingItemSl !== null) {
+        // Link material to existing item
+        const materialId = material.id || material.material_id;
+        const updatedBillItems = billItems.map(item => {
+          if (item.sl === linkingItemSl) {
+            // Keep existing fees and amount - user will enter manually
+            return {
+              ...item,
+              material_id: materialId,
+              itemName: item.itemName === 'New Item' ? material.name : item.itemName
+            };
+          }
+          return item;
+        });
+        setBillItems(updatedBillItems);
+        updateBillTotal(updatedBillItems);
+        setLinkingItemSl(null);
+        setIsMaterialSearchOpen(false);
+        
+        // Focus on remarks field after linking material
+        setTimeout(() => {
+          billItemInputRefs.current[linkingItemSl]?.remarks?.focus();
+        }, 100);
+        
+        return;
+      }
+      
+      // Handle new bill item material selection
       const qty = 1;
-      const fees = parseFloat(material.price) || 0;
-      const amount = fees * qty;
+      const fees = 0; // User will enter fees manually
+      const amount = ''; // User will enter amount manually as text
+      const materialId = material.id || material.material_id;
       
       const newBillItem = {
         sl: billItems.length + 1,
@@ -464,12 +879,18 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         qty: qty,
         fees: fees,
         amount: amount,
-        material_id: material.id
+        material_id: materialId
       };
       const updatedBillItems = [...billItems, newBillItem];
       setBillItems(updatedBillItems);
       updateBillTotal(updatedBillItems);
       setIsMaterialSearchOpen(false);
+      
+      // Focus on remarks field after adding item
+      setTimeout(() => {
+        billItemInputRefs.current[newBillItem.sl]?.remarks?.focus();
+      }, 100);
+      
       return;
     }
 
@@ -490,12 +911,12 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           jamba: material.jamba,
           ragab: material.ragab
         },
-        custom_thool: material.thool,
-        custom_kethet: material.kethet,
-        custom_thool_kum: material.thool_kum,
-        custom_ardh_f_kum: material.ardh_f_kum,
-        custom_jamba: material.jamba,
-        custom_ragab: material.ragab,
+        custom_thool: '',
+        custom_kethet: '',
+        custom_thool_kum: '',
+        custom_ardh_f_kum: '',
+        custom_jamba: '',
+        custom_ragab: '',
         note1: '',
         note2: '',
         note3: '',
@@ -505,6 +926,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
+      setIsMaterialSearchOpen(false);
     }
   };
 
@@ -519,12 +941,38 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         material.id === materialId 
           ? { 
               ...material, 
+              // Allow text input for all fields
               [field]: value,
               is_customized: true
             }
           : material
       )
     );
+  };
+
+  // On Enter: jump to next measurement input; on last input (note4) save material
+  const handleMeasurementKeyDown = (materialId, field, e) => {
+    if (e.key !== 'Enter') return;
+    if (lockedMaterialIds.includes(materialId)) return;
+    e.preventDefault();
+    const idx = MEASUREMENT_FIELD_ORDER.indexOf(field);
+    const nextField = MEASUREMENT_FIELD_ORDER[idx + 1];
+    if (nextField) {
+      materialInputRefs.current[materialId]?.[nextField]?.focus();
+    } else {
+      // On last input (Note4): save the current material
+      handleLockMaterial(materialId);
+    }
+  };
+
+  const isMaterialLocked = (materialId) => lockedMaterialIds.includes(materialId);
+
+  const handleLockMaterial = (materialId) => {
+    setLockedMaterialIds(prev => (prev.includes(materialId) ? prev : [...prev, materialId]));
+  };
+
+  const handleUnlockMaterial = (materialId) => {
+    setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
   };
 
   const handleResetMeasurements = (materialId) => {
@@ -626,6 +1074,16 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         throw new Error(`Cannot save measurements. The following materials are invalid:\n${errorMessages.join('\n')}\n\nPlease remove these materials from the job order.`);
       }
 
+      // Helper function to convert text input to number for backend
+      // Allows text input in UI but converts to number when saving
+      const parseMeasurement = (value) => {
+        if (value === '' || value === null || value === undefined) return 0;
+        // Try to extract numeric value from text
+        const num = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+        if (isNaN(num)) return 0;
+        return Math.round(num); // Convert to integer, removing decimal point
+      };
+
       const measurementsPayload = {
         job_order_measurements: selectedMaterials.map(material => {
           const materialId = parseInt(material.material_id);
@@ -635,12 +1093,12 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           
           return {
             material: materialId,
-            thool: material.custom_thool || 0,
-            kethet: material.custom_kethet || 0,
-            thool_kum: material.custom_thool_kum || 0,
-            ardh_f_kum: material.custom_ardh_f_kum || 0,
-            jamba: material.custom_jamba || 0,
-            ragab: material.custom_ragab || 0,
+            thool: parseMeasurement(material.custom_thool),
+            kethet: parseMeasurement(material.custom_kethet),
+            thool_kum: parseMeasurement(material.custom_thool_kum),
+            ardh_f_kum: parseMeasurement(material.custom_ardh_f_kum),
+            jamba: parseMeasurement(material.custom_jamba),
+            ragab: parseMeasurement(material.custom_ragab),
             note1: material.note1 || '',
             note2: material.note2 || '',
             note3: material.note3 || '',
@@ -736,15 +1194,25 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         console.warn('Could not verify material existence:', materialError);
       }
 
+      // Helper function to convert text input to number for backend
+      // Allows text input in UI but converts to number when saving
+      const parseMeasurement = (value) => {
+        if (value === '' || value === null || value === undefined) return 0;
+        // Try to extract numeric value from text
+        const num = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+        if (isNaN(num)) return 0;
+        return Math.round(num); // Convert to integer, removing decimal point
+      };
+
       // Prepare payload for single measurement update
       const measurementPayload = {
         material: materialIdInt,
-        thool: material.custom_thool || 0,
-        kethet: material.custom_kethet || 0,
-        thool_kum: material.custom_thool_kum || 0,
-        ardh_f_kum: material.custom_ardh_f_kum || 0,
-        jamba: material.custom_jamba || 0,
-        ragab: material.custom_ragab || 0,
+        thool: parseMeasurement(material.custom_thool),
+        kethet: parseMeasurement(material.custom_kethet),
+        thool_kum: parseMeasurement(material.custom_thool_kum),
+        ardh_f_kum: parseMeasurement(material.custom_ardh_f_kum),
+        jamba: parseMeasurement(material.custom_jamba),
+        ragab: parseMeasurement(material.custom_ragab),
         note1: material.note1 || '',
         note2: material.note2 || '',
         note3: material.note3 || '',
@@ -811,6 +1279,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     setSectionError(prev => ({ ...prev, bill: null }));
 
     try {
+      // Always send job_order_items (even if empty) so backend can delete removed items
       const billPayload = {
         delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate).toISOString() : null,
         total_amount: formData.bill.total,
@@ -819,18 +1288,17 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         cash_amount: formData.bill.cashAmount,
         card_amount: formData.bill.cardAmount,
         remarks: formData.measurement.remarks,
-        job_order_items: billItems.map(item => {
+        job_order_items: billItems.length > 0 ? billItems.map(item => {
           const materialId = parseInt(item.material_id);
           if (!materialId || isNaN(materialId)) {
-            throw new Error(`Invalid material ID for item: ${item.material_id}`);
+            throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
           }
-          
           return {
             material: materialId,
-            quantity: item.qty,
-            fees: item.fees
+            quantity: parseInt(item.qty) || 1,
+            fees: parseFloat(item.fees) || 0
           };
-        })
+        }) : [] // Send empty array to delete all items
       };
 
       const result = await jobOrdersApi.updateBill(jobOrderId, billPayload);
@@ -888,43 +1356,44 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         cash_amount: formData.bill.cashAmount,
         card_amount: formData.bill.cardAmount,
         remarks: formData.measurement.remarks,
-        job_order_items: billItems.map(item => {
-          // Ensure material_id is a valid number
+        // Always send job_order_items (even if empty) so backend can delete removed items
+        job_order_items: billItems.length > 0 ? billItems.map(item => {
           const materialId = parseInt(item.material_id);
           if (!materialId || isNaN(materialId)) {
-            console.error('Invalid material ID for item:', item.material_id);
-            throw new Error(`Invalid material ID for item: ${item.material_id}`);
+            throw new Error(`Invalid material ID for item: ${item.itemName}. Please select a material.`);
           }
-          
           return {
             material: materialId,
-            quantity: item.qty,
-            fees: item.fees
+            quantity: parseInt(item.qty) || 1,
+            fees: parseFloat(item.fees) || 0
           };
-        }),
+        }) : [], // Send empty array to delete all items
         job_order_measurements: selectedMaterials.map(material => {
-          console.log('Material data for update:', material);
-          console.log('Material ID:', material.material_id, typeof material.material_id);
-          
-          // Ensure material_id is a valid number
-          const materialId = parseInt(material.material_id);
+          const materialId = parseInt(material.material_id || material.id);
           if (!materialId || isNaN(materialId)) {
-            console.error('Invalid material ID:', material.material_id);
-            throw new Error(`Invalid material ID: ${material.material_id}`);
+            throw new Error(`Invalid material ID for measurement: ${material.material_name}`);
           }
-          
+          // Helper function to convert text input to number for backend
+          // Allows text input in UI but converts to number when saving
+          const parseMeasurement = (value) => {
+            if (value === '' || value === null || value === undefined) return 0;
+            // Try to extract numeric value from text
+            const num = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+            if (isNaN(num)) return 0;
+            return Math.round(num); // Convert to integer, removing decimal point
+          };
           return {
             material: materialId,
-            thool: material.custom_thool,
-            kethet: material.custom_kethet,
-            thool_kum: material.custom_thool_kum,
-            ardh_f_kum: material.custom_ardh_f_kum,
-            jamba: material.custom_jamba,
-            ragab: material.custom_ragab,
-            note1: material.note1,
-            note2: material.note2,
-            note3: material.note3,
-            note4: material.note4
+            thool: parseMeasurement(material.custom_thool),
+            kethet: parseMeasurement(material.custom_kethet),
+            thool_kum: parseMeasurement(material.custom_thool_kum),
+            ardh_f_kum: parseMeasurement(material.custom_ardh_f_kum),
+            jamba: parseMeasurement(material.custom_jamba),
+            ragab: parseMeasurement(material.custom_ragab),
+            note1: material.note1 || '',
+            note2: material.note2 || '',
+            note3: material.note3 || '',
+            note4: material.note4 || ''
           };
         })
       };
@@ -990,10 +1459,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         {/* Customer Section */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <User className="w-5 h-5" />
-              <span>Customer</span>
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={handleCreateCustomer}
@@ -1026,6 +1491,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <span>{sectionLoading.customer ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <User className="w-5 h-5" />
+              <span>Customer</span>
+            </h3>
           </div>
           
           {/* Customer Section Error/Success Message */}
@@ -1057,40 +1526,104 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           )}
 
           <div className="grid grid-cols-6 gap-4">
-            <div>
+            <div className="relative customer-no-search-container">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">No</label>
-              <input
-                type="text"
-                value={formData.customer.customerNo}
-                onChange={(e) => handleFormChange('customer', 'customerNo', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerNoSearchQuery || formData.customer.customerNo}
+                  onChange={(e) => handleCustomerNoInputChange(e.target.value)}
+                  onKeyDown={handleCustomerNoKeyDown}
+                  onFocus={() => {
+                    if (!selectedCustomer && customerNoSearchQuery.trim() && customerNoSearchResults.length > 0) {
+                      setShowCustomerNoDropdown(true);
+                    }
+                  }}
+                  readOnly={!!selectedCustomer}
+                  placeholder="Search customer number..."
+                  className={`w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${selectedCustomer ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
+                />
+                {isSearchingCustomerNo && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+                {/* Customer Dropdown for Customer No */}
+                {showCustomerNoDropdown && customerNoSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {customerNoSearchResults.map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerNoSelectFromDropdown(customer)}
+                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {customer.name}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              ID: {customer.customer_id} | {customer.phone}
+                            </div>
+                          </div>
+                          <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            ${formatCurrency(customer.balance || 0)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showCustomerNoDropdown && customerNoSearchResults.length === 0 && customerNoSearchQuery.trim() !== '' && !isSearchingCustomerNo && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                      No customers found. Try a different search or create a new customer.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Name</label>
               <input
+                ref={customerNameInputRef}
                 type="text"
                 value={formData.customer.customerName}
                 onChange={(e) => handleFormChange('customer', 'customerName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyDown={handleCustomerNameKeyDown}
+                readOnly={!!selectedCustomer}
+                placeholder="Customer name"
+                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${selectedCustomer ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer Reference</label>
               <input
+                ref={customerReferenceInputRef}
                 type="text"
                 value={formData.customer.customerReference}
                 onChange={(e) => handleFormChange('customer', 'customerReference', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyDown={handleCustomerReferenceKeyDown}
+                readOnly={!!selectedCustomer}
+                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${selectedCustomer ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mobile No</label>
               <input
+                ref={customerMobileInputRef}
                 type="text"
                 value={formData.customer.mobileNo}
-                onChange={(e) => handleFormChange('customer', 'mobileNo', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  handleFormChange('customer', 'mobileNo', e.target.value);
+                  // Clear selected customer if user manually changes the mobile number
+                  if (selectedCustomer && selectedCustomer.phone !== e.target.value) {
+                    setSelectedCustomer(null);
+                  }
+                }}
+                readOnly={!!selectedCustomer}
+                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${selectedCustomer ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
               />
             </div>
             <div>
@@ -1112,15 +1645,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         {/* Measurement Section - Same as AddJobOrder */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <Ruler className="w-5 h-5" />
-              <span>Measurement</span>
-              {selectedMaterials.length > 0 && (
-                <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2 py-1 rounded-full">
-                  {selectedMaterials.length} material{selectedMaterials.length !== 1 ? 's' : ''} selected
-                </span>
-              )}
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={() => selectedMaterials.length > 0 && handleMaterialsChange([])}
@@ -1145,6 +1669,15 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <span>{sectionLoading.measurement ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <Ruler className="w-5 h-5" />
+              <span>Measurement</span>
+              {selectedMaterials.length > 0 && (
+                <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2 py-1 rounded-full">
+                  {selectedMaterials.length} material{selectedMaterials.length !== 1 ? 's' : ''} selected
+                </span>
+              )}
+            </h3>
           </div>
           
           {/* Measurement Section Error/Success Message */}
@@ -1163,6 +1696,81 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
               </p>
             </div>
           )}
+
+          {/* Material Name Search Input */}
+          <div className="mb-4 relative material-name-search-container">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Search Material (Name or Number)
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={materialNameSearchQuery}
+                onChange={(e) => setMaterialNameSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (materialNameSearchQuery.trim() && materialNameSearchResults.length > 0) {
+                    setShowMaterialNameDropdown(true);
+                  }
+                }}
+                placeholder="Search by material name or number..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {isSearchingMaterialName && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                </div>
+              )}
+              {/* Material Dropdown */}
+              {showMaterialNameDropdown && materialNameSearchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {materialNameSearchResults.map((material) => {
+                    const isAlreadySelected = selectedMaterials.some(m => m.id === material.id);
+                    return (
+                      <div
+                        key={material.id}
+                        onClick={() => !isAlreadySelected && handleMaterialNameSelectFromDropdown(material)}
+                        className={`px-4 py-3 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 ${
+                          isAlreadySelected 
+                            ? 'bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed' 
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {material.name}
+                              {isAlreadySelected && (
+                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(Already added)</span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {material.material_number && (
+                                <span>Number: {material.material_number} | </span>
+                              )}
+                              Price: {formatCurrency(material.price || 0)}
+                            </div>
+                          </div>
+                          {material.is_measurement_required && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                              Measurement Required
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {showMaterialNameDropdown && materialNameSearchResults.length === 0 && materialNameSearchQuery.trim() !== '' && !isSearchingMaterialName && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                    No materials found. Try a different search or use the "Add Item" button.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
           
           {/* Selected Materials Display - Card Format with Individual Notes */}
           {selectedMaterials.length > 0 ? (
@@ -1214,61 +1822,73 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Thool</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_thool = el; } }}
+                          type="text"
                           value={material.custom_thool || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Kethef</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_kethet = el; } }}
+                          type="text"
                           value={material.custom_kethet || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_kethet', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Thool Kum</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_thool_kum = el; } }}
+                          type="text"
                           value={material.custom_thool_kum || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool_kum', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ardh F Kum</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_ardh_f_kum = el; } }}
+                          type="text"
                           value={material.custom_ardh_f_kum || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ardh_f_kum', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Jamba</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_jamba = el; } }}
+                          type="text"
                           value={material.custom_jamba || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_jamba', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ragab</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].custom_ragab = el; } }}
+                          type="text"
                           value={material.custom_ragab || ''}
-                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', e.target.value)}
+                          onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ragab', e)}
+                          readOnly={isMaterialLocked(material.id)}
+                          className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
                       </div>
                     </div>
@@ -1279,53 +1899,74 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Note1</label>
                           <input
+                            ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].note1 = el; } }}
                             type="text"
                             value={material.note1 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note1', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note1', e)}
+                            readOnly={isMaterialLocked(material.id)}
+                            className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 1"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Note2</label>
                           <input
+                            ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].note2 = el; } }}
                             type="text"
                             value={material.note2 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note2', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note2', e)}
+                            readOnly={isMaterialLocked(material.id)}
+                            className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 2"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Note3</label>
                           <input
+                            ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].note3 = el; } }}
                             type="text"
                             value={material.note3 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note3', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note3', e)}
+                            readOnly={isMaterialLocked(material.id)}
+                            className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 3"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Note4</label>
                           <input
+                            ref={(el) => { if (el) { if (!materialInputRefs.current[material.id]) materialInputRefs.current[material.id] = {}; materialInputRefs.current[material.id].note4 = el; } }}
                             type="text"
                             value={material.note4 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note4', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            placeholder="Note 4"
+                            onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note4', e)}
+                            readOnly={isMaterialLocked(material.id)}
+                            className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
+                            placeholder="Note 4 (Enter: save material)"
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* Individual Save button and status for each material */}
+                    {/* Edit/Save buttons for each material */}
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleSaveSingleMeasurement(material.id)}
-                          disabled={measurementLoading[material.id] || material.material_exists === false}
-                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs px-3 py-1 rounded border border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                          onClick={() => handleUnlockMaterial(material.id)}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleLockMaterial(material.id);
+                            handleSaveSingleMeasurement(material.id);
+                          }}
+                          disabled={measurementLoading[material.id] || material.material_exists === false || isMaterialLocked(material.id)}
+                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs px-2 py-1 rounded border border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
                           title={material.material_exists === false ? 'Cannot save: Material no longer exists in database' : 'Save this measurement'}
                         >
                           {measurementLoading[material.id] ? (
@@ -1348,9 +1989,14 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                         </button>
                       </div>
                       <div className="flex items-center space-x-2">
-                        {material.is_customized && (
+                        {isMaterialLocked(material.id) && (
+                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            Saved
+                          </span>
+                        )}
+                        {!isMaterialLocked(material.id) && material.is_customized && (
                           <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                            Modified
+                            Customized
                           </span>
                         )}
                         {measurementError[material.id] && (
@@ -1379,15 +2025,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         {/* Bill Section - Same as AddJobOrder */}
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <Calculator className="w-5 h-5" />
-              <span>BILL</span>
-              {billItems.length > 0 && (
-                <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2 py-1 rounded-full">
-                  {billItems.length} item{billItems.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </h3>
             <div className="flex items-center space-x-2">
               <button 
                 onClick={handleAddBillItem}
@@ -1395,13 +2032,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
               >
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
-              </button>
-              <button 
-                onClick={handleBillItemMaterialSearch}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
-              >
-                <Search className="w-3 h-3" />
-                <span>Find</span>
               </button>
               <button 
                 onClick={() => setBillItems([])}
@@ -1419,6 +2049,15 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <span>{sectionLoading.bill ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+              <Calculator className="w-5 h-5" />
+              <span>BILL</span>
+              {billItems.length > 0 && (
+                <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2 py-1 rounded-full">
+                  {billItems.length} item{billItems.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </h3>
           </div>
           
           {/* Bill Section Error/Success Message */}
@@ -1448,7 +2087,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Item Name / No</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Fees</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                     </tr>
@@ -1456,47 +2094,127 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {billItems.length > 0 ? (
                       billItems.map((item) => (
-                        <tr key={item.sl} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-4 py-3 text-gray-900 dark:text-white">{item.sl}</td>
-                          <td className="px-4 py-3 text-gray-900 dark:text-white">{item.itemName}</td>
-                          <td className="px-4 py-3 text-gray-900 dark:text-white">{item.remarks}</td>
-                          <td className="px-4 py-3 text-center">
+                        <tr key={item.sl} className="hover:bg-gray-50 dark:hover:bg-gray-700 align-top">
+                          <td className="px-4 py-4 text-gray-900 dark:text-white">{item.sl}</td>
+                          <td className="px-4 py-4" style={{ position: 'relative', verticalAlign: 'top' }}>
+                            <div className="relative bill-item-name-search-container">
+                              <div className="relative w-full">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                  ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].itemName = el; } }}
+                                  type="text"
+                                  value={billItemNameSearchQueries[item.sl] !== undefined ? billItemNameSearchQueries[item.sl] : item.itemName}
+                                  onChange={(e) => handleBillItemNameChange(item.sl, e.target.value)}
+                                  onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'itemName', e)}
+                                  onFocus={() => {
+                                    if (billItemNameSearchQueries[item.sl]?.trim() && billItemNameSearchResults[item.sl]?.length > 0) {
+                                      setShowBillItemNameDropdowns(prev => ({ ...prev, [item.sl]: true }));
+                                    }
+                                  }}
+                                  placeholder="Search item name..."
+                                  className="w-full pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                {isSearchingBillItemName[item.sl] && (
+                                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Item Name Dropdown */}
+                              {showBillItemNameDropdowns[item.sl] && billItemNameSearchResults[item.sl]?.length > 0 && (
+                                <div 
+                                  className="absolute w-full bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-600 rounded-lg shadow-2xl overflow-y-auto" 
+                                  style={{ 
+                                    maxHeight: '300px',
+                                    zIndex: 9999,
+                                    position: 'fixed',
+                                    top: 'auto',
+                                    left: 'auto',
+                                    right: 'auto',
+                                    marginTop: '0'
+                                  }}
+                                  ref={(el) => {
+                                    if (el && !el.dataset.positioned) {
+                                      const inputRect = el.previousElementSibling?.getBoundingClientRect();
+                                      if (inputRect) {
+                                        el.style.top = `${inputRect.bottom + 4}px`;
+                                        el.style.left = `${inputRect.left}px`;
+                                        el.style.width = `${inputRect.width}px`;
+                                        el.dataset.positioned = 'true';
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {billItemNameSearchResults[item.sl].map((material) => (
+                                    <div
+                                      key={material.id}
+                                      onClick={() => handleBillItemNameSelect(item.sl, material)}
+                                      className="px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors"
+                                    >
+                                      <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                        {material.name}
+                                      </div>
+                                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                        {material.material_number && (
+                                          <span>Number: {material.material_number} | </span>
+                                        )}
+                                        Price: {formatCurrency(material.price || 0)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
                             <input
-                              type="number"
-                              min="1"
+                              ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].remarks = el; } }}
+                              type="text"
+                              value={item.remarks}
+                              onChange={(e) => handleBillItemRemarksChange(item.sl, e.target.value)}
+                              onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'remarks', e)}
+                              placeholder="Remarks..."
+                              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <input
+                              ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].qty = el; } }}
+                              type="text"
                               value={item.qty}
-                              onChange={(e) => handleBillItemQtyChange(item.sl, parseInt(e.target.value) || 1)}
+                              onChange={(e) => handleBillItemQtyChange(item.sl, e.target.value)}
+                              onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'qty', e)}
                               className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-4 text-right">
                             <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.fees}
-                              onChange={(e) => handleBillItemFeesChange(item.sl, parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 text-right border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].amount = el; } }}
+                              type="text"
+                              value={item.amount === 0 || item.amount === '' ? '' : String(item.amount)}
+                              onChange={(e) => handleBillItemAmountChange(item.sl, e.target.value)}
+                              onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'amount', e)}
+                              className="w-24 px-2 py-1 text-right border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              placeholder="Enter amount"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-900 dark:text-white font-medium">
-                            ${formatCurrency(item.amount)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleRemoveBillItem(item.sl)}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
-                              title="Remove item"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                          <td className="px-4 py-4 text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                              <button
+                                onClick={() => handleRemoveBillItem(item.sl)}
+                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
+                                title="Remove item"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                          No items in bill. Select materials in the measurement section to auto-populate bill items.
+                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                          No items in bill. Click "Add Item" to manually add bill items (optional).
                         </td>
                       </tr>
                     )}
@@ -1510,6 +2228,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Order Date</label>
                 <div className="relative">
                   <input
+                    ref={orderDateInputRef}
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}
@@ -1639,11 +2358,14 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
       <MaterialSearchModal
         isOpen={isMaterialSearchOpen}
-        onClose={() => setIsMaterialSearchOpen(false)}
+        onClose={() => {
+          setIsMaterialSearchOpen(false);
+          setLinkingItemSl(null);
+        }}
         onSelectMaterial={handleSelectMaterial}
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
-        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : false}
+        filterByMeasurementRequired={materialSearchType === 'measurement' ? true : null}
       />
     </div>
   );

@@ -296,39 +296,53 @@ export default function Materials() {
                   color: #444;
                 }
 
-                /* Table */
-                .measurements-table {
-                  width: 100%;
-                  border-collapse: collapse;
-                  table-layout: fixed; /* ensure columns fit on A5 */
+                /* Measurement Items */
+                .measurement-item {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: flex-start;
+                  margin-bottom: 8mm;
+                  padding-bottom: 4mm;
+                  border-bottom: 0.5px solid #ccc;
                 }
-                .measurements-table th,
-                .measurements-table td {
-                  border: 0.6px solid #000;
-                  padding: 3px 2px;
-                  text-align: center;
-                  vertical-align: top;
+                .measurement-left {
+                  flex: 1;
+                  min-width: 0;
                 }
-                .measurements-table th {
-                  background-color: #f2f2f2;
-                  font-weight: 700;
-                  font-size: 8.5px;
-                }
-                .measurements-table td {
-                  font-size: 8.5px;
-                }
-                .material-column {
-                  text-align: left;
+                .material-name {
                   font-weight: 600;
-                  overflow-wrap: anywhere;
+                  font-size: 10px;
+                  margin-bottom: 2mm;
+                  color: #111;
                 }
-                .measurement-column {
-                  white-space: nowrap; /* keep numbers tidy */
+                .measurement-values {
+                  font-size: 10px;
+                  color: #333;
+                  white-space: nowrap;
                 }
-                .note-column {
-                  text-align: left;
-                  font-size: 7.5px;
-                  overflow-wrap: anywhere;
+                .measurement-right {
+                  display: flex;
+                  flex-direction: row;
+                  align-items: flex-start;
+                  gap: 8mm;
+                  min-width: 50mm;
+                  padding-left: 4mm;
+                }
+                .cutter-stitcher {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 0;
+                  font-size: 8px;
+                  align-items: flex-start;
+                }
+                .cutter-stitcher-label {
+                  font-weight: 600;
+                  margin-bottom: 1mm;
+                }
+                .cutter-stitcher-line {
+                  border-bottom: 0.5px solid #000;
+                  width: 20mm;
+                  height: 4mm;
                 }
 
                 /* Footer */
@@ -344,7 +358,7 @@ export default function Materials() {
                 /* Print-specific tweaks */
                 @media print {
                   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                  tr, td, th { page-break-inside: avoid; }
+                  .measurement-item { page-break-inside: avoid; }
                 }
               </style>
             </head>
@@ -364,48 +378,48 @@ export default function Materials() {
                   </div>
                 </div>
 
-                <table class="measurements-table">
-                  <thead>
-                    <tr>
-                      <th>Material</th>
-                      <th>Thool</th>
-                      <th>Kethef</th>
-                      <th>Thool Kum</th>
-                      <th>Ardh F. Kum</th>
-                      <th>Jamba</th>
-                      <th>Ragab</th>
-                      <th>Cutter</th>
-                      <th>Stitching</th>
-                      <th>Note 1</th>
-                      <th>Note 2</th>
-                      <th>Note 3</th>
-                      <th>Note 4</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${measurements.map(measurement => `
-                      <tr>
-                        <td class="material-column">${measurement.material_name || "Material"}</td>
-                        <td class="measurement-column">${measurement.thool ?? ""}</td>
-                        <td class="measurement-column">${measurement.kethet ?? ""}</td>
-                        <td class="measurement-column">${measurement.thool_kum ?? ""}</td>
-                        <td class="measurement-column">${measurement.ardh_f_kum ?? ""}</td>
-                        <td class="measurement-column">${measurement.jamba ?? ""}</td>
-                        <td class="measurement-column">${measurement.ragab ?? ""}</td>
-                        <td class="note-column"></td>
-                        <td class="note-column"></td>
-                        <td class="note-column">${measurement.note1 || ""}</td>
-                        <td class="note-column">${measurement.note2 || ""}</td>
-                        <td class="note-column">${measurement.note3 || ""}</td>
-                        <td class="note-column">${measurement.note4 || ""}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-
-                <div class="footer">
-                  Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+                <div class="measurements-container">
+                  ${measurements.map(measurement => {
+                    // Combine all measurement values into a single string, remove trailing zeros
+                    const formatValue = (val) => {
+                      if (val === "" || val === null || val === undefined) return "";
+                      const num = parseFloat(val);
+                      if (isNaN(num)) return "";
+                      // Convert to string and remove trailing zeros and decimal point if not needed
+                      return num.toString().replace(/\.0+$/, '').replace(/(\d+\.\d*?)0+$/, '$1');
+                    };
+                    
+                    const measurementValues = [
+                      formatValue(measurement.thool),
+                      formatValue(measurement.kethet),
+                      formatValue(measurement.thool_kum),
+                      formatValue(measurement.ardh_f_kum),
+                      formatValue(measurement.jamba),
+                      formatValue(measurement.ragab)
+                    ].filter(val => val !== "")
+                     .join(" - ");
+                    
+                    return `
+                      <div class="measurement-item">
+                        <div class="measurement-left">
+                          <div class="material-name">${measurement.material_name || "Material"}</div>
+                          <div class="measurement-values">${measurementValues || ""}</div>
+                        </div>
+                        <div class="measurement-right">
+                          <div class="cutter-stitcher">
+                            <div class="cutter-stitcher-label">Cutter</div>
+                            <div class="cutter-stitcher-line"></div>
+                          </div>
+                          <div class="cutter-stitcher">
+                            <div class="cutter-stitcher-label">Stitcher</div>
+                            <div class="cutter-stitcher-line"></div>
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
+
               </div>
               <script>
                 window.document.close();
@@ -588,38 +602,53 @@ export default function Materials() {
                     font-size: 9px;
                     color: #444;
                   }
-                  .measurements-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    table-layout: fixed;
+                  /* Measurement Items */
+                  .measurement-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 8mm;
+                    padding-bottom: 4mm;
+                    border-bottom: 0.5px solid #ccc;
                   }
-                  .measurements-table th,
-                  .measurements-table td {
-                    border: 0.6px solid #000;
-                    padding: 3px 2px;
-                    text-align: center;
-                    vertical-align: top;
+                  .measurement-left {
+                    flex: 1;
+                    min-width: 0;
                   }
-                  .measurements-table th {
-                    background-color: #f2f2f2;
-                    font-weight: 700;
-                    font-size: 8.5px;
-                  }
-                  .measurements-table td {
-                    font-size: 8.5px;
-                  }
-                  .material-column {
-                    text-align: left;
+                  .material-name {
                     font-weight: 600;
-                    overflow-wrap: anywhere;
+                    font-size: 10px;
+                    margin-bottom: 2mm;
+                    color: #111;
                   }
-                  .measurement-column {
+                  .measurement-values {
+                    font-size: 10px;
+                    color: #333;
                     white-space: nowrap;
                   }
-                  .note-column {
-                    text-align: left;
-                    font-size: 7.5px;
-                    overflow-wrap: anywhere;
+                  .measurement-right {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: flex-start;
+                    gap: 8mm;
+                    min-width: 50mm;
+                    padding-left: 4mm;
+                  }
+                  .cutter-stitcher {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0;
+                    font-size: 8px;
+                    align-items: flex-start;
+                  }
+                  .cutter-stitcher-label {
+                    font-weight: 600;
+                    margin-bottom: 1mm;
+                  }
+                  .cutter-stitcher-line {
+                    border-bottom: 0.5px solid #000;
+                    width: 20mm;
+                    height: 4mm;
                   }
                   .footer {
                     margin-top: 6mm;
@@ -631,7 +660,7 @@ export default function Materials() {
                   }
                   @media print {
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    tr, td, th { page-break-inside: avoid; }
+                    .measurement-item { page-break-inside: avoid; }
                   }
                 </style>
               </head>
@@ -651,48 +680,49 @@ export default function Materials() {
                     </div>
                   </div>
 
-                  <table class="measurements-table">
-                    <thead>
-                      <tr>
-                        <th>Material</th>
-                        <th>Thool</th>
-                        <th>Kethef</th>
-                        <th>Thool Kum</th>
-                        <th>Ardh F. Kum</th>
-                        <th>Jamba</th>
-                        <th>Ragab</th>
-                        <th>Cutter</th>
-                        <th>Stitching</th>
-                        <th>Note 1</th>
-                        <th>Note 2</th>
-                        <th>Note 3</th>
-                        <th>Note 4</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${measurements.map(measurement => `
-                        <tr>
-                          <td class="material-column">${measurement.material_name || "Material"}</td>
-                          <td class="measurement-column">${measurement.thool ?? ""}</td>
-                          <td class="measurement-column">${measurement.kethet ?? ""}</td>
-                          <td class="measurement-column">${measurement.thool_kum ?? ""}</td>
-                          <td class="measurement-column">${measurement.ardh_f_kum ?? ""}</td>
-                          <td class="measurement-column">${measurement.jamba ?? ""}</td>
-                          <td class="measurement-column">${measurement.ragab ?? ""}</td>
-                          <td class="note-column"></td>
-                          <td class="note-column"></td>
-                          <td class="note-column">${measurement.note1 || ""}</td>
-                          <td class="note-column">${measurement.note2 || ""}</td>
-                          <td class="note-column">${measurement.note3 || ""}</td>
-                          <td class="note-column">${measurement.note4 || ""}</td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-
-                  <div class="footer">
-                    Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+                  <div class="measurements-container">
+                    ${measurements.map(measurement => {
+                      // Combine all measurement values into a single string, remove trailing zeros
+                      const formatValue = (val) => {
+                        if (val === "" || val === null || val === undefined) return "";
+                        const num = parseFloat(val);
+                        if (isNaN(num)) return "";
+                        // Convert to string and remove trailing zeros and decimal point if not needed
+                        return num.toString().replace(/\.0+$/, '').replace(/(\d+\.\d*?)0+$/, '$1');
+                      };
+                      
+                      const measurementValues = [
+                        formatValue(measurement.thool),
+                        formatValue(measurement.kethet),
+                        formatValue(measurement.thool_kum),
+                        formatValue(measurement.ardh_f_kum),
+                        formatValue(measurement.jamba),
+                        formatValue(measurement.ragab)
+                      ].filter(val => val !== "")
+                       .join(" - ");
+                      
+                      return `
+                        <div class="measurement-item">
+                          <div class="measurement-left">
+                            <div class="material-name">${measurement.material_name || "Material"}</div>
+                            <div class="measurement-values">${measurementValues || ""}</div>
+                          </div>
+                          <div class="measurement-right">
+                            <div class="cutter-stitcher">
+                              <div class="cutter-stitcher-label">Cutter</div>
+                              <div class="cutter-stitcher-line"></div>
+                            </div>
+                            <div class="cutter-stitcher">
+                              <div class="cutter-stitcher-label">Stitcher</div>
+                              <div class="cutter-stitcher-line"></div>
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
                   </div>
+
+
                 </div>
                 <script>
                   (function() {

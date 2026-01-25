@@ -32,6 +32,7 @@ export default function Delivery() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCell, setEditingCell] = useState(null); // { deliveryId, field }
   const [editValue, setEditValue] = useState('');
+  const [currentEditingDeliveryId, setCurrentEditingDeliveryId] = useState(null);
 
   // Fetch deliveries on component mount
   useEffect(() => {
@@ -141,11 +142,13 @@ export default function Delivery() {
   const handleCellEditStart = (deliveryId, field, currentValue) => {
     setEditingCell({ deliveryId, field });
     setEditValue(currentValue || '');
+    setCurrentEditingDeliveryId(deliveryId);
   };
 
   const handleCellEditCancel = () => {
     setEditingCell(null);
     setEditValue('');
+    setCurrentEditingDeliveryId(null);
   };
 
   const handleCellEditSave = async (deliveryId) => {
@@ -194,13 +197,30 @@ export default function Delivery() {
       await fetchDeliveries();
       await fetchStats(); // Also refresh stats as status might have changed
       
-      setEditingCell(null);
-      setEditValue('');
+      // If we're in the navigation flow, move to next field
+      // Note: We use current delivery values since status/received_amount don't change when updating other fields
+      if (editingCell.field === 'delivery_date') {
+        // Move to status field
+        setEditingCell({ deliveryId, field: 'status' });
+        setEditValue(delivery.status || 'pending');
+        // Focus will be handled by useEffect
+      } else if (editingCell.field === 'status') {
+        // Move to received_amount field
+        setEditingCell({ deliveryId, field: 'received_amount' });
+        setEditValue(delivery.recived_on_delivery_amount || '0');
+        // Focus will be handled by useEffect
+      } else if (editingCell.field === 'received_amount') {
+        // End of navigation flow, clear editing state
+        setEditingCell(null);
+        setEditValue('');
+        setCurrentEditingDeliveryId(null);
+      }
     } catch (err) {
       console.error(`Error updating ${editingCell.field}:`, err);
       setError(`Failed to update ${editingCell.field}`);
       setEditingCell(null);
       setEditValue('');
+      setCurrentEditingDeliveryId(null);
     }
   };
 
@@ -286,6 +306,40 @@ export default function Delivery() {
     return matchesSearch && matchesStatus && matchesBlocked;
   });
 
+  // Handle search Enter key to start editing first result
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && filteredDeliveries.length > 0) {
+      const firstDelivery = filteredDeliveries[0];
+      handleCellEditStart(firstDelivery.id, 'delivery_date', firstDelivery.deliveryDate);
+      // Focus will be handled by useEffect
+    }
+  };
+
+  // Focus management for keyboard navigation
+  useEffect(() => {
+    if (editingCell) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const deliveryId = editingCell.deliveryId;
+        const field = editingCell.field;
+        
+        if (field === 'delivery_date') {
+          const input = document.querySelector(`input[data-delivery-id="${deliveryId}"][data-field="delivery_date"]`);
+          if (input) input.focus();
+        } else if (field === 'status') {
+          const select = document.querySelector(`select[data-delivery-id="${deliveryId}"][data-field="status"]`);
+          if (select) select.focus();
+        } else if (field === 'received_amount') {
+          const input = document.querySelector(`input[data-delivery-id="${deliveryId}"][data-field="received_amount"]`);
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        }
+      }, 50);
+    }
+  }, [editingCell]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -353,9 +407,10 @@ export default function Delivery() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search deliveries..."
+                  placeholder="Search deliveries... (Press Enter to edit first result)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -503,18 +558,20 @@ export default function Delivery() {
                     {editingCell?.deliveryId === delivery.id && editingCell?.field === 'delivery_date' ? (
                       <div className="flex items-center gap-2">
                         <input
+                          data-delivery-id={delivery.id}
+                          data-field="delivery_date"
                           type="date"
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
+                              e.preventDefault();
                               handleCellEditSave(delivery.id);
                             } else if (e.key === 'Escape') {
                               handleCellEditCancel();
                             }
                           }}
                           className="px-2 py-1 border border-blue-500 rounded text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          autoFocus
                         />
                         <button
                           onClick={() => handleCellEditSave(delivery.id)}
@@ -547,17 +604,19 @@ export default function Delivery() {
                     {editingCell?.deliveryId === delivery.id && editingCell?.field === 'status' ? (
                       <div className="flex items-center gap-2">
                         <select
+                          data-delivery-id={delivery.id}
+                          data-field="status"
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
+                              e.preventDefault();
                               handleCellEditSave(delivery.id);
                             } else if (e.key === 'Escape') {
                               handleCellEditCancel();
                             }
                           }}
                           className="px-2 py-1 border border-blue-500 rounded text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          autoFocus
                         >
                           <option value="pending">Pending</option>
                           <option value="in_progress">In Progress</option>
@@ -599,6 +658,8 @@ export default function Delivery() {
                     {editingCell?.deliveryId === delivery.id && editingCell?.field === 'received_amount' ? (
                       <div className="flex items-center gap-2">
                         <input
+                          data-delivery-id={delivery.id}
+                          data-field="received_amount"
                           type="number"
                           step="0.01"
                           min="0"
@@ -606,13 +667,13 @@ export default function Delivery() {
                           onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
+                              e.preventDefault();
                               handleCellEditSave(delivery.id);
                             } else if (e.key === 'Escape') {
                               handleCellEditCancel();
                             }
                           }}
                           className="w-32 px-2 py-1 border border-blue-500 rounded text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          autoFocus
                         />
                         <button
                           onClick={() => handleCellEditSave(delivery.id)}
