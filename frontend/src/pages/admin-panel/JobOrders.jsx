@@ -142,19 +142,19 @@ export default function JobOrders() {
           <head>
             <title>Print Job Order</title>
             <style>
-              @page { size: A5 portrait; margin: 8mm; }
+              @page { size: A5 portrait; margin: 4mm 3mm 15mm 3mm; }
               body { margin: 0; padding: 0; font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; }
-              .a5-sheet { width: 148mm; height: 210mm; background: #fff; color: #111827; padding: 8mm; }
-              .hdr { padding-bottom: 4mm; margin-bottom: 4mm; }
-              .hdr-top { margin-bottom: 2mm; }
-              .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 2mm; gap: 4mm; direction: ltr; }
+              .a5-sheet { width: 142mm; height: 210mm; background: #fff; color: #111827; padding: 3mm 4mm 3mm 4mm; }
+              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; }
+              .hdr-top { margin-bottom: 1mm; }
+              .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1mm; gap: 4mm; direction: ltr; }
               .hdr-phone-left { text-align: left; justify-self: start; }
               .hdr-phone-right { text-align: right; justify-self: end; }
               .brand { font-weight: 700; text-align: right; font-size: 14pt; }
               .small { font-size: 9pt; color: #4b5563; }
               .left { text-align: left; }
               .right { text-align: right; }
-              .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; align-items: center; margin-top: 2mm; font-size: 10.5pt; }
+              .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; align-items: center; margin-top: 1mm; font-size: 10.5pt; }
               .row .cell { text-align: right; }
               .row .cell.left { text-align: left; }
               .row .cell.center { text-align: center; }
@@ -163,7 +163,7 @@ export default function JobOrders() {
               .submeta .cell.left { text-align: left; justify-self: start; }
               .submeta .cell:not(.left) { text-align: right; justify-self: end; }
               table.items { width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; }
-              table.items th, table.items td { border: none; padding: 6px 8px; vertical-align: middle; }
+              table.items th, table.items td { border: none; padding: 4px 6px; vertical-align: middle; }
               table.items thead tr { border-bottom: 1px solid #9ca3af; }
               table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; white-space: nowrap; }
               table.items thead th.col-qty { text-align: center; }
@@ -172,17 +172,17 @@ export default function JobOrders() {
               .col-qty { width: 15%; text-align: center; }
               .col-unit { width: 15%; text-align: center; }
               .col-amt { width: 15%; text-align: right; }
-              table.items tfoot td { padding: 6px 8px; vertical-align: middle; }
-              table.items tfoot .totals-separator td { padding: 4px 8px; }
-              .ftr { margin-top: 6mm; padding-top: 3mm; font-size: 9.5pt; color: #374151; }
-              .hours { text-align: center; }
+              table.items tfoot td { padding: 2px 6px; vertical-align: middle; }
+              table.items tfoot .totals-separator td { padding: 2px 6px; }
+              .ftr { margin-top: 3mm; padding-top: 2mm; font-size: 9.5pt; color: #374151; }
+              .hours { text-align: center; white-space: nowrap; }
             </style>
           </head>
           <body>
             <div class="a5-sheet">
               <div class="hdr" dir="rtl">
                 <div class="hdr-top">
-                   <div class="right brand">الخرطوم للخياطة والأقمشة السودانية - الدوحة</div>
+                   <div class="right brand">لتفصيل وخياطة الملابس السودانية</div>
                 </div>
                 <div class="hdr-phone small">
                   <div class="hdr-phone-left">
@@ -190,15 +190,24 @@ export default function JobOrders() {
 
                   </div>
                   <div class="hdr-phone-right">
-                    <span>جوال:</span> 5071516122
+                    <span>جوال:</span> 50351571
                   </div>
                 </div>
-                <div style="text-align: left; direction: ltr; margin-top: 2mm; font-size: 10.5pt;">
+                <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt;">
                   <span>التاريخ:</span> <strong>${a5.date}</strong>
                 </div>
-                <div style="text-align: center; margin-top: 2mm; margin-bottom: 2mm;">
+                ${copyType === 'customer' ? `
+                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
                   <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
                 </div>
+                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+                  (customer copy)
+                </div>
+                ` : `
+                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+                  (file copy)
+                </div>
+                `}
 
                 <div class="row submeta">
                   <div class="cell left">
@@ -273,14 +282,11 @@ export default function JobOrders() {
                     </tr>
                   </tfoot>
                 </table>
-                <div style="text-align: center; margin-top: 4mm; font-size: 10pt; font-weight: 700;">
-                  (${copyType === 'customer' ? 'customer copy' : 'file copy'})
-                </div>
               </div>
               <div class="ftr" dir="rtl">
                 <div class="hours">
-                  <span>ساعات العمل:</span> صباحاً من 08:30 الى 01:00 مساءً من 04:00 الى 10:00 / الجمعة من 04:00 الى 10:00
-                </div>
+                 <span>ساعات العمل:</span> صباحاً من 09:00 الى 01:00 مساءً من 04:00 الى 10:30 / الجمعة من 04:00 الى 10:30  
+                 </div>
               </div>
             </div>
             <script>

@@ -248,7 +248,7 @@ export default function Materials() {
                 /* Page + base */
                 @page {
                   size: A5 portrait;
-                  margin: 10mm;
+                  margin: 5mm;
                 }
                 html, body {
                   height: auto;
@@ -264,6 +264,7 @@ export default function Materials() {
                 }
                 .a5 {
                   width: 100%;
+                  max-width: 100%;
                 }
 
                 /* Header */
@@ -272,9 +273,9 @@ export default function Materials() {
                   justify-content: space-between;
                   align-items: flex-start;
                   gap: 8px;
-                  margin-bottom: 8mm;
+                  margin-bottom: 4mm;
                   border-bottom: 1px solid #000;
-                  padding-bottom: 4mm;
+                  padding-bottom: 2mm;
                 }
                 .customer-info, .job-info {
                   flex: 1;
@@ -301,28 +302,32 @@ export default function Materials() {
                   display: flex;
                   justify-content: space-between;
                   align-items: flex-start;
-                  margin-bottom: 8mm;
-                  padding-bottom: 4mm;
+                  margin-bottom: 3mm;
+                  padding-bottom: 2mm;
                   border-bottom: 0.5px solid #ccc;
-                  gap: 4mm;
+                  gap: 3mm;
+                  page-break-inside: avoid;
+                  break-inside: avoid;
+                  orphans: 3;
+                  widows: 3;
                 }
                 .measurement-left {
                   flex: 1;
                   min-width: 0;
-                  max-width: calc(100% - 60mm);
+                  max-width: calc(100% - 45mm);
                   overflow: hidden;
                 }
                 .material-name {
                   font-weight: 600;
                   font-size: 16px;
-                  margin-bottom: 2mm;
+                  margin-bottom: 1mm;
                   color: #111;
                 }
                 .notes {
                   font-size: 16px;
                   color: #555;
-                  margin-bottom: 2mm;
-                  line-height: 1.4;
+                  margin-bottom: 1mm;
+                  line-height: 1.3;
                   word-wrap: break-word;
                   word-break: break-word;
                   overflow-wrap: break-word;
@@ -332,18 +337,19 @@ export default function Materials() {
                   font-size: 16px;
                   color: #333;
                   white-space: nowrap;
-                  margin-top: 2mm;
+                  margin-top: 1mm;
+                  margin-bottom: 1mm;
                 }
                 .measurement-right {
                   display: flex;
                   flex-direction: column;
                   align-items: flex-end;
                   gap: 3mm;
-                  width: 50mm;
-                  min-width: 50mm;
-                  max-width: 50mm;
+                  width: 40mm;
+                  min-width: 40mm;
+                  max-width: 40mm;
                   flex-shrink: 0;
-                  padding-left: 4mm;
+                  padding-left: 2mm;
                 }
                 .cutter-stitcher {
                   display: flex;
@@ -381,8 +387,20 @@ export default function Materials() {
 
                 /* Print-specific tweaks */
                 @media print {
-                  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                  .measurement-item { page-break-inside: avoid; }
+                  body { 
+                    -webkit-print-color-adjust: exact; 
+                    print-color-adjust: exact;
+                  }
+                  .measurement-item { 
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                    page-break-after: auto;
+                    orphans: 3;
+                    widows: 3;
+                  }
+                  .measurements-container {
+                    page-break-inside: auto;
+                  }
                 }
               </style>
             </head>
@@ -598,7 +616,7 @@ export default function Materials() {
                 <style>
                   @page {
                     size: A5 portrait;
-                    margin: 10mm;
+                    margin: 5mm;
                   }
                   html, body {
                     height: auto;
@@ -614,15 +632,16 @@ export default function Materials() {
                   }
                   .a5 {
                     width: 100%;
+                    max-width: 100%;
                   }
                   .header {
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-start;
                     gap: 8px;
-                    margin-bottom: 8mm;
+                    margin-bottom: 4mm;
                     border-bottom: 1px solid #000;
-                    padding-bottom: 4mm;
+                    padding-bottom: 2mm;
                   }
                   .customer-info, .job-info {
                     flex: 1;
@@ -648,28 +667,32 @@ export default function Materials() {
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-start;
-                    margin-bottom: 8mm;
-                    padding-bottom: 4mm;
+                    margin-bottom: 3mm;
+                    padding-bottom: 2mm;
                     border-bottom: 0.5px solid #ccc;
-                    gap: 4mm;
+                    gap: 3mm;
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                    orphans: 3;
+                    widows: 3;
                   }
                   .measurement-left {
                     flex: 1;
                     min-width: 0;
-                    max-width: calc(100% - 60mm);
+                    max-width: calc(100% - 45mm);
                     overflow: hidden;
                   }
                   .material-name {
                     font-weight: 600;
                     font-size: 16px;
-                    margin-bottom: 2mm;
+                    margin-bottom: 1mm;
                     color: #111;
                   }
                   .notes {
                     font-size: 16px;
                     color: #555;
-                    margin-bottom: 2mm;
-                    line-height: 1.4;
+                    margin-bottom: 1mm;
+                    line-height: 1.3;
                     word-wrap: break-word;
                     word-break: break-word;
                     overflow-wrap: break-word;
@@ -679,18 +702,19 @@ export default function Materials() {
                     font-size: 16px;
                     color: #333;
                     white-space: nowrap;
-                    margin-top: 2mm;
+                    margin-top: 1mm;
+                    margin-bottom: 1mm;
                   }
                   .measurement-right {
                     display: flex;
                     flex-direction: column;
                     align-items: flex-end;
                     gap: 3mm;
-                    width: 50mm;
-                    min-width: 50mm;
-                    max-width: 50mm;
+                    width: 40mm;
+                    min-width: 40mm;
+                    max-width: 40mm;
                     flex-shrink: 0;
-                    padding-left: 4mm;
+                    padding-left: 2mm;
                   }
                   .cutter-stitcher {
                     display: flex;
@@ -724,8 +748,20 @@ export default function Materials() {
                     padding-top: 3mm;
                   }
                   @media print {
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .measurement-item { page-break-inside: avoid; }
+                    body { 
+                      -webkit-print-color-adjust: exact; 
+                      print-color-adjust: exact;
+                    }
+                    .measurement-item { 
+                      page-break-inside: avoid;
+                      break-inside: avoid;
+                      page-break-after: auto;
+                      orphans: 3;
+                      widows: 3;
+                    }
+                    .measurements-container {
+                      page-break-inside: auto;
+                    }
                   }
                 </style>
               </head>
