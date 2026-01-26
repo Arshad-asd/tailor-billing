@@ -182,7 +182,7 @@ export default function JobOrders() {
             <div class="a5-sheet">
               <div class="hdr" dir="rtl">
                 <div class="hdr-top">
-                  <div class="right brand">أم درمان للخياطة والأقمشة السودانية - الدوحة</div>
+                   <div class="right brand">الخرطوم للخياطة والأقمشة السودانية - الدوحة</div>
                 </div>
                 <div class="hdr-phone small">
                   <div class="hdr-phone-left">
