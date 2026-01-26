@@ -136,18 +136,8 @@ export default function JobOrders() {
     setIsPrintModalOpen(true)
   }
 
-  const executePrint = (copyType) => {
-    if (!pendingPrintOrder) return
-    
-    const a5 = pendingPrintOrder
-    setPrintOrder(a5)
-    setIsPrintModalOpen(false)
-    
-    // Print with copy type
-    setTimeout(() => {
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank', 'width=800,height=600')
-      printWindow.document.write(`
+  const generatePrintContent = (a5, copyType, printId) => {
+    return `
         <html>
           <head>
             <title>Print Job Order</title>
@@ -293,16 +283,332 @@ export default function JobOrders() {
                 </div>
               </div>
             </div>
+            <script>
+              (function() {
+                var printId = '${printId}';
+                var printTriggered = false;
+                var dialogClosed = false;
+                
+                // Monitor for print dialog close
+                var afterPrint = function() {
+                  if (dialogClosed) return;
+                  dialogClosed = true;
+                  
+                  try {
+                    if (window.opener) {
+                      window.opener.postMessage('printDialogClosed_' + printId, '*');
+                    }
+                  } catch(e) {
+                    console.log('Could not send message to opener');
+                  }
+                };
+                
+                // Track when print is called
+                var originalPrint = window.print;
+                window.print = function() {
+                  printTriggered = true;
+                  originalPrint.apply(window, arguments);
+                };
+                
+                // Use afterprint event (most reliable)
+                window.addEventListener('afterprint', function() {
+                  afterPrint();
+                });
+                
+                // Fallback: Use matchMedia for print detection
+                if (window.matchMedia) {
+                  var mediaQueryList = window.matchMedia('print');
+                  var handleChange = function(mql) {
+                    if (!mql.matches && printTriggered) {
+                      setTimeout(function() {
+                        afterPrint();
+                      }, 100);
+                    }
+                  };
+                  
+                  if (mediaQueryList.addEventListener) {
+                    mediaQueryList.addEventListener('change', handleChange);
+                  } else {
+                    mediaQueryList.addListener(handleChange);
+                  }
+                }
+              })();
+            </script>
           </body>
         </html>
-      `)
-      printWindow.document.close()
-      printWindow.focus()
-      printWindow.print()
-      printWindow.close()
+      `
+  }
+
+  const doPrint = (copyType, onComplete, orderData = null) => {
+    return new Promise((resolve) => {
+      const a5 = orderData || pendingPrintOrder
+      
+      if (!a5) {
+        console.log(`⚠ No order data available for ${copyType} copy`)
+        if (onComplete) onComplete()
+        resolve()
+        return
+      }
+      
+      // Create unique ID for this print session
+      const printId = `${copyType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const printContent = generatePrintContent(a5, copyType, printId)
+      
+      setTimeout(() => {
+        const printWindow = window.open('', `print_${copyType}_${Date.now()}`, 'width=800,height=600')
+        
+        if (!printWindow) {
+          console.error(`❌ Failed to open print window for ${copyType} copy - browser may have blocked it`)
+          if (onComplete) onComplete()
+          resolve()
+          return
+        }
+        
+        try {
+          printWindow.document.write(printContent)
+          printWindow.document.close()
+        } catch (error) {
+          console.error(`❌ Error writing content for ${copyType} copy:`, error)
+          if (onComplete) onComplete()
+          resolve()
+          return
+        }
+        
+        // Wait for content to load
+        setTimeout(() => {
+          printWindow.focus()
+          
+          // Variables for detection
+          let printCalled = false
+          let resolved = false
+          let checkCount = 0
+          const maxChecks = 300
+          let messageHandler = null
+          let checkInterval = null
+          
+          // Set up message handler BEFORE calling print
+          if (onComplete) {
+            messageHandler = (event) => {
+              if (event.data === `printDialogClosed_${printId}` && !resolved && printCalled) {
+                console.log(`✓ Print dialog closed for ${copyType} copy`)
+                resolved = true
+                if (checkInterval) clearInterval(checkInterval)
+                window.removeEventListener('message', messageHandler)
+                
+                setTimeout(() => {
+                  if (!printWindow.closed) {
+                    printWindow.close()
+                  }
+                  if (onComplete) onComplete()
+                  resolve()
+                }, 300)
+              }
+            }
+            window.addEventListener('message', messageHandler)
+          }
+          
+          // Call print() with a delay to ensure window is ready
+          setTimeout(() => {
+            if (printWindow.closed) {
+              console.error(`❌ Print window closed before print() for ${copyType}`)
+              if (onComplete) onComplete()
+              resolve()
+              return
+            }
+            
+            try {
+              printWindow.focus()
+              console.log(`🖨️ Calling print() for ${copyType} copy`)
+              printCalled = true
+              printWindow.print()
+              console.log(`✅ print() executed for ${copyType} copy`)
+              
+              // Start polling ONLY after print() is called
+              if (onComplete) {
+                checkInterval = setInterval(() => {
+                  checkCount++
+                  
+                  if (printWindow.closed && !resolved) {
+                    console.log(`✓ Print window closed for ${copyType} copy`)
+                    resolved = true
+                    clearInterval(checkInterval)
+                    window.removeEventListener('message', messageHandler)
+                    onComplete()
+                    resolve()
+                    return
+                  }
+                  
+                  // Timeout fallback
+                  if (checkCount >= maxChecks && !resolved) {
+                    console.log(`⚠ Timeout for ${copyType} copy`)
+                    resolved = true
+                    clearInterval(checkInterval)
+                    window.removeEventListener('message', messageHandler)
+                    if (!printWindow.closed) {
+                      printWindow.close()
+                    }
+                    onComplete()
+                    resolve()
+                  }
+                }, 200)
+              } else {
+                // Single print without callback
+                setTimeout(() => {
+                  if (!printWindow.closed) {
+                    printWindow.close()
+                  }
+                  resolve()
+                }, 2000)
+              }
+            } catch (e) {
+              console.error(`❌ Error in print() for ${copyType}:`, e)
+              if (onComplete) onComplete()
+              resolve()
+            }
+          }, 500) // Delay before calling print()
+        }, 500) // Delay after window opens
+      }, 100)
+    })
+  }
+
+  const executePrint = (copyType) => {
+    if (!pendingPrintOrder) return
+    
+    setPrintOrder(pendingPrintOrder)
+    setIsPrintModalOpen(false)
+    doPrint(copyType, () => {
       setPrintOrder(null)
       setPendingPrintOrder(null)
-    }, 100)
+    })
+  }
+
+  const executePrintBoth = async () => {
+    if (!pendingPrintOrder) return
+    
+    const orderDataToPrint = pendingPrintOrder
+    console.log('🖨️ Starting Print Both process')
+    setPrintOrder(orderDataToPrint)
+    setIsPrintModalOpen(false)
+    
+    try {
+      const customerPrintId = `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const filePrintId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      const customerContent = generatePrintContent(orderDataToPrint, 'customer', customerPrintId)
+      const fileContent = generatePrintContent(orderDataToPrint, 'file', filePrintId)
+      
+      // Open customer window immediately
+      console.log('📄 Opening customer print window...')
+      let printWindow = window.open('', 'print_both', 'width=800,height=600')
+      
+      if (!printWindow) {
+        console.error('❌ Failed to open print window')
+        setPrintOrder(null)
+        setPendingPrintOrder(null)
+        return
+      }
+      
+      // Write customer content first
+      printWindow.document.write(customerContent)
+      printWindow.document.close()
+      
+      // Wait for content to load
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Wait for content to load
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Print customer copy first
+      console.log('🖨️ Printing customer copy...')
+      printWindow.focus()
+      printWindow.print()
+      
+      // Wait for customer copy print dialog to close
+      await new Promise((resolve) => {
+        let resolved = false
+        const messageHandler = (event) => {
+          if (event.data === `printDialogClosed_${customerPrintId}` && !resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            console.log('✅ Customer copy print dialog closed')
+            resolve()
+          }
+        }
+        window.addEventListener('message', messageHandler)
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            resolve()
+          }
+        }, 60000)
+      })
+      
+      // Wait a bit before changing content
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Check if window is still open, if not try to open a new one
+      if (printWindow.closed) {
+        console.log('📄 Reopening window for file copy...')
+        printWindow = window.open('', 'print_both', 'width=800,height=600')
+        if (!printWindow) {
+          console.error('❌ Cannot open window for file copy')
+          setPrintOrder(null)
+          setPendingPrintOrder(null)
+          return
+        }
+      }
+      
+      // Write file content to the same window
+      printWindow.document.open()
+      printWindow.document.write(fileContent)
+      printWindow.document.close()
+      
+      // Wait for content to load
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Print file copy
+      console.log('🖨️ Printing file copy...')
+      printWindow.focus()
+      printWindow.print()
+      
+      // Wait for file copy print dialog to close
+      await new Promise((resolve) => {
+        let resolved = false
+        const messageHandler = (event) => {
+          if (event.data === `printDialogClosed_${filePrintId}` && !resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            console.log('✅ File copy print dialog closed')
+            setTimeout(() => {
+              if (!printWindow.closed) printWindow.close()
+              resolve()
+            }, 500)
+          }
+        }
+        window.addEventListener('message', messageHandler)
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            if (!printWindow.closed) printWindow.close()
+            resolve()
+          }
+        }, 60000)
+      })
+      
+      console.log('✅ Print Both process complete')
+      setPrintOrder(null)
+      setPendingPrintOrder(null)
+    } catch (error) {
+      console.error('❌ Error in Print Both process:', error)
+      setPrintOrder(null)
+      setPendingPrintOrder(null)
+    }
   }
 
   // Load job orders and stats on component mount and when date filter or search changes
@@ -424,12 +730,34 @@ export default function JobOrders() {
     }
   }
 
-  const handleFormSuccess = () => {
+  const handleFormSuccess = async (savedOrder) => {
     loadJobOrders() // Refresh the list
     loadStats() // Refresh stats
     setIsAddFormOpen(false)
     setIsEditFormOpen(false)
     setEditingJobOrderId(null)
+    
+    // Show print modal if order was saved
+    if (savedOrder) {
+      // If the saved order doesn't have all required fields, fetch it
+      let orderToPrint = savedOrder
+      if (!savedOrder.job_order_number || !savedOrder.job_order_items) {
+        try {
+          const orderId = savedOrder.id || savedOrder.job_order_id
+          if (orderId) {
+            const fullOrder = await jobOrdersApi.getJobOrder(orderId)
+            orderToPrint = fullOrder
+          }
+        } catch (error) {
+          console.error('Error fetching full order for print:', error)
+          // Use savedOrder as fallback
+        }
+      }
+      
+      const a5 = mapToA5(orderToPrint)
+      setPendingPrintOrder(a5)
+      setIsPrintModalOpen(true)
+    }
   }
 
   const handleFormClose = () => {
@@ -670,11 +998,17 @@ export default function JobOrders() {
               </button>
             </div>
             <button
+              onClick={executePrintBoth}
+              className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+            >
+              Print Both
+            </button>
+            <button
               onClick={() => {
                 setIsPrintModalOpen(false)
                 setPendingPrintOrder(null)
               }}
-              className="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+              className="mt-3 w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
             >
               Cancel
             </button>

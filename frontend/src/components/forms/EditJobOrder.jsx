@@ -47,6 +47,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   
   // Ref for order date field (to move focus after last item)
   const orderDateInputRef = useRef(null);
+  // Ref for advance amount field
+  const advanceInputRef = useRef(null);
+  // Ref for delivery date field
+  const deliveryDateInputRef = useRef(null);
   
   // State for bill item name search
   const [billItemNameSearchQueries, setBillItemNameSearchQueries] = useState({}); // { itemSl: searchQuery }
@@ -56,6 +60,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState(null);
+  const [advanceError, setAdvanceError] = useState(null);
   const [sectionLoading, setSectionLoading] = useState({
     customer: false,
     measurement: false,
@@ -333,17 +338,35 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   // Function to update total amount when bill items change
   const updateBillTotal = (items) => {
     const totalAmount = items.reduce((sum, item) => {
+      const qty = parseFloat(item.qty) || 0;
       const amount = parseFloat(item.amount) || 0;
-      return sum + amount;
+      const subtotal = qty * amount;
+      return sum + subtotal;
     }, 0);
     setFormData(prev => {
-      const advance = parseFloat(prev.bill.advance) || 0;
+      // Handle advance value - it might be a string, number, or empty
+      let advance = 0;
+      if (prev.bill.advance !== '' && prev.bill.advance !== null && prev.bill.advance !== undefined) {
+        advance = parseFloat(String(prev.bill.advance));
+        if (isNaN(advance)) {
+          advance = 0;
+        }
+      }
+      
+      // Clear error if advance is now valid
+      if (advance <= totalAmount) {
+        setAdvanceError(null);
+      } else {
+        setAdvanceError('Advance amount cannot be greater than total amount');
+      }
+      
+      const balance = totalAmount - advance;
       return {
         ...prev,
         bill: {
           ...prev.bill,
           total: totalAmount,
-          balance: totalAmount - advance
+          balance: balance
         }
       };
     });
@@ -412,11 +435,37 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         }
       };
       
+      // Handle order date change - set delivery date to 1 week later if not already set
+      if (section === 'bill' && field === 'orderDate') {
+        // Only set delivery date if it's empty
+        if (!prev.bill.deliveryDate || prev.bill.deliveryDate === '') {
+          const orderDate = new Date(value);
+          const deliveryDate = new Date(orderDate);
+          deliveryDate.setDate(deliveryDate.getDate() + 7); // Add 7 days (1 week)
+          newFormData.bill.deliveryDate = deliveryDate.toISOString().split('T')[0];
+        }
+      }
+      
       if (section === 'bill' && field === 'advance') {
         // Store as text, but parse for calculations
-        const advance = parseFloat(value) || 0;
+        let advance = 0;
+        if (value !== '' && value !== null && value !== undefined) {
+          advance = parseFloat(String(value));
+          if (isNaN(advance)) {
+            advance = 0;
+          }
+        }
         const total = prev.bill.total;
-        newFormData.bill.balance = total - advance;
+        
+        // Validate: advance cannot be greater than total
+        if (advance > total) {
+          setAdvanceError('Advance amount cannot be greater than total amount');
+          // Don't update the advance value if it exceeds total
+          return prev;
+        } else {
+          setAdvanceError(null);
+          newFormData.bill.balance = total - advance;
+        }
       }
       
       // Handle payment method changes
@@ -663,6 +712,53 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       setTimeout(() => {
         customerMobileInputRef.current?.focus();
       }, 0);
+    }
+  };
+
+  // Handle Enter key press on order date field
+  const handleOrderDateKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Move to advance amount field
+      setTimeout(() => {
+        advanceInputRef.current?.focus();
+      }, 100);
+    }
+  };
+
+  // Handle Enter key press on advance amount field
+  const handleAdvanceKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Move to delivery date field and open calendar
+      setTimeout(() => {
+        deliveryDateInputRef.current?.focus();
+        // Open the date picker if supported
+        if (deliveryDateInputRef.current && typeof deliveryDateInputRef.current.showPicker === 'function') {
+          try {
+            deliveryDateInputRef.current.showPicker();
+          } catch (error) {
+            // If showPicker is not supported, just focus the field
+            console.log('Date picker showPicker not supported');
+          }
+        }
+      }, 100);
+    }
+  };
+
+  // Handle Enter key press on delivery date field
+  const handleDeliveryDateKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Open the date picker if supported
+      if (deliveryDateInputRef.current && typeof deliveryDateInputRef.current.showPicker === 'function') {
+        try {
+          deliveryDateInputRef.current.showPicker();
+        } catch (error) {
+          // If showPicker is not supported, just keep focus
+          console.log('Date picker showPicker not supported');
+        }
+      }
     }
   };
 
@@ -2097,6 +2193,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Subtotal</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                     </tr>
                   </thead>
@@ -2207,6 +2304,11 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                               placeholder="Enter amount"
                             />
                           </td>
+                          <td className="px-4 py-4 text-right">
+                            <div className="w-24 px-2 py-1 text-right font-medium text-gray-900 dark:text-white">
+                              {formatCurrency((parseFloat(item.qty) || 0) * (parseFloat(item.amount) || 0))}
+                            </div>
+                          </td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
                               <button
@@ -2222,7 +2324,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                           No items in bill. Click "Add Item" to manually add bill items (optional).
                         </td>
                       </tr>
@@ -2241,18 +2343,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                     type="date"
                     value={formData.bill.orderDate}
                     onChange={(e) => handleFormChange('bill', 'orderDate', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.bill.deliveryDate}
-                    onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
+                    onKeyDown={handleOrderDateKeyDown}
                     className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -2263,27 +2354,50 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                 <input
                   type="number"
                   value={formData.bill.total}
-                  onChange={(e) => handleFormChange('bill', 'total', parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-default focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Advance (-)</label>
                 <input
+                  ref={advanceInputRef}
                   type="text"
                   value={formData.bill.advance === 0 || formData.bill.advance === '' ? '' : String(formData.bill.advance)}
                   onChange={(e) => handleFormChange('bill', 'advance', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyDown={handleAdvanceKeyDown}
+                  className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    advanceError 
+                      ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
                 />
+                {advanceError && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{advanceError}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Balance Amount</label>
                 <input
                   type="number"
                   value={formData.bill.balance}
-                  onChange={(e) => handleFormChange('bill', 'balance', parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white cursor-default focus:outline-none"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Date</label>
+                <div className="relative">
+                  <input
+                    ref={deliveryDateInputRef}
+                    type="date"
+                    value={formData.bill.deliveryDate}
+                    onChange={(e) => handleFormChange('bill', 'deliveryDate', e.target.value)}
+                    onKeyDown={handleDeliveryDateKeyDown}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Method</label>

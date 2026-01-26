@@ -256,7 +256,7 @@ export default function Materials() {
                 }
                 body {
                   font-family: Arial, sans-serif;
-                  font-size: 9px;
+                  font-size: 16px;
                   line-height: 1.25;
                   margin: 0;
                   padding: 0;
@@ -287,12 +287,12 @@ export default function Materials() {
                 }
                 .header h1 {
                   margin: 0 0 2px 0;
-                  font-size: 14px;
+                  font-size: 16px;
                   color: #111;
                 }
                 .header p {
                   margin: 1px 0;
-                  font-size: 9px;
+                  font-size: 16px;
                   color: #444;
                 }
 
@@ -304,52 +304,76 @@ export default function Materials() {
                   margin-bottom: 8mm;
                   padding-bottom: 4mm;
                   border-bottom: 0.5px solid #ccc;
+                  gap: 4mm;
                 }
                 .measurement-left {
                   flex: 1;
                   min-width: 0;
+                  max-width: calc(100% - 60mm);
+                  overflow: hidden;
                 }
                 .material-name {
                   font-weight: 600;
-                  font-size: 10px;
+                  font-size: 16px;
                   margin-bottom: 2mm;
                   color: #111;
                 }
+                .notes {
+                  font-size: 16px;
+                  color: #555;
+                  margin-bottom: 2mm;
+                  line-height: 1.4;
+                  word-wrap: break-word;
+                  word-break: break-word;
+                  overflow-wrap: break-word;
+                  max-width: 100%;
+                }
                 .measurement-values {
-                  font-size: 10px;
+                  font-size: 16px;
                   color: #333;
                   white-space: nowrap;
+                  margin-top: 2mm;
                 }
                 .measurement-right {
                   display: flex;
-                  flex-direction: row;
-                  align-items: flex-start;
-                  gap: 8mm;
+                  flex-direction: column;
+                  align-items: flex-end;
+                  gap: 3mm;
+                  width: 50mm;
                   min-width: 50mm;
+                  max-width: 50mm;
+                  flex-shrink: 0;
                   padding-left: 4mm;
                 }
                 .cutter-stitcher {
                   display: flex;
                   flex-direction: column;
                   gap: 0;
-                  font-size: 8px;
-                  align-items: flex-start;
+                  font-size: 16px;
+                  align-items: flex-end;
+                }
+                .cutter-stitcher > div {
+                  display: flex;
+                  align-items: baseline;
+                  white-space: nowrap;
                 }
                 .cutter-stitcher-label {
                   font-weight: 600;
-                  margin-bottom: 1mm;
                 }
                 .cutter-stitcher-line {
+                  display: inline-block;
                   border-bottom: 0.5px solid #000;
-                  width: 20mm;
-                  height: 4mm;
+                  width: 25mm;
+                  height: 1em;
+                  margin-left: 2mm;
+                  vertical-align: baseline;
                 }
 
                 /* Footer */
                 .footer {
                   margin-top: 6mm;
                   text-align: center;
-                  font-size: 8px;
+                  font-size: 16px;
                   color: #555;
                   border-top: 0.6px solid #bbb;
                   padding-top: 3mm;
@@ -399,20 +423,37 @@ export default function Materials() {
                     ].filter(val => val !== "")
                      .join(" - ");
                     
+                    // Collect notes and join with hyphens
+                    const notes = [
+                      measurement.note1,
+                      measurement.note2,
+                      measurement.note3,
+                      measurement.note4
+                    ].filter(note => note && note.trim() !== "");
+                    
+                    const notesHtml = notes.length > 0 
+                      ? `<div class="notes">${notes.join(" - ")}</div>`
+                      : '';
+                    
                     return `
                       <div class="measurement-item">
                         <div class="measurement-left">
                           <div class="material-name">${measurement.material_name || "Material"}</div>
                           <div class="measurement-values">${measurementValues || ""}</div>
+                          ${notesHtml}
                         </div>
                         <div class="measurement-right">
                           <div class="cutter-stitcher">
-                            <div class="cutter-stitcher-label">Cutter</div>
-                            <div class="cutter-stitcher-line"></div>
+                            <div>
+                              <span class="cutter-stitcher-label">Cutter</span>
+                              <span class="cutter-stitcher-line"></span>
+                            </div>
                           </div>
                           <div class="cutter-stitcher">
-                            <div class="cutter-stitcher-label">Stitcher</div>
-                            <div class="cutter-stitcher-line"></div>
+                            <div>
+                              <span class="cutter-stitcher-label">Stitcher</span>
+                              <span class="cutter-stitcher-line"></span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -565,7 +606,7 @@ export default function Materials() {
                   }
                   body {
                     font-family: Arial, sans-serif;
-                    font-size: 9px;
+                    font-size: 16px;
                     line-height: 1.25;
                     margin: 0;
                     padding: 0;
@@ -594,12 +635,12 @@ export default function Materials() {
                   }
                   .header h1 {
                     margin: 0 0 2px 0;
-                    font-size: 14px;
+                    font-size: 16px;
                     color: #111;
                   }
                   .header p {
                     margin: 1px 0;
-                    font-size: 9px;
+                    font-size: 16px;
                     color: #444;
                   }
                   /* Measurement Items */
@@ -610,50 +651,74 @@ export default function Materials() {
                     margin-bottom: 8mm;
                     padding-bottom: 4mm;
                     border-bottom: 0.5px solid #ccc;
+                    gap: 4mm;
                   }
                   .measurement-left {
                     flex: 1;
                     min-width: 0;
+                    max-width: calc(100% - 60mm);
+                    overflow: hidden;
                   }
                   .material-name {
                     font-weight: 600;
-                    font-size: 10px;
+                    font-size: 16px;
                     margin-bottom: 2mm;
                     color: #111;
                   }
+                  .notes {
+                    font-size: 16px;
+                    color: #555;
+                    margin-bottom: 2mm;
+                    line-height: 1.4;
+                    word-wrap: break-word;
+                    word-break: break-word;
+                    overflow-wrap: break-word;
+                    max-width: 100%;
+                  }
                   .measurement-values {
-                    font-size: 10px;
+                    font-size: 16px;
                     color: #333;
                     white-space: nowrap;
+                    margin-top: 2mm;
                   }
                   .measurement-right {
                     display: flex;
-                    flex-direction: row;
-                    align-items: flex-start;
-                    gap: 8mm;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 3mm;
+                    width: 50mm;
                     min-width: 50mm;
+                    max-width: 50mm;
+                    flex-shrink: 0;
                     padding-left: 4mm;
                   }
                   .cutter-stitcher {
                     display: flex;
                     flex-direction: column;
                     gap: 0;
-                    font-size: 8px;
-                    align-items: flex-start;
+                    font-size: 16px;
+                    align-items: flex-end;
+                  }
+                  .cutter-stitcher > div {
+                    display: flex;
+                    align-items: baseline;
+                    white-space: nowrap;
                   }
                   .cutter-stitcher-label {
                     font-weight: 600;
-                    margin-bottom: 1mm;
                   }
                   .cutter-stitcher-line {
+                    display: inline-block;
                     border-bottom: 0.5px solid #000;
-                    width: 20mm;
-                    height: 4mm;
+                    width: 25mm;
+                    height: 1em;
+                    margin-left: 2mm;
+                    vertical-align: baseline;
                   }
                   .footer {
                     margin-top: 6mm;
                     text-align: center;
-                    font-size: 8px;
+                    font-size: 16px;
                     color: #555;
                     border-top: 0.6px solid #bbb;
                     padding-top: 3mm;
@@ -701,20 +766,37 @@ export default function Materials() {
                       ].filter(val => val !== "")
                        .join(" - ");
                       
+                      // Collect notes and join with hyphens
+                      const notes = [
+                        measurement.note1,
+                        measurement.note2,
+                        measurement.note3,
+                        measurement.note4
+                      ].filter(note => note && note.trim() !== "");
+                      
+                      const notesHtml = notes.length > 0 
+                        ? `<div class="notes">${notes.join(" - ")}</div>`
+                        : '';
+                      
                       return `
                         <div class="measurement-item">
                           <div class="measurement-left">
                             <div class="material-name">${measurement.material_name || "Material"}</div>
                             <div class="measurement-values">${measurementValues || ""}</div>
+                            ${notesHtml}
                           </div>
                           <div class="measurement-right">
                             <div class="cutter-stitcher">
-                              <div class="cutter-stitcher-label">Cutter</div>
-                              <div class="cutter-stitcher-line"></div>
+                              <div>
+                                <span class="cutter-stitcher-label">Cutter</span>
+                                <span class="cutter-stitcher-line"></span>
+                              </div>
                             </div>
                             <div class="cutter-stitcher">
-                              <div class="cutter-stitcher-label">Stitcher</div>
-                              <div class="cutter-stitcher-line"></div>
+                              <div>
+                                <span class="cutter-stitcher-label">Stitcher</span>
+                                <span class="cutter-stitcher-line"></span>
+                              </div>
                             </div>
                           </div>
                         </div>

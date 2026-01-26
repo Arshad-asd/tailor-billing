@@ -61,6 +61,10 @@ def sync_customer_measurements(job_order):
                 'ardh_f_kum': job_measurement.ardh_f_kum,
                 'jamba': job_measurement.jamba,
                 'ragab': job_measurement.ragab,
+                'note1': job_measurement.note1,
+                'note2': job_measurement.note2,
+                'note3': job_measurement.note3,
+                'note4': job_measurement.note4,
             }
         )
         
@@ -72,5 +76,9 @@ def sync_customer_measurements(job_order):
             customer_measurement.ardh_f_kum = job_measurement.ardh_f_kum
             customer_measurement.jamba = job_measurement.jamba
             customer_measurement.ragab = job_measurement.ragab
+            customer_measurement.note1 = job_measurement.note1
+            customer_measurement.note2 = job_measurement.note2
+            customer_measurement.note3 = job_measurement.note3
+            customer_measurement.note4 = job_measurement.note4
             customer_measurement.is_active = True
             customer_measurement.save()
