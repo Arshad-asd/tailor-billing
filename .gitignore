@@ -21,3 +21,11 @@ backend/core/.env
 # SQLite database
 *.sqlite3
 *.db
+logs/
+*.log
+
+# Tailor Billing Manager - Build artifacts
+tailor-billing-manager/build/
+tailor-billing-manager/dist/
+tailor-billing-manager/*.spec
+tailor-billing-manager/__pycache__/

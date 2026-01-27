@@ -1,0 +1,10 @@
+# Requirements for Tailor Billing Manager GUI Application
+# Most dependencies are built-in Python modules
+
+# For building executable
+pyinstaller>=6.0.0
+
+# Optional: For better UI (if you want to upgrade later)
+# PyQt5>=5.15.0
+# or
+# PySide6>=6.0.0
