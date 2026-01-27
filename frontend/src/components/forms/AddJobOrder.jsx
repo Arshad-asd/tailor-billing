@@ -282,15 +282,13 @@ export default function AddJobOrder({ onClose, onSuccess }) {
     setBillItems(prevItems => {
       return prevItems.map(item => {
         if (item.sl === itemSl) {
-          // Only set default remarks if remarks is empty or undefined
+          // Preserve existing remarks, don't auto-fill default
           const currentRemarks = item.remarks || '';
-          const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
           return {
             ...item,
             itemName: materialName,
             material_id: materialId,
-            // Preserve existing remarks, only set default if empty
-            remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+            remarks: currentRemarks
           };
         }
         return item;
@@ -913,15 +911,13 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           const updatedBillItems = prevItems.map(item => {
             if (item.sl === linkingItemSl) {
               // Keep existing fees and amount - user will enter manually
-              // Only set default remarks if remarks is empty or undefined
+              // Preserve existing remarks, don't auto-fill default
               const currentRemarks = item.remarks || '';
-              const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
               return {
                 ...item,
                 material_id: materialId,
                 itemName: item.itemName === 'New Item' ? material.name : item.itemName,
-                // Preserve existing remarks, only set default if empty
-                remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+                remarks: currentRemarks
               };
             }
             return item;
@@ -949,7 +945,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       const newBillItem = {
         sl: billItems.length + 1,
         itemName: material.name,
-        remarks: 'Custom tailoring service',
+        remarks: '', // Empty by default, user will enter manually
         qty: qty,
         fees: fees,
         amount: amount,
