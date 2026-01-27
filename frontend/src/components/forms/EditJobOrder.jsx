@@ -112,26 +112,51 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         
         // Set customer data
         if (jobOrder.customer) {
-          // Create customer object from available data
-          const customerData = {
-            id: jobOrder.customer,
-            customer_id: jobOrder.customer.toString(),
-            name: jobOrder.customer_name || '',
-            phone: jobOrder.customer_phone || '',
-            balance: 0 // Default balance since it's not in the response
-          };
-          
-          setSelectedCustomer(customerData);
-          setFormData(prev => ({
-            ...prev,
-            customer: {
-              customerNo: customerData.customer_id,
-              customerName: customerData.name,
-              customerReference: customerData.customer_id,
-              mobileNo: customerData.phone,
-              currentBalance: safeParseFloat(customerData.balance, 0)
-            }
-          }));
+          // Fetch customer details to get balance
+          try {
+            const customerDetails = await customerApi.getCustomer(jobOrder.customer);
+            const customerData = {
+              id: customerDetails.id || jobOrder.customer,
+              customer_id: customerDetails.customer_id || jobOrder.customer.toString(),
+              name: customerDetails.name || jobOrder.customer_name || '',
+              phone: customerDetails.phone || jobOrder.customer_phone || '',
+              balance: customerDetails.balance || 0
+            };
+            
+            setSelectedCustomer(customerData);
+            setFormData(prev => ({
+              ...prev,
+              customer: {
+                customerNo: customerData.customer_id,
+                customerName: customerData.name,
+                customerReference: customerData.customer_id,
+                mobileNo: customerData.phone,
+                currentBalance: safeParseFloat(customerData.balance, 0)
+              }
+            }));
+          } catch (error) {
+            console.error('Error fetching customer details:', error);
+            // Fallback to job order data if customer fetch fails
+            const customerData = {
+              id: jobOrder.customer,
+              customer_id: jobOrder.customer.toString(),
+              name: jobOrder.customer_name || '',
+              phone: jobOrder.customer_phone || '',
+              balance: 0
+            };
+            
+            setSelectedCustomer(customerData);
+            setFormData(prev => ({
+              ...prev,
+              customer: {
+                customerNo: customerData.customer_id,
+                customerName: customerData.name,
+                customerReference: customerData.customer_id,
+                mobileNo: customerData.phone,
+                currentBalance: safeParseFloat(customerData.balance, 0)
+              }
+            }));
+          }
         }
 
         // Set bill data
@@ -160,14 +185,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         if (jobOrder.job_order_items) {
           const items = jobOrder.job_order_items.map((item, index) => {
             const qty = parseInt(item.quantity) || 1;
-            const fees = parseFloat(item.fees) || 0;
-            const amount = parseFloat(item.total_amount) || (fees * qty);
+            // Use amount field, fallback to calculating from sub_total if amount not available
+            const amount = parseFloat(item.amount) || (item.sub_total ? parseFloat(item.sub_total) / qty : 0);
             return {
               sl: index + 1,
               itemName: item.material_name || 'Item',
               remarks: item.remarks || 'Custom tailoring service',
               qty: qty.toString(), // Convert to string for text input
-              fees: fees,
               amount: amount === 0 ? '' : amount.toString(), // Convert to string, empty if 0
               material_id: item.material
             };
@@ -762,16 +786,29 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     }
   };
 
-  const handleSelectCustomer = (customer) => {
-    setSelectedCustomer(customer);
+  const handleSelectCustomer = async (customer) => {
+    // If balance is not in the customer object, fetch full customer details
+    let customerWithBalance = customer;
+    if (customer.id && (customer.balance === undefined || customer.balance === null)) {
+      try {
+        const fullCustomerDetails = await customerApi.getCustomer(customer.id);
+        customerWithBalance = { ...customer, balance: fullCustomerDetails.balance || 0 };
+      } catch (error) {
+        console.error('Error fetching customer balance:', error);
+        // Use customer as-is if fetch fails
+        customerWithBalance = { ...customer, balance: 0 };
+      }
+    }
+    
+    setSelectedCustomer(customerWithBalance);
     setFormData(prev => ({
       ...prev,
       customer: {
-        customerNo: customer.customer_id || '',
-        customerName: customer.name || '',
-        customerReference: customer.customer_id || '',
-        mobileNo: customer.phone || '',
-        currentBalance: safeParseFloat(customer.balance, 0)
+        customerNo: customerWithBalance.customer_id || '',
+        customerName: customerWithBalance.name || '',
+        customerReference: customerWithBalance.customer_id || '',
+        mobileNo: customerWithBalance.phone || '',
+        currentBalance: safeParseFloat(customerWithBalance.balance, 0)
       }
     }));
   };
@@ -1392,12 +1429,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           }
           const quantity = parseInt(item.qty) || 1;
           const amount = parseFloat(item.amount) || 0;
-          // Calculate fees from amount: fees = amount / quantity
-          const fees = quantity > 0 ? amount / quantity : 0;
+          // Calculate sub_total: sub_total = quantity * amount
+          const sub_total = quantity * amount;
           return {
             material: materialId,
             quantity: quantity,
-            fees: fees
+            amount: amount,
+            sub_total: sub_total
           };
         }) : [] // Send empty array to delete all items
       };
@@ -1465,12 +1503,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           }
           const quantity = parseInt(item.qty) || 1;
           const amount = parseFloat(item.amount) || 0;
-          // Calculate fees from amount: fees = amount / quantity
-          const fees = quantity > 0 ? amount / quantity : 0;
+          // Calculate sub_total: sub_total = quantity * amount
+          const sub_total = quantity * amount;
           return {
             material: materialId,
             quantity: quantity,
-            fees: fees
+            amount: amount,
+            sub_total: sub_total
           };
         }) : [], // Send empty array to delete all items
         job_order_measurements: selectedMaterials.map(material => {
@@ -1734,7 +1773,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Balance</label>
               <div className="w-full px-3 py-2 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-lg flex items-center justify-between">
-                <span className="text-yellow-800 dark:text-yellow-200 font-medium">${formatCurrency(formData.customer.currentBalance)}</span>
+                <span className="text-yellow-800 dark:text-yellow-200 font-medium">QAR {formatCurrency(formData.customer.currentBalance)}</span>
                 <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               </div>
             </div>

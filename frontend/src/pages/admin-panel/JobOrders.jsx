@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, AlertCircle, DollarSign, Printer } from "lucide-react"
+import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, AlertCircle, DollarSign, Printer, User, Ruler, Calculator, Calendar } from "lucide-react"
 import AddJobOrder from "../../components/forms/AddJobOrder"
 import EditJobOrder from "../../components/forms/EditJobOrder"
 import jobOrdersApi from "../../services/jobOrdersApi"
@@ -99,8 +99,8 @@ export default function JobOrders() {
       items = order.job_order_items.map(item => ({
         description: item.material_name || "خدمة خياطة",
         qty: parseInt(item.quantity) || 1,
-        unitPrice: safeParseFloat(item.fees) || 0,
-        amount: safeParseFloat(item.total_amount) || (safeParseFloat(item.fees) * (parseInt(item.quantity) || 1))
+        unitPrice: safeParseFloat(item.amount) || 0,
+        amount: safeParseFloat(item.sub_total) || (safeParseFloat(item.amount) * (parseInt(item.quantity) || 1))
       }))
     } else {
       // Fallback to single item with remarks if no items exist
@@ -772,8 +772,16 @@ export default function JobOrders() {
     setEditingJobOrderId(null)
   }
 
-  const openOrderDetail = (order) => {
-    setSelectedOrder(order)
+  const openOrderDetail = async (order) => {
+    // Fetch full job order details to ensure we have all information
+    try {
+      const fullOrder = await jobOrdersApi.getJobOrder(order.id)
+      setSelectedOrder(fullOrder)
+    } catch (error) {
+      console.error('Error fetching job order details:', error)
+      // Fallback to the order from the list if fetch fails
+      setSelectedOrder(order)
+    }
     setIsDetailModalOpen(true)
   }
 
@@ -986,7 +994,7 @@ export default function JobOrders() {
 
       {/* Print Modal */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-sm flex items-center justify-center z-[60]">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Print Copy</h3>
             <div className="flex gap-4">
@@ -1018,6 +1026,289 @@ export default function JobOrders() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Job Order Detail Modal */}
+      {isDetailModalOpen && selectedOrder && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Job Order Details
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {selectedOrder.job_order_number}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePrintOrder(selectedOrder)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                  title="Print"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDetailModalOpen(false)
+                    setSelectedOrder(null)
+                  }}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Customer Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                  <User className="w-5 h-5" />
+                  <span>Customer Information</span>
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Customer Name</label>
+                    <p className="text-gray-900 dark:text-white font-medium">{selectedOrder.customer_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Customer ID</label>
+                    <p className="text-gray-900 dark:text-white font-medium">{selectedOrder.customer_id || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone</label>
+                    <p className="text-gray-900 dark:text-white font-medium">{selectedOrder.customer_phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
+                      {getStatusIcon(selectedOrder.status)}
+                      <span className="ml-1 capitalize">{selectedOrder.status?.replace("-", " ") || 'N/A'}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Measurements */}
+              {selectedOrder.job_order_measurements && selectedOrder.job_order_measurements.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                    <Ruler className="w-5 h-5" />
+                    <span>Measurements</span>
+                  </h3>
+                  <div className="space-y-4">
+                    {selectedOrder.job_order_measurements.map((measurement, index) => (
+                      <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                          {measurement.material_name || `Material ${index + 1}`}
+                        </h4>
+                        <div className="grid grid-cols-6 gap-4 text-sm">
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Thool</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.thool || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Kethef</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.kethet || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Thool Kum</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.thool_kum || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Ardh F Kum</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.ardh_f_kum || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Jamba</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.jamba || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600 dark:text-gray-400">Ragab</label>
+                            <p className="text-gray-900 dark:text-white font-medium">{measurement.ragab || 'N/A'}</p>
+                          </div>
+                        </div>
+                        {(measurement.note1 || measurement.note2 || measurement.note3 || measurement.note4) && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              {measurement.note1 && (
+                                <div>
+                                  <label className="text-gray-600 dark:text-gray-400">Note 1</label>
+                                  <p className="text-gray-900 dark:text-white">{measurement.note1}</p>
+                                </div>
+                              )}
+                              {measurement.note2 && (
+                                <div>
+                                  <label className="text-gray-600 dark:text-gray-400">Note 2</label>
+                                  <p className="text-gray-900 dark:text-white">{measurement.note2}</p>
+                                </div>
+                              )}
+                              {measurement.note3 && (
+                                <div>
+                                  <label className="text-gray-600 dark:text-gray-400">Note 3</label>
+                                  <p className="text-gray-900 dark:text-white">{measurement.note3}</p>
+                                </div>
+                              )}
+                              {measurement.note4 && (
+                                <div>
+                                  <label className="text-gray-600 dark:text-gray-400">Note 4</label>
+                                  <p className="text-gray-900 dark:text-white">{measurement.note4}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Order Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                  <Calendar className="w-5 h-5" />
+                  <span>Order Information</span>
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Order Date</label>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Delivery Date</label>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      {selectedOrder.delivery_date ? new Date(selectedOrder.delivery_date).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Items */}
+              {selectedOrder.job_order_items && selectedOrder.job_order_items.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                    <Calculator className="w-5 h-5" />
+                    <span>Order Items</span>
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 dark:bg-gray-600">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Item</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Quantity</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                        {selectedOrder.job_order_items.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <td className="px-4 py-3 text-gray-900 dark:text-white">
+                              {item.material_name || 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 text-center text-gray-900 dark:text-white">
+                              {item.quantity || 0}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white">
+                              {formatCurrency(item.amount || 0)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-white font-medium">
+                              {formatCurrency(item.sub_total || 0)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-100 dark:bg-gray-600">
+                        <tr>
+                          <td colSpan="3" className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                            Total:
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                            {formatCurrency(selectedOrder.total_amount || 0)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5" />
+                  <span>Payment Information</span>
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</label>
+                    <p className="text-gray-900 dark:text-white font-medium text-lg">
+                      {formatCurrency(selectedOrder.total_amount || 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Advance Amount</label>
+                    <p className="text-gray-900 dark:text-white font-medium text-lg">
+                      {formatCurrency(selectedOrder.advance_amount || 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Balance Amount</label>
+                    <p className="text-gray-900 dark:text-white font-medium text-lg">
+                      {formatCurrency(selectedOrder.balance_amount || 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Method</label>
+                    <p className="text-gray-900 dark:text-white font-medium capitalize">
+                      {selectedOrder.payment_method?.replace('_', ' ') || 'N/A'}
+                    </p>
+                  </div>
+                  {selectedOrder.payment_method === 'cash_card' && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Cash Amount</label>
+                        <p className="text-gray-900 dark:text-white font-medium">
+                          {formatCurrency(selectedOrder.cash_amount || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Card Amount</label>
+                        <p className="text-gray-900 dark:text-white font-medium">
+                          {formatCurrency(selectedOrder.card_amount || 0)}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {selectedOrder.recived_on_delivery_amount > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Received on Delivery</label>
+                      <p className="text-gray-900 dark:text-white font-medium">
+                        {formatCurrency(selectedOrder.recived_on_delivery_amount || 0)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Remarks */}
+              {selectedOrder.remarks && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Remarks</h3>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedOrder.remarks}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -18,8 +18,8 @@ class JobOrderItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = jobOrderItem
-        fields = ['id', 'material', 'material_name', 'material_price', 'quantity', 'fees', 'total_amount', 'is_active']
-        read_only_fields = ['id', 'total_amount']
+        fields = ['id', 'material', 'material_name', 'material_price', 'quantity', 'amount', 'sub_total', 'is_active']
+        read_only_fields = ['id', 'sub_total']
 
 
 class JobOrderMeasurementSerializer(serializers.ModelSerializer):
@@ -138,8 +138,8 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Invalid material ID: {material_id}. Expected an integer, got {type(material_id).__name__}")
                 
                 quantity = item_data['quantity']
-                fees = item_data['fees']
-                total_amount = quantity * fees
+                amount = item_data['amount']
+                sub_total = quantity * amount
                 
                 # Get the Material object
                 try:
@@ -151,8 +151,8 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
                     job_order=job_order,
                     material=material,
                     quantity=quantity,
-                    fees=fees,
-                    total_amount=total_amount
+                    amount=amount,
+                    sub_total=sub_total
                 )
         
         # Create job order measurements
@@ -272,8 +272,8 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Invalid material ID: {material_id}. Expected an integer, got {type(material_id).__name__}")
                 
                 quantity = item_data['quantity']
-                fees = item_data['fees']
-                total_amount = quantity * fees
+                amount = item_data['amount']
+                sub_total = quantity * amount
                 
                 # Get the Material object
                 try:
@@ -285,8 +285,8 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                     job_order=instance,
                     material=material,
                     quantity=quantity,
-                    fees=fees,
-                    total_amount=total_amount
+                    amount=amount,
+                    sub_total=sub_total
                 )
         
         # Update job order measurements if provided

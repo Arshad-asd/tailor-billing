@@ -606,8 +606,8 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                             raise serializers.ValidationError(f"Invalid material ID: {material_id}")
                         
                         quantity = item_data['quantity']
-                        fees = item_data['fees']
-                        total_amount = quantity * fees
+                        amount = item_data['amount']
+                        sub_total = quantity * amount
                         
                         try:
                             material = Material.objects.get(id=material_id)
@@ -618,8 +618,8 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                             job_order=job_order,
                             material=material,
                             quantity=quantity,
-                            fees=fees,
-                            total_amount=total_amount
+                            amount=amount,
+                            sub_total=sub_total
                         )
                 
                 serializer = JobOrderListSerializer(job_order)

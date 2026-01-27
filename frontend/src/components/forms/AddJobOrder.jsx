@@ -555,15 +555,28 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   }, []); // Only run on mount
 
   const handleSelectCustomer = async (customer) => {
-    setSelectedCustomer(customer);
+    // If balance is not in the customer object, fetch full customer details
+    let customerWithBalance = customer;
+    if (customer.id && (customer.balance === undefined || customer.balance === null)) {
+      try {
+        const fullCustomerDetails = await customerApi.getCustomer(customer.id);
+        customerWithBalance = { ...customer, balance: fullCustomerDetails.balance || 0 };
+      } catch (error) {
+        console.error('Error fetching customer balance:', error);
+        // Use customer as-is if fetch fails
+        customerWithBalance = { ...customer, balance: 0 };
+      }
+    }
+    
+    setSelectedCustomer(customerWithBalance);
     setFormData(prev => ({
       ...prev,
       customer: {
-        customerNo: customer.customer_id || '',
-        customerName: customer.name || '',
-        customerReference: customer.customer_id || '',
-        mobileNo: customer.phone || '',
-        currentBalance: safeParseFloat(customer.balance, 0)
+        customerNo: customerWithBalance.customer_id || '',
+        customerName: customerWithBalance.name || '',
+        customerReference: customerWithBalance.customer_id || '',
+        mobileNo: customerWithBalance.phone || '',
+        currentBalance: safeParseFloat(customerWithBalance.balance, 0)
       }
     }));
 
@@ -1079,12 +1092,13 @@ export default function AddJobOrder({ onClose, onSuccess }) {
             }
             const quantity = parseInt(item.qty) || 1;
             const amount = parseFloat(item.amount) || 0;
-            // Calculate fees from amount: fees = amount / quantity
-            const fees = quantity > 0 ? amount / quantity : 0;
+            // Calculate sub_total: sub_total = quantity * amount
+            const sub_total = quantity * amount;
             return {
               material: materialId,
               quantity: quantity,
-              fees: fees
+              amount: amount,
+              sub_total: sub_total
             };
           })
         }),
@@ -1348,7 +1362,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Balance</label>
               <div className="w-full px-3 py-2 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-lg flex items-center justify-between">
-                <span className="text-yellow-800 dark:text-yellow-200 font-medium">${formatCurrency(formData.customer.currentBalance)}</span>
+                <span className="text-yellow-800 dark:text-yellow-200 font-medium">QAR {formatCurrency(formData.customer.currentBalance)}</span>
                 <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               </div>
             </div>
