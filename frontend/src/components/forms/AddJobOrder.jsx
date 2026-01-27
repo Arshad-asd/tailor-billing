@@ -266,7 +266,8 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const handleBillItemNameChange = (itemSl, value) => {
     const updatedBillItems = billItems.map(item => {
       if (item.sl === itemSl) {
-        return { ...item, itemName: value };
+        // Clear material_id when user starts typing to allow new search
+        return { ...item, itemName: value, material_id: undefined };
       }
       return item;
     });
@@ -278,19 +279,25 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const handleBillItemNameSelect = (itemSl, material) => {
     const materialId = material.id || material.material_id;
     const materialName = material.name;
-    const updatedBillItems = billItems.map(item => {
-      if (item.sl === itemSl) {
-        return {
-          ...item,
-          itemName: materialName,
-          material_id: materialId
-        };
-      }
-      return item;
+    setBillItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.sl === itemSl) {
+          // Only set default remarks if remarks is empty or undefined
+          const currentRemarks = item.remarks || '';
+          const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
+          return {
+            ...item,
+            itemName: materialName,
+            material_id: materialId,
+            // Preserve existing remarks, only set default if empty
+            remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+          };
+        }
+        return item;
+      });
     });
-    setBillItems(updatedBillItems);
-    // Set search query to selected material name so it displays in the input
-    setBillItemNameSearchQueries(prev => ({ ...prev, [itemSl]: materialName }));
+    // Clear search query to prevent dropdown from showing again
+    setBillItemNameSearchQueries(prev => ({ ...prev, [itemSl]: '' }));
     setShowBillItemNameDropdowns(prev => ({ ...prev, [itemSl]: false }));
     setBillItemNameSearchResults(prev => ({ ...prev, [itemSl]: [] }));
     // Focus on remarks input after dropdown closes
@@ -301,13 +308,14 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
   // Handle bill item remarks change
   const handleBillItemRemarksChange = (itemSl, value) => {
-    const updatedBillItems = billItems.map(item => {
-      if (item.sl === itemSl) {
-        return { ...item, remarks: value };
-      }
-      return item;
+    setBillItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.sl === itemSl) {
+          return { ...item, remarks: value || '' };
+        }
+        return item;
+      });
     });
-    setBillItems(updatedBillItems);
   };
 
   // Handle Enter key navigation in bill items
@@ -632,6 +640,14 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           
           // Set the materials
           handleMaterialsChange(materialsFromMeasurements);
+          
+          // Automatically lock all auto-selected materials (make them read-only)
+          const autoSelectedMaterialIds = materialsFromMeasurements.map(m => m.id);
+          setLockedMaterialIds(prev => {
+            // Combine existing locked IDs with new auto-selected ones, avoiding duplicates
+            const combined = [...prev, ...autoSelectedMaterialIds];
+            return [...new Set(combined)]; // Remove duplicates
+          });
         }
       } catch (error) {
         console.error('Error fetching customer measurements:', error);
@@ -893,19 +909,26 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       if (linkingItemSl !== null) {
         // Link material to existing item
         const materialId = material.id || material.material_id;
-        const updatedBillItems = billItems.map(item => {
-          if (item.sl === linkingItemSl) {
-            // Keep existing fees and amount - user will enter manually
-            return {
-              ...item,
-              material_id: materialId,
-              itemName: item.itemName === 'New Item' ? material.name : item.itemName
-            };
-          }
-          return item;
+        setBillItems(prevItems => {
+          const updatedBillItems = prevItems.map(item => {
+            if (item.sl === linkingItemSl) {
+              // Keep existing fees and amount - user will enter manually
+              // Only set default remarks if remarks is empty or undefined
+              const currentRemarks = item.remarks || '';
+              const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
+              return {
+                ...item,
+                material_id: materialId,
+                itemName: item.itemName === 'New Item' ? material.name : item.itemName,
+                // Preserve existing remarks, only set default if empty
+                remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+              };
+            }
+            return item;
+          });
+          updateBillTotal(updatedBillItems);
+          return updatedBillItems;
         });
-        setBillItems(updatedBillItems);
-        updateBillTotal(updatedBillItems);
         setLinkingItemSl(null);
         setIsMaterialSearchOpen(false);
         
@@ -1098,7 +1121,8 @@ export default function AddJobOrder({ onClose, onSuccess }) {
               material: materialId,
               quantity: quantity,
               amount: amount,
-              sub_total: sub_total
+              sub_total: sub_total,
+              remarks: item.remarks || ''
             };
           })
         }),
@@ -1740,10 +1764,16 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                                 <input
                                   ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].itemName = el; } }}
                                   type="text"
-                                  value={billItemNameSearchQueries[item.sl] !== undefined ? billItemNameSearchQueries[item.sl] : item.itemName}
+                                  value={
+                                    // If material is selected, show itemName; otherwise show search query or itemName
+                                    item.material_id && !billItemNameSearchQueries[item.sl] 
+                                      ? item.itemName 
+                                      : (billItemNameSearchQueries[item.sl] !== undefined ? billItemNameSearchQueries[item.sl] : item.itemName)
+                                  }
                                   onChange={(e) => handleBillItemNameChange(item.sl, e.target.value)}
                                   onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'itemName', e)}
                                   onFocus={() => {
+                                    // Only show dropdown if there's an active search query with results
                                     if (billItemNameSearchQueries[item.sl]?.trim() && billItemNameSearchResults[item.sl]?.length > 0) {
                                       setShowBillItemNameDropdowns(prev => ({ ...prev, [item.sl]: true }));
                                     }
@@ -1807,7 +1837,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             <input
                               ref={(el) => { if (el) { if (!billItemInputRefs.current[item.sl]) billItemInputRefs.current[item.sl] = {}; billItemInputRefs.current[item.sl].remarks = el; } }}
                               type="text"
-                              value={item.remarks}
+                              value={item.remarks || ''}
                               onChange={(e) => handleBillItemRemarksChange(item.sl, e.target.value)}
                               onKeyDown={(e) => handleBillItemKeyDown(item.sl, 'remarks', e)}
                               placeholder="Remarks..."

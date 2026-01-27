@@ -7,6 +7,7 @@ import { Label } from "../ui/label";
 export default function EditMaterialModal({ open, onClose, onSubmit, editingMaterial = null, loading = false }) {
   const [form, setForm] = useState({
     name: "",
+    arabic_name: "",
     material_number: "",
     price: "",
     is_measurement_required: false,
@@ -16,6 +17,7 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
     if (editingMaterial) {
       setForm({
         name: editingMaterial.name || "",
+        arabic_name: editingMaterial.arabic_name || "",
         material_number: editingMaterial.material_number || "",
         price: editingMaterial.price?.toString() || "",
         is_measurement_required: editingMaterial.is_measurement_required || false,
@@ -33,6 +35,7 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
     e.preventDefault();
     const formData = {
       name: form.name,
+      arabic_name: form.arabic_name || null,
       material_number: form.material_number || null,
       price: parseFloat(form.price) || 0,
       is_measurement_required: form.is_measurement_required,
@@ -68,6 +71,17 @@ export default function EditMaterialModal({ open, onClose, onSubmit, editingMate
                 onChange={handleChange}
                 placeholder="Enter material name"
                 required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="arabic_name">Arabic Name</Label>
+              <Input
+                id="arabic_name"
+                name="arabic_name"
+                value={form.arabic_name}
+                onChange={handleChange}
+                placeholder="Enter Arabic name (optional)"
               />
             </div>
 

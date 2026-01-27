@@ -13,32 +13,53 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 class JobOrderItemSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
+    material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
     material_price = serializers.DecimalField(source='material.price', max_digits=10, decimal_places=2, read_only=True)
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all())
     
     class Meta:
         model = jobOrderItem
-        fields = ['id', 'material', 'material_name', 'material_price', 'quantity', 'amount', 'sub_total', 'is_active']
+        fields = ['id', 'material', 'material_name', 'material_arabic_name', 'material_price', 'quantity', 'amount', 'sub_total', 'remarks', 'is_active']
         read_only_fields = ['id', 'sub_total']
 
 
 class JobOrderMeasurementSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
+    material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all())
     
     class Meta:
         model = jobOrderMeasurement
-        fields = ['id', 'material', 'material_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
+        fields = ['id', 'material', 'material_name', 'material_arabic_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
         read_only_fields = ['id']
 
 
 class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
+    material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
+    material_id = serializers.IntegerField(source='material.id', read_only=True)
+    quantity = serializers.SerializerMethodField()
     
     class Meta:
         model = jobOrderMeasurement
-        fields = ['id', 'material_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
+        fields = ['id', 'material', 'material_id', 'material_name', 'material_arabic_name', 'quantity', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
         read_only_fields = ['id']
+    
+    def get_quantity(self, obj):
+        """Get the total quantity for this material from job order items"""
+        if not obj.job_order:
+            return None
+        
+        # Get all job order items for this job order that match this material
+        items = jobOrderItem.objects.filter(
+            job_order=obj.job_order,
+            material=obj.material,
+            is_active=True
+        )
+        
+        # Sum up all quantities for this material
+        total_quantity = sum(item.quantity for item in items)
+        return total_quantity if total_quantity > 0 else None
 
 
 class JobOrderCreateSerializer(serializers.ModelSerializer):
@@ -140,6 +161,7 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
                 quantity = item_data['quantity']
                 amount = item_data['amount']
                 sub_total = quantity * amount
+                remarks = item_data.get('remarks', '')
                 
                 # Get the Material object
                 try:
@@ -152,7 +174,8 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
                     material=material,
                     quantity=quantity,
                     amount=amount,
-                    sub_total=sub_total
+                    sub_total=sub_total,
+                    remarks=remarks
                 )
         
         # Create job order measurements
@@ -274,6 +297,7 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                 quantity = item_data['quantity']
                 amount = item_data['amount']
                 sub_total = quantity * amount
+                remarks = item_data.get('remarks', '')
                 
                 # Get the Material object
                 try:
@@ -286,7 +310,8 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                     material=material,
                     quantity=quantity,
                     amount=amount,
-                    sub_total=sub_total
+                    sub_total=sub_total,
+                    remarks=remarks
                 )
         
         # Update job order measurements if provided

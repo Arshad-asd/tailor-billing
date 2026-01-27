@@ -134,7 +134,8 @@ export default function Materials() {
     const matchesSearch =
       material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       material.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (material.material_number && material.material_number.toLowerCase().includes(searchTerm.toLowerCase()))
+      (material.material_number && material.material_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (material.arabic_name && material.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()))
     // Note: API materials don't have category field, so we'll skip category filtering for now
     return matchesSearch
   })
@@ -239,6 +240,21 @@ export default function Materials() {
       console.log('Measurements received:', measurements)
 
       if (measurements && measurements.length > 0) {
+        // Create a map of material_id to total quantity from job_order_items
+        const materialQuantityMap = {};
+        if (jobOrder.job_order_items && Array.isArray(jobOrder.job_order_items)) {
+          jobOrder.job_order_items.forEach(item => {
+            const materialId = item.material;
+            if (materialId) {
+              if (materialQuantityMap[materialId]) {
+                materialQuantityMap[materialId] += parseInt(item.quantity) || 0;
+              } else {
+                materialQuantityMap[materialId] = parseInt(item.quantity) || 0;
+              }
+            }
+          });
+        }
+        
         const printContent = `
           <!DOCTYPE html>
           <html>
@@ -305,17 +321,18 @@ export default function Materials() {
                   margin-bottom: 3mm;
                   padding-bottom: 2mm;
                   border-bottom: 0.5px solid #ccc;
-                  gap: 3mm;
+                  gap: 1mm;
                   page-break-inside: avoid;
                   break-inside: avoid;
                   orphans: 3;
                   widows: 3;
                 }
                 .measurement-left {
-                  flex: 1;
+                  flex: 1 1 auto;
                   min-width: 0;
-                  max-width: calc(100% - 45mm);
-                  overflow: hidden;
+                  max-width: calc(100% - 32mm);
+                  overflow: visible;
+                  width: auto;
                 }
                 .material-name {
                   font-weight: 600;
@@ -328,10 +345,24 @@ export default function Materials() {
                   color: #555;
                   margin-bottom: 1mm;
                   line-height: 1.3;
-                  word-wrap: break-word;
-                  word-break: break-word;
-                  overflow-wrap: break-word;
+                  width: 100%;
                   max-width: 100%;
+                }
+                .notes-row {
+                  display: flex;
+                  gap: 1.5mm;
+                  margin-bottom: 0.5mm;
+                  width: 100%;
+                  max-width: 100%;
+                }
+                .notes-row-item {
+                  flex: 1 1 0;
+                  min-width: 0;
+                  max-width: 50%;
+                  word-wrap: break-word;
+                  word-break: normal;
+                  overflow-wrap: break-word;
+                  hyphens: auto;
                 }
                 .measurement-values {
                   font-size: 16px;
@@ -345,11 +376,11 @@ export default function Materials() {
                   flex-direction: column;
                   align-items: flex-end;
                   gap: 3mm;
-                  width: 40mm;
-                  min-width: 40mm;
-                  max-width: 40mm;
+                  width: 30mm;
+                  min-width: 30mm;
+                  max-width: 30mm;
                   flex-shrink: 0;
-                  padding-left: 2mm;
+                  padding-left: 0.5mm;
                 }
                 .cutter-stitcher {
                   display: flex;
@@ -441,22 +472,41 @@ export default function Materials() {
                     ].filter(val => val !== "")
                      .join(" - ");
                     
-                    // Collect notes and join with hyphens
-                    const notes = [
-                      measurement.note1,
-                      measurement.note2,
-                      measurement.note3,
-                      measurement.note4
-                    ].filter(note => note && note.trim() !== "");
+                    // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
+                    const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
+                    const note2 = measurement.note2 && measurement.note2.trim() ? measurement.note2.trim() : "";
+                    const note3 = measurement.note3 && measurement.note3.trim() ? measurement.note3.trim() : "";
+                    const note4 = measurement.note4 && measurement.note4.trim() ? measurement.note4.trim() : "";
                     
-                    const notesHtml = notes.length > 0 
-                      ? `<div class="notes">${notes.join(" - ")}</div>`
-                      : '';
+                    let notesHtml = "";
+                    if (note1 || note2 || note3 || note4) {
+                      notesHtml = '<div class="notes">';
+                      // First row: note1 and note2
+                      if (note1 || note2) {
+                        notesHtml += '<div class="notes-row">';
+                        if (note1) notesHtml += `<div class="notes-row-item">${note1}</div>`;
+                        if (note2) notesHtml += `<div class="notes-row-item">${note2}</div>`;
+                        notesHtml += '</div>';
+                      }
+                      // Second row: note3 and note4
+                      if (note3 || note4) {
+                        notesHtml += '<div class="notes-row">';
+                        if (note3) notesHtml += `<div class="notes-row-item">${note3}</div>`;
+                        if (note4) notesHtml += `<div class="notes-row-item">${note4}</div>`;
+                        notesHtml += '</div>';
+                      }
+                      notesHtml += '</div>';
+                    }
+                    
+                    // Get quantity for this material
+                    const materialId = measurement.material;
+                    const quantity = materialId && materialQuantityMap[materialId] ? materialQuantityMap[materialId] : null;
+                    const quantityText = quantity ? ` (${quantity} pcs)` : '';
                     
                     return `
                       <div class="measurement-item">
                         <div class="measurement-left">
-                          <div class="material-name">${measurement.material_name || "Material"}</div>
+                          <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
                           <div class="measurement-values">${measurementValues || ""}</div>
                           ${notesHtml}
                         </div>
@@ -607,6 +657,21 @@ export default function Materials() {
             continue
           }
 
+          // Create a map of material_id to total quantity from job_order_items
+          const materialQuantityMap = {};
+          if (jobOrder.job_order_items && Array.isArray(jobOrder.job_order_items)) {
+            jobOrder.job_order_items.forEach(item => {
+              const materialId = item.material;
+              if (materialId) {
+                if (materialQuantityMap[materialId]) {
+                  materialQuantityMap[materialId] += parseInt(item.quantity) || 0;
+                } else {
+                  materialQuantityMap[materialId] = parseInt(item.quantity) || 0;
+                }
+              }
+            });
+          }
+
           // STEP 4: Create and populate print content
           const printContent = `
             <!DOCTYPE html>
@@ -670,17 +735,18 @@ export default function Materials() {
                     margin-bottom: 3mm;
                     padding-bottom: 2mm;
                     border-bottom: 0.5px solid #ccc;
-                    gap: 3mm;
+                    gap: 1mm;
                     page-break-inside: avoid;
                     break-inside: avoid;
                     orphans: 3;
                     widows: 3;
                   }
                   .measurement-left {
-                    flex: 1;
+                    flex: 1 1 auto;
                     min-width: 0;
-                    max-width: calc(100% - 45mm);
-                    overflow: hidden;
+                    max-width: calc(100% - 32mm);
+                    overflow: visible;
+                    width: auto;
                   }
                   .material-name {
                     font-weight: 600;
@@ -693,10 +759,24 @@ export default function Materials() {
                     color: #555;
                     margin-bottom: 1mm;
                     line-height: 1.3;
-                    word-wrap: break-word;
-                    word-break: break-word;
-                    overflow-wrap: break-word;
+                    width: 100%;
                     max-width: 100%;
+                  }
+                  .notes-row {
+                    display: flex;
+                    gap: 1.5mm;
+                    margin-bottom: 0.5mm;
+                    width: 100%;
+                    max-width: 100%;
+                  }
+                  .notes-row-item {
+                    flex: 1 1 0;
+                    min-width: 0;
+                    max-width: 50%;
+                    word-wrap: break-word;
+                    word-break: normal;
+                    overflow-wrap: break-word;
+                    hyphens: auto;
                   }
                   .measurement-values {
                     font-size: 16px;
@@ -710,11 +790,11 @@ export default function Materials() {
                     flex-direction: column;
                     align-items: flex-end;
                     gap: 3mm;
-                    width: 40mm;
-                    min-width: 40mm;
-                    max-width: 40mm;
+                    width: 30mm;
+                    min-width: 30mm;
+                    max-width: 30mm;
                     flex-shrink: 0;
-                    padding-left: 2mm;
+                    padding-left: 0.5mm;
                   }
                   .cutter-stitcher {
                     display: flex;
@@ -802,22 +882,41 @@ export default function Materials() {
                       ].filter(val => val !== "")
                        .join(" - ");
                       
-                      // Collect notes and join with hyphens
-                      const notes = [
-                        measurement.note1,
-                        measurement.note2,
-                        measurement.note3,
-                        measurement.note4
-                      ].filter(note => note && note.trim() !== "");
+                      // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
+                      const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
+                      const note2 = measurement.note2 && measurement.note2.trim() ? measurement.note2.trim() : "";
+                      const note3 = measurement.note3 && measurement.note3.trim() ? measurement.note3.trim() : "";
+                      const note4 = measurement.note4 && measurement.note4.trim() ? measurement.note4.trim() : "";
                       
-                      const notesHtml = notes.length > 0 
-                        ? `<div class="notes">${notes.join(" - ")}</div>`
-                        : '';
+                      let notesHtml = "";
+                      if (note1 || note2 || note3 || note4) {
+                        notesHtml = '<div class="notes">';
+                        // First row: note1 and note2
+                        if (note1 || note2) {
+                          notesHtml += '<div class="notes-row">';
+                          if (note1) notesHtml += `<div class="notes-row-item">${note1}</div>`;
+                          if (note2) notesHtml += `<div class="notes-row-item">${note2}</div>`;
+                          notesHtml += '</div>';
+                        }
+                        // Second row: note3 and note4
+                        if (note3 || note4) {
+                          notesHtml += '<div class="notes-row">';
+                          if (note3) notesHtml += `<div class="notes-row-item">${note3}</div>`;
+                          if (note4) notesHtml += `<div class="notes-row-item">${note4}</div>`;
+                          notesHtml += '</div>';
+                        }
+                        notesHtml += '</div>';
+                      }
+                      
+                      // Get quantity for this material
+                      const materialId = measurement.material;
+                      const quantity = materialId && materialQuantityMap[materialId] ? materialQuantityMap[materialId] : null;
+                      const quantityText = quantity ? ` (${quantity} pcs)` : '';
                       
                       return `
                         <div class="measurement-item">
                           <div class="measurement-left">
-                            <div class="material-name">${measurement.material_name || "Material"}</div>
+                            <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
                             <div class="measurement-values">${measurementValues || ""}</div>
                             ${notesHtml}
                           </div>
@@ -1422,6 +1521,9 @@ export default function Materials() {
                     Material
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Arabic Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Material Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -1441,7 +1543,7 @@ export default function Materials() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center">
+                    <td colSpan="7" className="px-6 py-8 text-center">
                       <div className="flex items-center justify-center">
                         <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
                         <span className="text-gray-600 dark:text-gray-400">Loading materials...</span>
@@ -1450,7 +1552,7 @@ export default function Materials() {
                   </tr>
                 ) : filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="7" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       No materials found. {searchTerm && "Try adjusting your search."}
                     </td>
                   </tr>
@@ -1473,6 +1575,11 @@ export default function Materials() {
                             </span>
                           </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {material.arabic_name || "—"}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">

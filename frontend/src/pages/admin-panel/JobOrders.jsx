@@ -74,6 +74,18 @@ export default function JobOrders() {
     }
   }
 
+  const toIsoDateTime = (d) => {
+    if (!d) return ""
+    try {
+      const dt = new Date(d)
+      const date = dt.toLocaleDateString("en-CA")
+      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+      return `${date} ${time}`
+    } catch {
+      return ""
+    }
+  }
+
   const toDMY = (d) => {
     if (!d) return ""
     try {
@@ -96,12 +108,17 @@ export default function JobOrders() {
     let items = []
     if (order?.job_order_items && Array.isArray(order.job_order_items) && order.job_order_items.length > 0) {
       // Use actual job order items
-      items = order.job_order_items.map(item => ({
-        description: item.material_name || "خدمة خياطة",
-        qty: parseInt(item.quantity) || 1,
-        unitPrice: safeParseFloat(item.amount) || 0,
-        amount: safeParseFloat(item.sub_total) || (safeParseFloat(item.amount) * (parseInt(item.quantity) || 1))
-      }))
+      items = order.job_order_items.map(item => {
+        const materialName = item.material_name || "خدمة خياطة"
+        const arabicName = item.material_arabic_name || ""
+        const description = arabicName ? `${materialName} - ${arabicName}` : materialName
+        return {
+          description: description,
+          qty: parseInt(item.quantity) || 1,
+          unitPrice: safeParseFloat(item.amount) || 0,
+          amount: safeParseFloat(item.sub_total) || (safeParseFloat(item.amount) * (parseInt(item.quantity) || 1))
+        }
+      })
     } else {
       // Fallback to single item with remarks if no items exist
       items = [
@@ -117,6 +134,7 @@ export default function JobOrders() {
     return {
       invoiceNumber: order?.job_order_number || "",
       date: toIsoDate(order?.created_at),
+      dateTime: toIsoDateTime(order?.created_at),
       customerNumber: order?.customer_id || order?.id || "",
       customerName: order?.customer_name || "",
       customerPhone: order?.customer_phone || "",
@@ -137,16 +155,194 @@ export default function JobOrders() {
   }
 
   const generatePrintContent = (a5, copyType, printId) => {
+    // Split items into chunks of 6
+    const itemsPerPage = 6
+    const itemChunks = []
+    for (let i = 0; i < a5.items.length; i += itemsPerPage) {
+      itemChunks.push(a5.items.slice(i, i + itemsPerPage))
+    }
+    
+    // If no items, create one empty chunk
+    if (itemChunks.length === 0) {
+      itemChunks.push([])
+    }
+    
+    // Generate header HTML
+    const generateHeader = () => `
+      <div class="hdr" dir="rtl">
+        <div class="hdr-top">
+           <div class="right brand">لتفصيل وخياطة الملابس السودانية</div>
+        </div>
+        <div class="hdr-phone small">
+          <div class="hdr-phone-left">
+          <strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span> 
+          </div>
+          <div class="hdr-phone-right">
+            <span>جوال:</span> 50377968
+          </div>
+        </div>
+        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt;">
+          <span>التاريخ:</span> <strong>${a5.dateTime || a5.date}</strong>
+        </div>
+        ${copyType === 'customer' ? `
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
+          <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
+        </div>
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+          (customer copy)
+        </div>
+        ` : `
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+          (file copy)
+        </div>
+        `}
+        <div class="row submeta">
+          <div class="cell left">
+            <span>رقم العميل:</span> <strong>${a5.customerNumber}</strong>
+          </div>
+          <div class="cell">
+            <strong>${a5.customerName}</strong>
+            ${a5.customerPhone ? ` - ${a5.customerPhone}` : ''}<span>:اسم الزبون</span> 
+          </div>
+        </div>
+      </div>
+    `
+    
+    // Generate footer HTML
+    const generateFooter = () => `
+      <div class="ftr" dir="rtl">
+        <div class="hours">
+         <span>ساعات العمل:</span> صباحاً من 09:00 الى 01:00 مساءً من 04:00 الى 10:30 / الجمعة من 04:00 الى 10:30  
+         </div>
+      </div>
+    `
+    
+    // Generate table rows for items
+    const generateItemRows = (items) => {
+      return items.map(item => {
+        const itemAmount = item.amount !== undefined ? item.amount : (item.qty * item.unitPrice);
+        return `
+          <tr>
+            <td class="col-details">${item.description}</td>
+            <td class="col-qty">${item.qty}</td>
+            <td class="col-unit">${item.unitPrice.toFixed(2)}</td>
+            <td class="col-amt">${itemAmount.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('')
+    }
+    
+    // Generate empty rows to fill up to 6
+    const generateEmptyRows = (count) => {
+      return Array.from({ length: count }).map(() => `
+        <tr>
+          <td class="col-details">&nbsp;</td>
+          <td class="col-qty">&nbsp;</td>
+          <td class="col-unit">&nbsp;</td>
+          <td class="col-amt">&nbsp;</td>
+        </tr>
+      `).join('')
+    }
+    
+    // Generate totals footer (only on last page)
+    const generateTotalsFooter = (isLastPage) => {
+      if (!isLastPage) return ''
+      return `
+        <tr class="totals-separator">
+          <td colspan="4" style="border-top: 1px solid #9ca3af; padding: 4px 8px;"></td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">المجموع:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.total.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">مقدماً:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.advance.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">الباقي:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.balance.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details" style="text-align: right;">
+            <span>تاريخ تسليم:</span> <strong>${a5.deliveryDate}</strong>
+          </td>
+          <td class="col-qty"></td>
+          <td class="col-unit"></td>
+          <td class="col-amt"></td>
+        </tr>
+      `
+    }
+    
+    // Generate pages
+    const pages = itemChunks.map((chunk, pageIndex) => {
+      const isLastPage = pageIndex === itemChunks.length - 1
+      const emptyRowsCount = Math.max(itemsPerPage - chunk.length, 0)
+      
+      return `
+        <div class="a5-sheet">
+          ${generateHeader()}
+          <div class="tbl" dir="rtl">
+            <table class="items">
+              <thead>
+                <tr>
+                  <th class="col-details">التفاصيل</th>
+                  <th class="col-qty">كمية</th>
+                  <th class="col-unit">سعر الوحدة</th>
+                  <th class="col-amt">المبلغ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${generateItemRows(chunk)}
+                ${generateEmptyRows(emptyRowsCount)}
+              </tbody>
+              <tfoot>
+                ${generateTotalsFooter(isLastPage)}
+              </tfoot>
+            </table>
+          </div>
+          ${generateFooter()}
+        </div>
+      `
+    }).join('')
+    
     return `
         <html>
           <head>
             <title>Print Job Order</title>
             <style>
-              @page { size: A5 portrait; margin: 4mm 3mm 15mm 3mm; }
-              body { margin: 0; padding: 0; font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; }
-              .a5-sheet { width: 142mm; height: 210mm; background: #fff; color: #111827; padding: 3mm 4mm 3mm 4mm; }
-              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; }
-              .hdr-top { margin-bottom: 1mm; }
+              @page { 
+                size: A5 portrait; 
+                margin: 4mm 3mm 15mm 3mm; 
+              }
+              html, body { 
+                margin: 0; 
+                padding: 0; 
+                height: auto;
+                overflow: visible;
+                font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; 
+              }
+              .a5-sheet { 
+                width: 142mm; 
+                min-height: auto;
+                max-height: 210mm;
+                background: #fff; 
+                color: #111827; 
+                padding: 3mm 2mm 3mm 2mm; 
+                page-break-after: always;
+                page-break-inside: avoid;
+              }
+              .a5-sheet:last-child {
+                page-break-after: avoid;
+              }
+              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; page-break-inside: avoid; }
+              .hdr-top { margin-bottom: 0.5mm; margin-top: -1mm; }
               .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1mm; gap: 4mm; direction: ltr; }
               .hdr-phone-left { text-align: left; justify-self: start; }
               .hdr-phone-right { text-align: right; justify-self: end; }
@@ -162,7 +358,8 @@ export default function JobOrders() {
               .submeta { grid-template-columns: 1fr 2fr; direction: ltr; }
               .submeta .cell.left { text-align: left; justify-self: start; }
               .submeta .cell:not(.left) { text-align: right; justify-self: end; }
-              table.items { width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; }
+              table.items { width: 100%; max-width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; page-break-inside: avoid; }
+              .tbl { width: 100%; }
               table.items th, table.items td { border: none; padding: 4px 6px; vertical-align: middle; }
               table.items thead tr { border-bottom: 1px solid #9ca3af; }
               table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; white-space: nowrap; }
@@ -174,121 +371,52 @@ export default function JobOrders() {
               .col-amt { width: 15%; text-align: right; }
               table.items tfoot td { padding: 2px 6px; vertical-align: middle; }
               table.items tfoot .totals-separator td { padding: 2px 6px; }
-              .ftr { margin-top: 3mm; padding-top: 2mm; font-size: 9.5pt; color: #374151; }
+              .tbl { margin-bottom: 0; }
+              .ftr { margin-top: 1mm; padding-top: 1mm; font-size: 9.5pt; color: #374151; page-break-inside: avoid; }
               .hours { text-align: center; white-space: nowrap; }
+              
+              @media print {
+                html, body {
+                  height: auto !important;
+                  overflow: visible !important;
+                  margin: 0;
+                  padding: 0;
+                }
+                .a5-sheet {
+                  page-break-after: always !important;
+                  page-break-inside: avoid !important;
+                  height: auto !important;
+                  min-height: auto !important;
+                  max-height: none !important;
+                  overflow: visible;
+                }
+                .a5-sheet:last-child {
+                  page-break-after: avoid !important;
+                }
+                /* Prevent blank pages - only print pages with content */
+                @page {
+                  size: A5 portrait;
+                  margin: 4mm 3mm 15mm 3mm;
+                }
+                /* Avoid breaking inside important sections */
+                .hdr, .tbl, .ftr {
+                  page-break-inside: avoid;
+                }
+                /* Prevent breaking table rows */
+                table.items tbody tr {
+                  page-break-inside: avoid;
+                }
+                table.items thead {
+                  display: table-header-group;
+                }
+                table.items tfoot {
+                  display: table-footer-group;
+                }
+              }
             </style>
           </head>
           <body>
-            <div class="a5-sheet">
-              <div class="hdr" dir="rtl">
-                <div class="hdr-top">
-                   <div class="right brand">لتفصيل وخياطة الملابس السودانية</div>
-                </div>
-                <div class="hdr-phone small">
-                  <div class="hdr-phone-left">
-                  <strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span> 
-
-                  </div>
-                  <div class="hdr-phone-right">
-                    <span>جوال:</span> 50351571
-                  </div>
-                </div>
-                <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt;">
-                  <span>التاريخ:</span> <strong>${a5.date}</strong>
-                </div>
-                ${copyType === 'customer' ? `
-                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
-                  <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
-                </div>
-                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
-                  (customer copy)
-                </div>
-                ` : `
-                <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
-                  (file copy)
-                </div>
-                `}
-
-                <div class="row submeta">
-                  <div class="cell left">
-                    <span>رقم العميل:</span> <strong>${a5.customerNumber}</strong>
-                  </div>
-                  <div class="cell">
-                    <strong>${a5.customerName}</strong>
-                    ${a5.customerPhone ? ` - ${a5.customerPhone}` : ''}<span>:اسم الزبون</span> 
-                  </div>
-                </div>
-              </div>
-              <div class="tbl" dir="rtl">
-                <table class="items">
-                  <thead>
-                    <tr>
-                      <th class="col-details">التفاصيل</th>
-                      <th class="col-qty">كمية</th>
-                      <th class="col-unit">سعر الوحدة</th>
-                      <th class="col-amt">المبلغ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${a5.items.map(item => {
-                      const itemAmount = item.amount !== undefined ? item.amount : (item.qty * item.unitPrice);
-                      return `
-                      <tr>
-                        <td class="col-details">${item.description}</td>
-                        <td class="col-qty">${item.qty}</td>
-                        <td class="col-unit">${item.unitPrice.toFixed(2)}</td>
-                        <td class="col-amt">${itemAmount.toFixed(2)}</td>
-                      </tr>
-                    `;
-                    }).join('')}
-                    ${Array.from({ length: Math.max(6 - a5.items.length, 0) }).map(() => `
-                      <tr>
-                        <td class="col-details">&nbsp;</td>
-                        <td class="col-qty">&nbsp;</td>
-                        <td class="col-unit">&nbsp;</td>
-                        <td class="col-amt">&nbsp;</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                  <tfoot>
-                    <tr class="totals-separator">
-                      <td colspan="4" style="border-top: 1px solid #9ca3af; padding: 4px 8px;"></td>
-                    </tr>
-                    <tr>
-                      <td class="col-details"></td>
-                      <td class="col-qty" style="text-align: right; font-weight: 700;">المجموع:</td>
-                      <td class="col-unit"></td>
-                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.total.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td class="col-details"></td>
-                      <td class="col-qty" style="text-align: right; font-weight: 700;">مقدماً:</td>
-                      <td class="col-unit"></td>
-                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.advance.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td class="col-details"></td>
-                      <td class="col-qty" style="text-align: right; font-weight: 700;">الباقي:</td>
-                      <td class="col-unit"></td>
-                      <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.balance.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td class="col-details" style="text-align: right;">
-                        <span>تاريخ تسليم:</span> <strong>${a5.deliveryDate}</strong>
-                      </td>
-                      <td class="col-qty"></td>
-                      <td class="col-unit"></td>
-                      <td class="col-amt"></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <div class="ftr" dir="rtl">
-                <div class="hours">
-                 <span>ساعات العمل:</span> صباحاً من 09:00 الى 01:00 مساءً من 04:00 الى 10:30 / الجمعة من 04:00 الى 10:30  
-                 </div>
-              </div>
-            </div>
+            ${pages}
             <script>
               (function() {
                 var printId = '${printId}';
@@ -1104,10 +1232,14 @@ export default function JobOrders() {
                     <span>Measurements</span>
                   </h3>
                   <div className="space-y-4">
-                    {selectedOrder.job_order_measurements.map((measurement, index) => (
+                    {selectedOrder.job_order_measurements.map((measurement, index) => {
+                      const materialName = measurement.material_name || `Material ${index + 1}`
+                      const arabicName = measurement.material_arabic_name || ""
+                      const displayName = arabicName ? `${materialName} - ${arabicName}` : materialName
+                      return (
                       <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                         <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-                          {measurement.material_name || `Material ${index + 1}`}
+                          {displayName}
                         </h4>
                         <div className="grid grid-cols-6 gap-4 text-sm">
                           <div>
@@ -1166,7 +1298,8 @@ export default function JobOrders() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -1211,10 +1344,14 @@ export default function JobOrders() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {selectedOrder.job_order_items.map((item, index) => (
+                        {selectedOrder.job_order_items.map((item, index) => {
+                          const materialName = item.material_name || 'N/A'
+                          const arabicName = item.material_arabic_name || ""
+                          const displayName = arabicName ? `${materialName} - ${arabicName}` : materialName
+                          return (
                           <tr key={index} className="hover:bg-gray-100 dark:hover:bg-gray-600">
                             <td className="px-4 py-3 text-gray-900 dark:text-white">
-                              {item.material_name || 'N/A'}
+                              {displayName}
                             </td>
                             <td className="px-4 py-3 text-center text-gray-900 dark:text-white">
                               {item.quantity || 0}
@@ -1226,7 +1363,8 @@ export default function JobOrders() {
                               {formatCurrency(item.sub_total || 0)}
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                       <tfoot className="bg-gray-100 dark:bg-gray-600">
                         <tr>

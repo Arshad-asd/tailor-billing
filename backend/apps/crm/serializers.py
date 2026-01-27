@@ -142,6 +142,7 @@ class CustomerReportSerializer(serializers.ModelSerializer):
 
 class CustomerMeasurementSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
+    material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
     material_id = serializers.IntegerField(source='material.id', read_only=True)
     
     class Meta:
@@ -152,6 +153,7 @@ class CustomerMeasurementSerializer(serializers.ModelSerializer):
             'material',
             'material_id',
             'material_name',
+            'material_arabic_name',
             'thool',
             'kethet',
             'thool_kum',

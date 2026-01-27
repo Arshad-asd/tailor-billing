@@ -8,6 +8,7 @@ class MaterialSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'name',
+            'arabic_name',
             'material_number',
             'price',
             'created_at',

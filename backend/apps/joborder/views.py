@@ -608,6 +608,7 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                         quantity = item_data['quantity']
                         amount = item_data['amount']
                         sub_total = quantity * amount
+                        remarks = item_data.get('remarks', '')
                         
                         try:
                             material = Material.objects.get(id=material_id)
@@ -619,7 +620,8 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                             material=material,
                             quantity=quantity,
                             amount=amount,
-                            sub_total=sub_total
+                            sub_total=sub_total,
+                            remarks=remarks
                         )
                 
                 serializer = JobOrderListSerializer(job_order)
