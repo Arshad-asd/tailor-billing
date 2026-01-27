@@ -7,6 +7,7 @@ import webbrowser
 import os
 import sys
 import ctypes
+import time
 from pathlib import Path
 from datetime import datetime
 import subprocess
@@ -468,8 +469,11 @@ class TailorBillingManager:
                     # Restart service if it was running
                     if service_was_running and self.service_manager:
                         self.service_manager.start_service()
-                    # Refresh status
+                    # Wait a moment for git to update, then refresh status
+                    time.sleep(0.5)  # Give git time to update branch info
                     self.root.after(0, self.refresh_status)
+                    # Also refresh again after a short delay to ensure it's updated
+                    self.root.after(1000, self.refresh_status)
                 else:
                     messagebox.showerror("Error", f"Failed to switch branch:\n{result['error']}")
                     # Restart service if it was running
@@ -523,18 +527,35 @@ class TailorBillingManager:
             self.status_bar.config(text="Refreshing status...")
             self.service_status = self.service_manager.get_service_status()
             
-            # Update branch info
-            branch_info = get_branch_info()
-            current_branch = branch_info.get('current_branch', 'N/A')
-            remote_branch = branch_info.get('remote_branch', '')
+            # Update branch info - retry if needed to ensure we get the latest info
+            branch_info = None
+            for attempt in range(3):  # Try up to 3 times
+                branch_info = get_branch_info()
+                current_branch = branch_info.get('current_branch')
+                if current_branch:  # If we got a branch, break
+                    break
+                if attempt < 2:  # Wait a bit before retry (except on last attempt)
+                    time.sleep(0.2)
             
-            if current_branch and current_branch != 'N/A':
+            current_branch = branch_info.get('current_branch') if branch_info else None
+            remote_branch = branch_info.get('remote_branch') if branch_info else None
+            
+            # Always show branch info if we have it
+            if current_branch:
                 branch_text = current_branch
-                if remote_branch and remote_branch != 'N/A':
+                if remote_branch:
                     branch_text += f" → {remote_branch}"
-                self.root.after(0, lambda: self.branch_label.config(text=branch_text))
+                elif branch_info and branch_info.get('has_remote', False):
+                    # Show that remote exists but tracking not configured
+                    branch_text += " → (no upstream)"
+                self.root.after(0, lambda bt=branch_text: self.branch_label.config(text=bt))
             else:
-                self.root.after(0, lambda: self.branch_label.config(text="Not a Git repo"))
+                # Check if it's a git repo at all
+                from git_sync import check_git_repo
+                if check_git_repo():
+                    self.root.after(0, lambda: self.branch_label.config(text="(detached HEAD)"))
+                else:
+                    self.root.after(0, lambda: self.branch_label.config(text="Not a Git repo"))
             
             self.root.after(0, self.update_status_display)
             self.root.after(0, self.update_logs)
@@ -721,7 +742,11 @@ class TailorBillingManager:
             
             self.root.after(0, self.update_status_display)
             self.root.after(0, lambda: self.status_bar.config(text="Ready"))
+            # Wait a moment for git to update after pull, then refresh status
+            time.sleep(0.5)  # Give git time to update branch info
             self.root.after(0, self.refresh_status)
+            # Also refresh again after a short delay to ensure it's updated
+            self.root.after(1000, self.refresh_status)
         
         threading.Thread(target=do_sync, daemon=True).start()
     

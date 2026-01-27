@@ -38,7 +38,7 @@ def build_exe():
         sys.executable,                 # Use the same Python interpreter
         "-m", "PyInstaller",            # Run PyInstaller as a module
         "--onefile",                    # Single executable file
-        "--console",                    # Show console window (for debugging - change to --windowed later)
+        "--windowed",                    # Hide console window (no terminal)
         "--name", "TailorBillingManager",  # Executable name
         "--hidden-import", "tkinter",
         "--hidden-import", "tkinter.ttk",

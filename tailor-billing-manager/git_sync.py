@@ -96,21 +96,37 @@ def get_remote_tracking_branch():
     if not current_branch:
         return None
     
+    # First try to get upstream using rev-parse
     result = run_git_command(f'git rev-parse --abbrev-ref --symbolic-full-name @{{u}}')
-    if result['success'] and result['output']:
-        return result['output'].strip()
+    if result['success'] and result['output'] and result['output'].strip():
+        upstream = result['output'].strip()
+        # Verify the upstream branch exists
+        verify_result = run_git_command(f'git rev-parse --verify {upstream}')
+        if verify_result['success']:
+            return upstream
     
-    # Try to get remote branch info
+    # Try to get remote branch info from config
     result = run_git_command(f'git config branch.{current_branch}.remote')
     remote = result['output'].strip() if result['success'] and result['output'] else 'origin'
     
     result = run_git_command(f'git config branch.{current_branch}.merge')
-    merge = result['output'].strip() if result['success'] and result['output'] else f'refs/heads/{current_branch}'
+    merge = result['output'].strip() if result['success'] and result['output'] else None
     
-    if merge.startswith('refs/heads/'):
-        merge = merge.replace('refs/heads/', '')
+    if merge:
+        if merge.startswith('refs/heads/'):
+            merge = merge.replace('refs/heads/', '')
+        # Verify this remote branch exists
+        verify_result = run_git_command(f'git ls-remote --heads {remote} {merge}')
+        if verify_result['success'] and verify_result['output']:
+            return f"{remote}/{merge}"
     
-    return f"{remote}/{merge}"
+    # If no upstream configured, try to infer from remote branches
+    # Check if origin/current_branch exists
+    verify_result = run_git_command(f'git ls-remote --heads origin {current_branch}')
+    if verify_result['success'] and verify_result['output']:
+        return f"origin/{current_branch}"
+    
+    return None
 
 def get_branch_info():
     """Get comprehensive branch information"""
