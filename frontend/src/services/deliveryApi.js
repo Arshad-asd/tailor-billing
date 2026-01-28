@@ -52,9 +52,11 @@ export const deliveryApi = {
   },
 
   // Get delivery statistics
-  getDeliveryStats: async () => {
+  getDeliveryStats: async (params = {}) => {
     try {
-      const response = await api.get(`${DELIVERY_BASE_URL}stats/`);
+      // Add use_delivery_date flag to filter by delivery_date instead of created_at
+      const statsParams = { ...params, use_delivery_date: 'true' };
+      const response = await api.get(`${DELIVERY_BASE_URL}stats/`, { params: statsParams });
       return response.data;
     } catch (error) {
       console.error('Error fetching delivery stats:', error);

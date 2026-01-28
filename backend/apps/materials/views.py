@@ -24,14 +24,14 @@ class MaterialViewSet(viewsets.ModelViewSet):
     - GET /api/materials/search/?q=query - Search materials
     - GET /api/materials/active/ - Get only active materials
     """
-    queryset = Material.objects.all()
+    queryset = Material.objects.all().order_by('material_number')
     serializer_class = MaterialSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['is_active', 'name', 'is_measurement_required', 'material_number']
     search_fields = ['name', 'material_number']
-    ordering_fields = ['created_at', 'updated_at', 'name', 'price']
-    ordering = ['-created_at']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'price', 'material_number']
+    ordering = ['material_number']
 
     def create(self, request, *args, **kwargs):
         """Override create to provide better error handling"""
@@ -75,7 +75,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return queryset with optional filtering"""
-        queryset = Material.objects.all()
+        queryset = Material.objects.all().order_by('material_number')
         
         # Filter by active status if requested
         is_active = self.request.query_params.get('is_active', None)

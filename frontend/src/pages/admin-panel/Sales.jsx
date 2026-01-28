@@ -7,8 +7,7 @@ import AddSaleModal from "../../components/modals/AddSaleModal"
 import EditSaleModal from "../../components/modals/EditSaleModal"
 import { salesAPI } from "../../services/salesApi"
 import { useNotification } from "../../hooks/useNotification"
-import { buildA5TailorInvoiceHTML } from "../../components/print/a5-tailor-invoice"
-import { printHTMLInNewWindow } from "../../components/print/print"
+import { safeParseFloat } from "../../utils/currencyUtils"
 
 export default function Sales() {
   const location = useLocation()
@@ -26,6 +25,11 @@ export default function Sales() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const { showNotification } = useNotification()
+
+  // Print state and helpers
+  const [printSale, setPrintSale] = useState(null)
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+  const [pendingPrintSale, setPendingPrintSale] = useState(null)
 
   // Load sales data on component mount and when filters change
   useEffect(() => {
@@ -51,6 +55,688 @@ export default function Sales() {
       }
     }
   }, [location.state, sales, navigate, location.pathname]);
+
+  useEffect(() => {
+    const onAfter = () => setPrintSale(null)
+    window.addEventListener("afterprint", onAfter)
+    return () => window.removeEventListener("afterprint", onAfter)
+  }, [])
+
+  const toIsoDate = (d) => {
+    if (!d) return ""
+    try {
+      return new Date(d).toLocaleDateString("en-CA")
+    } catch {
+      return ""
+    }
+  }
+
+  const toIsoDateTime = (d) => {
+    if (!d) return ""
+    try {
+      const dt = new Date(d)
+      const date = dt.toLocaleDateString("en-CA")
+      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+      return `${date} ${time}`
+    } catch {
+      return ""
+    }
+  }
+
+  const mapToA5 = (sale) => {
+    const totalAmount = safeParseFloat(sale?.total_amount ?? sale?.amount ?? 0)
+    const depositAmount = safeParseFloat(sale?.deposit ?? 0)
+    const balanceAmount = safeParseFloat(sale?.balance ?? (totalAmount - depositAmount))
+    
+    // Map sale items to print items
+    let items = []
+    if (sale?.sale_items && Array.isArray(sale.sale_items) && sale.sale_items.length > 0) {
+      // Use actual sale items
+      items = sale.sale_items.map(item => {
+        const description = item.description || sale.notes || "خدمة خياطة"
+        return {
+          description: description,
+          qty: parseInt(item.quantity ?? item.qty ?? 1) || 1,
+          unitPrice: safeParseFloat(item.unit_price ?? item.unitPrice ?? item.price ?? 0),
+          amount: safeParseFloat(item.sub_total ?? item.amount ?? (safeParseFloat(item.unit_price ?? item.unitPrice ?? item.price ?? 0) * (parseInt(item.quantity ?? item.qty ?? 1) || 1)))
+        }
+      })
+    } else {
+      // Fallback to single item with notes if no items exist
+      items = [
+        {
+          description: sale?.notes || "خدمة خياطة",
+          qty: 1,
+          unitPrice: totalAmount || 0,
+          amount: totalAmount || 0
+        },
+      ]
+    }
+    
+    return {
+      invoiceNumber: sale?.sale_number || sale?.id || "",
+      date: toIsoDate(sale?.date ?? sale?.created_at),
+      dateTime: toIsoDateTime(sale?.date ?? sale?.created_at),
+      customerNumber: sale?.customer_id || sale?.id || "",
+      customerName: sale?.customer_name || "",
+      customerPhone: sale?.customer_phone || "",
+      items: items,
+      totals: { 
+        total: totalAmount, 
+        advance: depositAmount, 
+        balance: balanceAmount 
+      },
+      deliveryDate: toIsoDate(sale?.delivery_date ?? sale?.date),
+    }
+  }
+
+  const handlePrintSale = async (sale) => {
+    try {
+      // Fetch complete sale details with sale_items
+      const response = await salesAPI.getSale(sale.id)
+      const saleData = response.data
+      
+      const a5 = mapToA5(saleData)
+      setPendingPrintSale(a5)
+      setIsPrintModalOpen(true)
+    } catch (err) {
+      console.error("Error fetching sale details:", err)
+      showNotification("Failed to load sale details", "error")
+    }
+  }
+
+  const generatePrintContent = (a5, copyType, printId) => {
+    // Split items into chunks of 6
+    const itemsPerPage = 6
+    const itemChunks = []
+    for (let i = 0; i < a5.items.length; i += itemsPerPage) {
+      itemChunks.push(a5.items.slice(i, i + itemsPerPage))
+    }
+    
+    // If no items, create one empty chunk
+    if (itemChunks.length === 0) {
+      itemChunks.push([])
+    }
+    
+    // Generate header HTML
+    const generateHeader = () => `
+      <div class="hdr" dir="rtl">
+        <div class="hdr-top">
+      <div class="right brand">الخرطوم لتفصيل وخياطة الملابس السودانية</div>
+     </div>
+        <div class="hdr-phone small">
+          <div class="hdr-phone-left">
+          <strong style="color: black;">${a5.invoiceNumber}</strong><span style="color: black;">:الرقم فاتورة</span> 
+          </div>
+          <div class="hdr-phone-right">
+            <span style="color: black;">جوال:</span> <strong style="color: black;">50377968</strong>
+          </div>
+        </div>
+        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
+          <span>التاريخ:</span> <strong>${a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date}</strong>
+        </div>
+        ${a5.dateTime ? `
+        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
+          <span>الوقت:</span> <strong>${a5.dateTime.split(' ')[1] || ''}</strong>
+        </div>
+        ` : ''}
+        ${copyType === 'customer' ? `
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
+          <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
+        </div>
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+          (customer copy)
+        </div>
+        ` : `
+        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
+          (file copy)
+        </div>
+        `}
+        <div class="row submeta">
+          <div class="cell left">
+            <span>رقم العميل:</span> <strong>${a5.customerNumber}</strong>
+          </div>
+          <div class="cell">
+            <strong>${a5.customerName}</strong>
+            ${a5.customerPhone ? ` - ${a5.customerPhone}` : ''}<span>:اسم الزبون</span> 
+          </div>
+        </div>
+      </div>
+    `
+    
+    // Generate footer HTML
+    const generateFooter = () => `
+      <div class="ftr" dir="rtl">
+        <div class="hours">
+         <span>ساعات العمل:</span> صباحاً من 09:00 الى 01:00 مساءً من 04:00 الى 10:30 / الجمعة من 04:00 الى 10:30  
+         </div>
+      </div>
+    `
+    
+    // Generate table rows for items
+    const generateItemRows = (items) => {
+      return items.map(item => {
+        const itemAmount = item.amount !== undefined ? item.amount : (item.qty * item.unitPrice);
+        return `
+          <tr>
+            <td class="col-details">${item.description}</td>
+            <td class="col-qty">${item.qty}</td>
+            <td class="col-unit">${item.unitPrice.toFixed(2)}</td>
+            <td class="col-amt">${itemAmount.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('')
+    }
+    
+    // Generate empty rows to fill up to 6
+    const generateEmptyRows = (count) => {
+      return Array.from({ length: count }).map(() => `
+        <tr>
+          <td class="col-details">&nbsp;</td>
+          <td class="col-qty">&nbsp;</td>
+          <td class="col-unit">&nbsp;</td>
+          <td class="col-amt">&nbsp;</td>
+        </tr>
+      `).join('')
+    }
+    
+    // Generate totals footer (only on last page)
+    const generateTotalsFooter = (isLastPage) => {
+      if (!isLastPage) return ''
+      return `
+        <tr class="totals-separator">
+          <td colspan="4" style="border-top: 1px solid #9ca3af; padding: 4px 8px;"></td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">المجموع:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.total.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">مقدماً:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.advance.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details"></td>
+          <td class="col-qty" style="text-align: right; font-weight: 700;">الباقي:</td>
+          <td class="col-unit"></td>
+          <td class="col-amt" style="text-align: right; font-weight: 700;">${a5.totals.balance.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td class="col-details" style="text-align: right;">
+            <span>تاريخ تسليم:</span> <strong>${a5.deliveryDate}</strong>
+          </td>
+          <td class="col-qty"></td>
+          <td class="col-unit"></td>
+          <td class="col-amt"></td>
+        </tr>
+      `
+    }
+    
+    // Generate pages
+    const pages = itemChunks.map((chunk, pageIndex) => {
+      const isLastPage = pageIndex === itemChunks.length - 1
+      const emptyRowsCount = Math.max(itemsPerPage - chunk.length, 0)
+      
+      return `
+        <div class="a5-sheet">
+          ${generateHeader()}
+          <div class="tbl" dir="rtl">
+            <table class="items">
+              <thead>
+                <tr>
+                  <th class="col-details">التفاصيل</th>
+                  <th class="col-qty">كمية</th>
+                  <th class="col-unit">سعر الوحدة</th>
+                  <th class="col-amt">المبلغ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${generateItemRows(chunk)}
+                ${generateEmptyRows(emptyRowsCount)}
+              </tbody>
+              <tfoot>
+                ${generateTotalsFooter(isLastPage)}
+              </tfoot>
+            </table>
+          </div>
+          ${generateFooter()}
+        </div>
+      `
+    }).join('')
+    
+    return `
+        <html>
+          <head>
+            <title>Print Sale</title>
+            <style>
+              @page { 
+                size: A5 portrait; 
+                margin: 4mm 3mm 15mm 3mm; 
+              }
+              html, body { 
+                margin: 0; 
+                padding: 0; 
+                height: auto;
+                overflow: visible;
+                font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; 
+              }
+              .a5-sheet { 
+                width: 142mm; 
+                min-height: auto;
+                max-height: 210mm;
+                background: #fff; 
+                color: #111827; 
+                padding: 3mm 2mm 3mm 2mm; 
+                page-break-after: always;
+                page-break-inside: avoid;
+              }
+              .a5-sheet:last-child {
+                page-break-after: avoid;
+              }
+              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; page-break-inside: avoid; }
+              .hdr-top { margin-bottom: 0.5mm; margin-top: -1mm; }
+              .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1mm; gap: 4mm; direction: ltr; }
+              .hdr-phone-left { text-align: left; justify-self: start; }
+              .hdr-phone-right { text-align: right; justify-self: end; }
+              .brand { font-weight: 700; text-align: right; font-size: 14pt; }
+              .small { font-size: 9pt; color: #4b5563; }
+              .left { text-align: left; }
+              .right { text-align: right; }
+              .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; align-items: center; margin-top: 1mm; font-size: 10.5pt; }
+              .row .cell { text-align: right; }
+              .row .cell.left { text-align: left; }
+              .row .cell.center { text-align: center; }
+              .title { font-weight: 700; font-size: 12pt; }
+              .submeta { grid-template-columns: 1fr 2fr; direction: ltr; }
+              .submeta .cell.left { text-align: left; justify-self: start; }
+              .submeta .cell:not(.left) { text-align: right; justify-self: end; }
+              table.items { width: 100%; max-width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; page-break-inside: avoid; }
+              .tbl { width: 100%; }
+              table.items th, table.items td { border: none; padding: 4px 6px; vertical-align: middle; }
+              table.items thead tr { border-bottom: 1px solid #9ca3af; }
+              table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; white-space: nowrap; }
+              table.items thead th.col-qty { text-align: center; }
+              table.items thead th.col-unit { text-align: center; }
+              .col-details { width: 55%; }
+              .col-qty { width: 15%; text-align: center; }
+              .col-unit { width: 15%; text-align: center; }
+              .col-amt { width: 15%; text-align: right; }
+              table.items tfoot td { padding: 2px 6px; vertical-align: middle; }
+              table.items tfoot .totals-separator td { padding: 2px 6px; }
+              .tbl { margin-bottom: 0; }
+              .ftr { margin-top: 1mm; padding-top: 1mm; font-size: 9.5pt; color: #374151; page-break-inside: avoid; }
+              .hours { text-align: center; white-space: nowrap; }
+              
+              @media print {
+                html, body {
+                  height: auto !important;
+                  overflow: visible !important;
+                  margin: 0;
+                  padding: 0;
+                }
+                .a5-sheet {
+                  page-break-after: always !important;
+                  page-break-inside: avoid !important;
+                  height: auto !important;
+                  min-height: auto !important;
+                  max-height: none !important;
+                  overflow: visible;
+                }
+                .a5-sheet:last-child {
+                  page-break-after: avoid !important;
+                }
+                /* Prevent blank pages - only print pages with content */
+                @page {
+                  size: A5 portrait;
+                  margin: 4mm 3mm 15mm 3mm;
+                }
+                /* Avoid breaking inside important sections */
+                .hdr, .tbl, .ftr {
+                  page-break-inside: avoid;
+                }
+                /* Prevent breaking table rows */
+                table.items tbody tr {
+                  page-break-inside: avoid;
+                }
+                table.items thead {
+                  display: table-header-group;
+                }
+                table.items tfoot {
+                  display: table-footer-group;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${pages}
+            <script>
+              (function() {
+                var printId = '${printId}';
+                var printTriggered = false;
+                var dialogClosed = false;
+                
+                // Monitor for print dialog close
+                var afterPrint = function() {
+                  if (dialogClosed) return;
+                  dialogClosed = true;
+                  
+                  try {
+                    if (window.opener) {
+                      window.opener.postMessage('printDialogClosed_' + printId, '*');
+                    }
+                  } catch(e) {
+                    console.log('Could not send message to opener');
+                  }
+                };
+                
+                // Track when print is called
+                var originalPrint = window.print;
+                window.print = function() {
+                  printTriggered = true;
+                  originalPrint.apply(window, arguments);
+                };
+                
+                // Use afterprint event (most reliable)
+                window.addEventListener('afterprint', function() {
+                  afterPrint();
+                });
+                
+                // Fallback: Use matchMedia for print detection
+                if (window.matchMedia) {
+                  var mediaQueryList = window.matchMedia('print');
+                  var handleChange = function(mql) {
+                    if (!mql.matches && printTriggered) {
+                      setTimeout(function() {
+                        afterPrint();
+                      }, 100);
+                    }
+                  };
+                  
+                  if (mediaQueryList.addEventListener) {
+                    mediaQueryList.addEventListener('change', handleChange);
+                  } else {
+                    mediaQueryList.addListener(handleChange);
+                  }
+                }
+              })();
+            </script>
+          </body>
+        </html>
+      `
+  }
+
+  const doPrint = (copyType, onComplete, saleData = null) => {
+    return new Promise((resolve) => {
+      const a5 = saleData || pendingPrintSale
+      
+      if (!a5) {
+        console.log(`⚠ No sale data available for ${copyType} copy`)
+        if (onComplete) onComplete()
+        resolve()
+        return
+      }
+      
+      // Create unique ID for this print session
+      const printId = `${copyType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const printContent = generatePrintContent(a5, copyType, printId)
+      
+      setTimeout(() => {
+        const printWindow = window.open('', `print_${copyType}_${Date.now()}`, 'width=800,height=600')
+        
+        if (!printWindow) {
+          console.error(`❌ Failed to open print window for ${copyType} copy - browser may have blocked it`)
+          if (onComplete) onComplete()
+          resolve()
+          return
+        }
+        
+        try {
+          printWindow.document.write(printContent)
+          printWindow.document.close()
+        } catch (error) {
+          console.error(`❌ Error writing content for ${copyType} copy:`, error)
+          if (onComplete) onComplete()
+          resolve()
+          return
+        }
+        
+        // Wait for content to load
+        setTimeout(() => {
+          printWindow.focus()
+          
+          // Variables for detection
+          let printCalled = false
+          let resolved = false
+          let checkCount = 0
+          const maxChecks = 300
+          let messageHandler = null
+          let checkInterval = null
+          
+          // Set up message handler BEFORE calling print
+          if (onComplete) {
+            messageHandler = (event) => {
+              if (event.data === `printDialogClosed_${printId}` && !resolved && printCalled) {
+                console.log(`✓ Print dialog closed for ${copyType} copy`)
+                resolved = true
+                if (checkInterval) clearInterval(checkInterval)
+                window.removeEventListener('message', messageHandler)
+                
+                setTimeout(() => {
+                  if (!printWindow.closed) {
+                    printWindow.close()
+                  }
+                  if (onComplete) onComplete()
+                  resolve()
+                }, 300)
+              }
+            }
+            window.addEventListener('message', messageHandler)
+          }
+          
+          // Call print() with a delay to ensure window is ready
+          setTimeout(() => {
+            if (printWindow.closed) {
+              console.error(`❌ Print window closed before print() for ${copyType}`)
+              if (onComplete) onComplete()
+              resolve()
+              return
+            }
+            
+            try {
+              printWindow.focus()
+              console.log(`🖨️ Calling print() for ${copyType} copy`)
+              printCalled = true
+              printWindow.print()
+              console.log(`✅ print() executed for ${copyType} copy`)
+              
+              // Start polling ONLY after print() is called
+              if (onComplete) {
+                checkInterval = setInterval(() => {
+                  checkCount++
+                  
+                  if (printWindow.closed && !resolved) {
+                    console.log(`✓ Print window closed for ${copyType} copy`)
+                    resolved = true
+                    clearInterval(checkInterval)
+                    window.removeEventListener('message', messageHandler)
+                    onComplete()
+                    resolve()
+                    return
+                  }
+                  
+                  // Timeout fallback
+                  if (checkCount >= maxChecks && !resolved) {
+                    console.log(`⚠ Timeout for ${copyType} copy`)
+                    resolved = true
+                    clearInterval(checkInterval)
+                    window.removeEventListener('message', messageHandler)
+                    if (!printWindow.closed) {
+                      printWindow.close()
+                    }
+                    onComplete()
+                    resolve()
+                  }
+                }, 200)
+              } else {
+                // Single print without callback
+                setTimeout(() => {
+                  if (!printWindow.closed) {
+                    printWindow.close()
+                  }
+                  resolve()
+                }, 2000)
+              }
+            } catch (e) {
+              console.error(`❌ Error in print() for ${copyType}:`, e)
+              if (onComplete) onComplete()
+              resolve()
+            }
+          }, 500) // Delay before calling print()
+        }, 500) // Delay after window opens
+      }, 100)
+    })
+  }
+
+  const executePrint = (copyType) => {
+    if (!pendingPrintSale) return
+    
+    setPrintSale(pendingPrintSale)
+    setIsPrintModalOpen(false)
+    doPrint(copyType, () => {
+      setPrintSale(null)
+      setPendingPrintSale(null)
+    })
+  }
+
+  const executePrintBoth = async () => {
+    if (!pendingPrintSale) return
+    
+    const saleDataToPrint = pendingPrintSale
+    console.log('🖨️ Starting Print Both process')
+    setPrintSale(saleDataToPrint)
+    setIsPrintModalOpen(false)
+    
+    try {
+      const customerPrintId = `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const filePrintId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      const customerContent = generatePrintContent(saleDataToPrint, 'customer', customerPrintId)
+      const fileContent = generatePrintContent(saleDataToPrint, 'file', filePrintId)
+      
+      // Open customer window immediately
+      console.log('📄 Opening customer print window...')
+      let printWindow = window.open('', 'print_both', 'width=800,height=600')
+      
+      if (!printWindow) {
+        console.error('❌ Failed to open print window')
+        setPrintSale(null)
+        setPendingPrintSale(null)
+        return
+      }
+      
+      // Write customer content first
+      printWindow.document.write(customerContent)
+      printWindow.document.close()
+      
+      // Wait for content to load
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Print customer copy first
+      console.log('🖨️ Printing customer copy...')
+      printWindow.focus()
+      printWindow.print()
+      
+      // Wait for customer copy print dialog to close
+      await new Promise((resolve) => {
+        let resolved = false
+        const messageHandler = (event) => {
+          if (event.data === `printDialogClosed_${customerPrintId}` && !resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            console.log('✅ Customer copy print dialog closed')
+            resolve()
+          }
+        }
+        window.addEventListener('message', messageHandler)
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            resolve()
+          }
+        }, 60000)
+      })
+      
+      // Wait a bit before changing content
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Check if window is still open, if not try to open a new one
+      if (printWindow.closed) {
+        console.log('📄 Reopening window for file copy...')
+        printWindow = window.open('', 'print_both', 'width=800,height=600')
+        if (!printWindow) {
+          console.error('❌ Cannot open window for file copy')
+          setPrintSale(null)
+          setPendingPrintSale(null)
+          return
+        }
+      }
+      
+      // Write file content to the same window
+      printWindow.document.open()
+      printWindow.document.write(fileContent)
+      printWindow.document.close()
+      
+      // Wait for content to load
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Print file copy
+      console.log('🖨️ Printing file copy...')
+      printWindow.focus()
+      printWindow.print()
+      
+      // Wait for file copy print dialog to close
+      await new Promise((resolve) => {
+        let resolved = false
+        const messageHandler = (event) => {
+          if (event.data === `printDialogClosed_${filePrintId}` && !resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            console.log('✅ File copy print dialog closed')
+            setTimeout(() => {
+              if (!printWindow.closed) printWindow.close()
+              resolve()
+            }, 500)
+          }
+        }
+        window.addEventListener('message', messageHandler)
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            window.removeEventListener('message', messageHandler)
+            if (!printWindow.closed) printWindow.close()
+            resolve()
+          }
+        }, 60000)
+      })
+      
+      console.log('✅ Print Both process complete')
+      setPrintSale(null)
+      setPendingPrintSale(null)
+    } catch (error) {
+      console.error('❌ Error in Print Both process:', error)
+      setPrintSale(null)
+      setPendingPrintSale(null)
+    }
+  }
 
   const loadSales = async () => {
     try {
@@ -190,45 +876,6 @@ export default function Sales() {
     }
   }
 
-  const handlePrintClick = async (sale) => {
-    try {
-      // Fetch complete sale details with sale_items
-      const response = await salesAPI.getSale(sale.id)
-      const saleData = response.data
-
-      const items = Array.isArray(saleData.sale_items)
-        ? saleData.sale_items.map((it) => ({
-            description: it.description || saleData.notes || "خدمة خياطة",
-            qty: Number(it.quantity ?? it.qty ?? 1),
-            unitPrice: Number(
-              it.unit_price ?? it.unitPrice ?? it.price ?? saleData.total_amount ?? saleData.amount ?? 0,
-            ),
-          }))
-        : undefined
-
-      const total = Number(saleData.total_amount ?? saleData.amount ?? 0)
-      const deposit = Number(saleData.deposit ?? 0)
-      const mapped = {
-        sale_number: saleData.sale_number || saleData.id,
-        id: saleData.id,
-        date: saleData.date,
-        customer_name: saleData.customer_name,
-        customer_phone: saleData.customer_phone,
-        notes: saleData.notes,
-        items,
-        total,
-        deposit,
-        balance: Number(saleData.balance ?? total - deposit),
-        deliveryDate: saleData.delivery_date || saleData.deliveryDate || saleData.date,
-      }
-
-      const html = buildA5TailorInvoiceHTML(mapped)
-      printHTMLInNewWindow(html)
-    } catch (err) {
-      console.error("Error fetching sale details:", err)
-      showNotification("Failed to load sale details", "error")
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -238,13 +885,23 @@ export default function Sales() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sales</h1>
           <p className="text-gray-600 dark:text-gray-400">Track sales and revenue</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Sale</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => (Array.isArray(sales) && sales.length ? handlePrintSale(sales[0]) : null)}
+            className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-60"
+            disabled={!Array.isArray(sales) || sales.length === 0}
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print Slip</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Sale</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -448,7 +1105,7 @@ export default function Sales() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
                         <button
-                          onClick={() => handlePrintClick(sale)}
+                          onClick={() => handlePrintSale(sale)}
                           className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           title="Print Invoice"
                         >
@@ -494,6 +1151,44 @@ export default function Sales() {
                 ? "No sales match your current filters."
                 : "Get started by creating a new sale."}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Print Modal */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-sm flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Print Copy</h3>
+            <div className="flex gap-4">
+              <button
+                onClick={() => executePrint('customer')}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+              >
+                Customer Copy
+              </button>
+              <button
+                onClick={() => executePrint('file')}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+              >
+                File Copy
+              </button>
+            </div>
+            <button
+              onClick={executePrintBoth}
+              className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+            >
+              Print Both
+            </button>
+            <button
+              onClick={() => {
+                setIsPrintModalOpen(false)
+                setPendingPrintSale(null)
+              }}
+              className="mt-3 w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

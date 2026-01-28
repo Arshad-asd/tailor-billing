@@ -43,6 +43,7 @@ export default function Delivery() {
   // Fetch deliveries when filters change
   useEffect(() => {
     fetchDeliveries();
+    fetchStats();
   }, [statusFilter, searchTerm, fromDate, toDate, blockedFilter]);
 
   const fetchDeliveries = async () => {
@@ -82,7 +83,16 @@ export default function Delivery() {
 
   const fetchStats = async () => {
     try {
-      const data = await deliveryApi.getDeliveryStats();
+      // Pass date filters to stats API
+      const params = {};
+      if (fromDate) {
+        params.from_date = fromDate;
+      }
+      if (toDate) {
+        params.to_date = toDate;
+      }
+      
+      const data = await deliveryApi.getDeliveryStats(params);
       setStats({
         scheduled: data.pending || 0,
         in_transit: data.in_progress || 0,

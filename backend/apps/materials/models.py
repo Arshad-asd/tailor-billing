@@ -10,5 +10,9 @@ class Material(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     is_measurement_required = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['material_number']
+    
     def __str__(self):
         return self.name

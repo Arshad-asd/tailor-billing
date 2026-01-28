@@ -59,10 +59,15 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
     }
   }, [isOpen, customer, isEdit]);
 
-  // Focus first input when modal opens
+  // Focus first input when modal opens (only if not already focused)
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => customerIdRef.current?.focus(), 50);
+      const timer = setTimeout(() => {
+        // Only auto-focus if no input is currently focused
+        if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+          customerIdRef.current?.focus();
+        }
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -153,9 +158,24 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
 
   if (!isOpen) return null;
 
+  const handleOverlayClick = (e) => {
+    // Only close if clicking directly on the overlay, not on the modal content
+    if (e.target === e.currentTarget) {
+      handleCancel();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
+      onClick={handleOverlayClick}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        style={{ pointerEvents: 'auto' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
@@ -189,6 +209,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               value={formData.customer_id}
               onChange={(e) => handleInputChange('customer_id', e.target.value)}
               onKeyDown={(e) => handleKeyDown('customer_id', e)}
+              onClick={(e) => e.target.focus()}
               className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.customer_id ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
@@ -209,6 +230,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
               onKeyDown={(e) => handleKeyDown('name', e)}
+              onClick={(e) => e.target.focus()}
               className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
@@ -229,6 +251,7 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
               onKeyDown={(e) => handleKeyDown('phone', e)}
+              onClick={(e) => e.target.focus()}
               className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.phone ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}

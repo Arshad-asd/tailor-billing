@@ -273,7 +273,7 @@ export default function Materials() {
                 body {
                   font-family: Arial, sans-serif;
                   font-size: 16px;
-                  line-height: 1.25;
+                  line-height: 1.4;
                   margin: 0;
                   padding: 0;
                   color: #111;
@@ -296,32 +296,43 @@ export default function Materials() {
                 .customer-info, .job-info {
                   flex: 1;
                   max-width: 35%;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: flex-start;
+                  line-height: 1.4;
                 }
                 .customer-id-center {
                   flex: 1;
                   text-align: center;
                   max-width: 30%;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: flex-start;
+                  align-items: center;
+                  line-height: 1.4;
                 }
                 .header h1 {
-                  margin: 0 0 2px 0;
+                  margin: 0;
+                  padding: 0;
                   font-size: 16px;
                   color: #111;
+                  line-height: 1.4;
+                  vertical-align: top;
                 }
                 .header p {
-                  margin: 1px 0;
+                  margin: 0;
+                  padding: 0;
                   font-size: 16px;
                   color: #444;
+                  line-height: 1.4;
+                  vertical-align: top;
                 }
 
                 /* Measurement Items */
                 .measurement-item {
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: flex-start;
                   margin-bottom: 3mm;
                   padding-bottom: 2mm;
                   border-bottom: 0.5px solid #ccc;
-                  gap: 1mm;
                   page-break-inside: avoid;
                   break-inside: avoid;
                   orphans: 3;
@@ -330,80 +341,63 @@ export default function Materials() {
                 .measurement-left {
                   flex: 1 1 auto;
                   min-width: 0;
-                  max-width: calc(100% - 32mm);
+                  width: 100%;
                   overflow: visible;
-                  width: auto;
                 }
                 .material-name {
                   font-weight: 600;
                   font-size: 16px;
-                  margin-bottom: 1mm;
+                  margin: 0 0 1mm 0;
+                  padding: 0;
                   color: #111;
+                  line-height: 1.4;
+                  vertical-align: top;
                 }
                 .notes {
                   font-size: 16px;
                   color: #555;
-                  margin-bottom: 1mm;
-                  line-height: 1.3;
+                  margin: 0 0 1mm 0;
+                  padding: 0;
+                  line-height: 1.4;
                   width: 100%;
                   max-width: 100%;
                 }
                 .notes-row {
-                  display: flex;
-                  gap: 1.5mm;
-                  margin-bottom: 0.5mm;
+                  display: table;
                   width: 100%;
-                  max-width: 100%;
+                  table-layout: fixed;
+                  margin-bottom: 0.5mm;
+                  border-collapse: separate;
+                  border-spacing: 1.5mm 0;
                 }
                 .notes-row-item {
-                  flex: 1 1 0;
-                  min-width: 0;
-                  max-width: 50%;
+                  display: table-cell;
+                  width: 50%;
                   word-wrap: break-word;
-                  word-break: normal;
+                  word-break: break-word;
                   overflow-wrap: break-word;
                   hyphens: auto;
+                  line-height: 1.4;
+                  padding: 0;
+                  margin: 0;
+                  vertical-align: top;
                 }
                 .measurement-values {
-                  font-size: 16px;
+                  font-size: 20px;
                   color: #333;
                   white-space: nowrap;
-                  margin-top: 1mm;
-                  margin-bottom: 1mm;
+                  margin: 1mm 0;
+                  padding: 0;
+                  line-height: 1.4;
+                  vertical-align: top;
+                  letter-spacing: 0.5px;
                 }
-                .measurement-right {
-                  display: flex;
-                  flex-direction: column;
-                  align-items: flex-end;
-                  gap: 3mm;
-                  width: 30mm;
-                  min-width: 30mm;
-                  max-width: 30mm;
-                  flex-shrink: 0;
-                  padding-left: 0.5mm;
-                }
-                .cutter-stitcher {
-                  display: flex;
-                  flex-direction: column;
-                  gap: 0;
-                  font-size: 16px;
-                  align-items: flex-end;
-                }
-                .cutter-stitcher > div {
-                  display: flex;
-                  align-items: baseline;
-                  white-space: nowrap;
-                }
-                .cutter-stitcher-label {
-                  font-weight: 600;
-                }
-                .cutter-stitcher-line {
+                .measurement-values .measurement-separator {
+                  padding: 0 3mm;
                   display: inline-block;
-                  border-bottom: 0.5px solid #000;
-                  width: 25mm;
-                  height: 1em;
-                  margin-left: 2mm;
-                  vertical-align: baseline;
+                }
+                .measurement-values span:not(.measurement-separator) {
+                  display: inline-block;
                 }
 
                 /* Footer */
@@ -470,7 +464,8 @@ export default function Materials() {
                       formatValue(measurement.jamba),
                       formatValue(measurement.ragab)
                     ].filter(val => val !== "")
-                     .join(" - ");
+                     .map(val => `<span>${val}</span>`)
+                     .join('<span class="measurement-separator"> - </span>');
                     
                     // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
                     const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
@@ -509,20 +504,6 @@ export default function Materials() {
                           <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
                           <div class="measurement-values">${measurementValues || ""}</div>
                           ${notesHtml}
-                        </div>
-                        <div class="measurement-right">
-                          <div class="cutter-stitcher">
-                            <div>
-                              <span class="cutter-stitcher-label">Cutter</span>
-                              <span class="cutter-stitcher-line"></span>
-                            </div>
-                          </div>
-                          <div class="cutter-stitcher">
-                            <div>
-                              <span class="cutter-stitcher-label">Stitcher</span>
-                              <span class="cutter-stitcher-line"></span>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     `;
@@ -690,7 +671,7 @@ export default function Materials() {
                   body {
                     font-family: Arial, sans-serif;
                     font-size: 16px;
-                    line-height: 1.25;
+                    line-height: 1.4;
                     margin: 0;
                     padding: 0;
                     color: #111;
@@ -711,31 +692,42 @@ export default function Materials() {
                   .customer-info, .job-info {
                     flex: 1;
                     max-width: 35%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    line-height: 1.4;
                   }
                   .customer-id-center {
                     flex: 1;
                     text-align: center;
                     max-width: 30%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    align-items: center;
+                    line-height: 1.4;
                   }
                   .header h1 {
-                    margin: 0 0 2px 0;
+                    margin: 0;
+                    padding: 0;
                     font-size: 16px;
                     color: #111;
+                    line-height: 1.4;
+                    vertical-align: top;
                   }
                   .header p {
-                    margin: 1px 0;
+                    margin: 0;
+                    padding: 0;
                     font-size: 16px;
                     color: #444;
+                    line-height: 1.4;
+                    vertical-align: top;
                   }
                   /* Measurement Items */
                   .measurement-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
                     margin-bottom: 3mm;
                     padding-bottom: 2mm;
                     border-bottom: 0.5px solid #ccc;
-                    gap: 1mm;
                     page-break-inside: avoid;
                     break-inside: avoid;
                     orphans: 3;
@@ -744,80 +736,63 @@ export default function Materials() {
                   .measurement-left {
                     flex: 1 1 auto;
                     min-width: 0;
-                    max-width: calc(100% - 32mm);
+                    width: 100%;
                     overflow: visible;
-                    width: auto;
                   }
                   .material-name {
                     font-weight: 600;
                     font-size: 16px;
-                    margin-bottom: 1mm;
+                    margin: 0 0 1mm 0;
+                    padding: 0;
                     color: #111;
+                    line-height: 1.4;
+                    vertical-align: top;
                   }
                   .notes {
                     font-size: 16px;
                     color: #555;
-                    margin-bottom: 1mm;
-                    line-height: 1.3;
+                    margin: 0 0 1mm 0;
+                    padding: 0;
+                    line-height: 1.4;
                     width: 100%;
                     max-width: 100%;
                   }
                   .notes-row {
-                    display: flex;
-                    gap: 1.5mm;
-                    margin-bottom: 0.5mm;
+                    display: table;
                     width: 100%;
-                    max-width: 100%;
+                    table-layout: fixed;
+                    margin-bottom: 0.5mm;
+                    border-collapse: separate;
+                    border-spacing: 1.5mm 0;
                   }
                   .notes-row-item {
-                    flex: 1 1 0;
-                    min-width: 0;
-                    max-width: 50%;
+                    display: table-cell;
+                    width: 50%;
                     word-wrap: break-word;
-                    word-break: normal;
+                    word-break: break-word;
                     overflow-wrap: break-word;
                     hyphens: auto;
+                    line-height: 1.4;
+                    padding: 0;
+                    margin: 0;
+                    vertical-align: top;
                   }
                   .measurement-values {
-                    font-size: 16px;
+                    font-size: 20px;
                     color: #333;
                     white-space: nowrap;
-                    margin-top: 1mm;
-                    margin-bottom: 1mm;
+                    margin: 1mm 0;
+                    padding: 0;
+                    line-height: 1.4;
+                    vertical-align: top;
+                    letter-spacing: 0.5px;
                   }
-                  .measurement-right {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 3mm;
-                    width: 30mm;
-                    min-width: 30mm;
-                    max-width: 30mm;
-                    flex-shrink: 0;
-                    padding-left: 0.5mm;
-                  }
-                  .cutter-stitcher {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0;
-                    font-size: 16px;
-                    align-items: flex-end;
-                  }
-                  .cutter-stitcher > div {
-                    display: flex;
-                    align-items: baseline;
-                    white-space: nowrap;
-                  }
-                  .cutter-stitcher-label {
-                    font-weight: 600;
-                  }
-                  .cutter-stitcher-line {
+                  .measurement-values .measurement-separator {
+                    padding: 0 3mm;
                     display: inline-block;
-                    border-bottom: 0.5px solid #000;
-                    width: 25mm;
-                    height: 1em;
-                    margin-left: 2mm;
-                    vertical-align: baseline;
+                  }
+                  .measurement-values span:not(.measurement-separator) {
+                    display: inline-block;
                   }
                   .footer {
                     margin-top: 6mm;
@@ -880,7 +855,8 @@ export default function Materials() {
                         formatValue(measurement.jamba),
                         formatValue(measurement.ragab)
                       ].filter(val => val !== "")
-                       .join(" - ");
+                       .map(val => `<span>${val}</span>`)
+                       .join('<span class="measurement-separator"> - </span>');
                       
                       // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
                       const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
@@ -919,20 +895,6 @@ export default function Materials() {
                             <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
                             <div class="measurement-values">${measurementValues || ""}</div>
                             ${notesHtml}
-                          </div>
-                          <div class="measurement-right">
-                            <div class="cutter-stitcher">
-                              <div>
-                                <span class="cutter-stitcher-label">Cutter</span>
-                                <span class="cutter-stitcher-line"></span>
-                              </div>
-                            </div>
-                            <div class="cutter-stitcher">
-                              <div>
-                                <span class="cutter-stitcher-label">Stitcher</span>
-                                <span class="cutter-stitcher-line"></span>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       `;

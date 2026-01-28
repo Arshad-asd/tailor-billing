@@ -330,11 +330,11 @@ const AdminLayout = ({ children }) => {
         {/* Desktop Sidebar */}
         <aside
           className={`
-          hidden lg:flex flex-col
+          hidden lg:flex flex-col fixed top-0 left-0
           ${sidebarOpen ? "w-64" : "w-16"} 
-          min-h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+          h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
           transition-all duration-300 ease-in-out
-          shadow-lg
+          shadow-lg z-30
         `}
         >
           {/* Sidebar Header */}
@@ -493,7 +493,7 @@ const AdminLayout = ({ children }) => {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className={`flex-1 flex flex-col min-h-screen ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"} transition-all duration-300 ease-in-out`}>
           {/* Enhanced Top Header */}
           <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-40">
             <div className="flex items-center justify-between px-4 lg:px-6 py-3">

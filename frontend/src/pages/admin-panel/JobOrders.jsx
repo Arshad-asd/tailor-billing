@@ -79,7 +79,7 @@ export default function JobOrders() {
     try {
       const dt = new Date(d)
       const date = dt.toLocaleDateString("en-CA")
-      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
       return `${date} ${time}`
     } catch {
       return ""
@@ -171,19 +171,24 @@ export default function JobOrders() {
     const generateHeader = () => `
       <div class="hdr" dir="rtl">
         <div class="hdr-top">
-           <div class="right brand">لتفصيل وخياطة الملابس السودانية</div>
-        </div>
+      <div class="right brand">الخرطوم لتفصيل وخياطة الملابس السودانية</div>
+     </div>
         <div class="hdr-phone small">
           <div class="hdr-phone-left">
-          <strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span> 
+          <strong style="color: black;">${a5.invoiceNumber}</strong><span style="color: black;">:الرقم فاتورة</span> 
           </div>
           <div class="hdr-phone-right">
-            <span>جوال:</span> 50377968
+            <span style="color: black;">جوال:</span> <strong style="color: black;">50377968</strong>
           </div>
         </div>
-        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt;">
-          <span>التاريخ:</span> <strong>${a5.dateTime || a5.date}</strong>
+        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
+          <span>التاريخ:</span> <strong>${a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date}</strong>
         </div>
+        ${a5.dateTime ? `
+        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
+          <span>الوقت:</span> <strong>${a5.dateTime.split(' ')[1] || ''}</strong>
+        </div>
+        ` : ''}
         ${copyType === 'customer' ? `
         <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
           <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
@@ -803,7 +808,14 @@ export default function JobOrders() {
 
   const loadStats = async () => {
     try {
-      const statsData = await jobOrdersApi.getJobOrderStats()
+      // Only apply date filter when not searching (same logic as loadJobOrders)
+      const params = {}
+      if (!searchTerm.trim()) {
+        params.from_date = dateFilter.from
+        params.to_date = dateFilter.to
+      }
+      
+      const statsData = await jobOrdersApi.getJobOrderStats(params)
       setStats(
         statsData || {
           total_orders: 0,

@@ -199,7 +199,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def measurements(self, request, pk=None):
         """Get all measurements for a specific customer"""
         customer = self.get_object()
-        measurements = CustomerMeasurement.objects.filter(customer=customer, is_active=True)
+        measurements = CustomerMeasurement.objects.filter(customer=customer, is_active=True).select_related('material').order_by('material__material_number')
         serializer = CustomerMeasurementSerializer(measurements, many=True)
         return Response(serializer.data)
     

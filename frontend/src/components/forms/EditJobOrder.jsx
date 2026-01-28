@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar, Edit, AlertCircle } from 'lucide-react';
 import CustomerSearchModal from '../modals/CustomerSearchModal';
 import CustomerModal from '../modals/CustomerModal';
@@ -29,6 +29,15 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [showMaterialNameDropdown, setShowMaterialNameDropdown] = useState(false);
   const [isSearchingMaterialName, setIsSearchingMaterialName] = useState(false);
   const [billItems, setBillItems] = useState([]);
+  
+  // Memoize excludeMaterialIds to prevent unnecessary re-renders
+  const excludeMaterialIds = useMemo(() => {
+    if (materialSearchType === 'measurement') {
+      return selectedMaterials.map(m => m.id || m.material_id).filter(Boolean);
+    } else {
+      return billItems.map(item => item.material_id).filter(Boolean);
+    }
+  }, [materialSearchType, selectedMaterials, billItems]);
   // Material measurement cards: when Save is clicked, inputs become read-only until Edit is clicked
   const [lockedMaterialIds, setLockedMaterialIds] = useState([]);
   
@@ -190,7 +199,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
             return {
               sl: index + 1,
               itemName: item.material_name || 'Item',
-              remarks: item.remarks || 'Custom tailoring service',
+              remarks: item.remarks || '', // Empty if no remarks, don't auto-fill
               qty: qty.toString(), // Convert to string for text input
               amount: amount === 0 ? '' : amount.toString(), // Convert to string, empty if 0
               material_id: item.material
@@ -445,8 +454,11 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     const updatedBillItems = [...billItems, newItem];
     setBillItems(updatedBillItems);
     updateBillTotal(updatedBillItems);
-    // Initialize search query for new item
+    // Initialize search query for new item and clear any existing results/dropdowns
     setBillItemNameSearchQueries(prev => ({ ...prev, [newItem.sl]: '' }));
+    setBillItemNameSearchResults(prev => ({ ...prev, [newItem.sl]: [] }));
+    setShowBillItemNameDropdowns(prev => ({ ...prev, [newItem.sl]: false }));
+    setIsSearchingBillItemName(prev => ({ ...prev, [newItem.sl]: false }));
     // Focus on itemName input of the new item
     setTimeout(() => {
       billItemInputRefs.current[newItem.sl]?.itemName?.focus();
@@ -615,15 +627,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     setBillItems(prevItems => {
       return prevItems.map(item => {
         if (item.sl === itemSl) {
-          // Only set default remarks if remarks is empty or undefined
+          // Preserve existing remarks, don't auto-fill
           const currentRemarks = item.remarks || '';
-          const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
           return {
             ...item,
             itemName: materialName,
             material_id: materialId,
-            // Preserve existing remarks, only set default if empty
-            remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+            remarks: currentRemarks
           };
         }
         return item;
@@ -1000,8 +1010,12 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
-      // Lock newly added material by default (read-only)
-      setLockedMaterialIds(prev => [...prev, material.id]);
+      // Don't lock newly added material - keep it editable by default
+      
+      // Focus the first input field of the newly added material
+      setTimeout(() => {
+        materialInputRefs.current[material.id]?.custom_thool?.focus();
+      }, 100);
     }
     
     setMaterialNameSearchQuery('');
@@ -1026,15 +1040,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           const updatedBillItems = prevItems.map(item => {
             if (item.sl === linkingItemSl) {
               // Keep existing fees and amount - user will enter manually
-              // Only set default remarks if remarks is empty or undefined
+              // Preserve existing remarks, don't auto-fill
               const currentRemarks = item.remarks || '';
-              const shouldSetDefault = !currentRemarks || currentRemarks.trim() === '';
               return {
                 ...item,
                 material_id: materialId,
                 itemName: item.itemName === 'New Item' ? material.name : item.itemName,
-                // Preserve existing remarks, only set default if empty
-                remarks: shouldSetDefault ? 'Custom tailoring service' : currentRemarks
+                remarks: currentRemarks
               };
             }
             return item;
@@ -1062,7 +1074,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       const newBillItem = {
         sl: billItems.length + 1,
         itemName: material.name,
-        remarks: 'Custom tailoring service',
+        remarks: '', // Empty by default, user will enter manually
         qty: qty,
         fees: fees,
         amount: amount,
@@ -1116,9 +1128,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
-      // Lock newly added material by default (read-only)
-      setLockedMaterialIds(prev => [...prev, material.id]);
+      // Don't lock newly added material - keep it editable by default
       setIsMaterialSearchOpen(false);
+      
+      // Focus the first input field of the newly added material
+      setTimeout(() => {
+        materialInputRefs.current[material.id]?.custom_thool?.focus();
+      }, 100);
     }
   };
 
@@ -1165,9 +1181,8 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
 
   const handleUnlockMaterial = (materialId) => {
     setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
-    // Immediately focus the first input field after unlocking
-    // Use requestAnimationFrame to ensure DOM is updated
-    requestAnimationFrame(() => {
+    // Focus the first input field after unlocking
+    setTimeout(() => {
       const firstInput = materialInputRefs.current[materialId]?.custom_thool;
       if (firstInput) {
         firstInput.focus();
@@ -1176,7 +1191,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           firstInput.select();
         }
       }
-    });
+    }, 50);
   };
 
   const handleResetMeasurements = (materialId) => {
@@ -2043,6 +2058,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_thool || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2055,6 +2071,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_kethet || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_kethet', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2067,6 +2084,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_thool_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool_kum', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2079,6 +2097,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_ardh_f_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ardh_f_kum', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2091,6 +2110,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_jamba || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_jamba', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2103,6 +2123,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                           value={material.custom_ragab || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ragab', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -2120,6 +2141,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                             value={material.note1 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note1', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note1', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 1"
@@ -2133,6 +2155,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                             value={material.note2 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note2', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note2', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 2"
@@ -2146,6 +2169,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                             value={material.note3 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note3', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note3', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 3"
@@ -2159,6 +2183,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                             value={material.note4 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note4', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note4', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 4 (Enter: save material)"
@@ -2171,7 +2196,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleUnlockMaterial(material.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUnlockMaterial(material.id);
+                          }}
                           className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900"
                         >
                           Edit
@@ -2335,6 +2363,12 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                                         return newQueries;
                                       });
                                       return;
+                                    }
+                                    // Clear any stale results if search query is empty
+                                    const currentQuery = billItemNameSearchQueries[item.sl];
+                                    if (!currentQuery || currentQuery.trim() === '') {
+                                      setBillItemNameSearchResults(prev => ({ ...prev, [item.sl]: [] }));
+                                      setShowBillItemNameDropdowns(prev => ({ ...prev, [item.sl]: false }));
                                     }
                                     // Close all other dropdowns first
                                     setShowBillItemNameDropdowns(prev => {
@@ -2618,6 +2652,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
         filterByMeasurementRequired={materialSearchType === 'measurement' ? true : null}
+        excludeMaterialIds={excludeMaterialIds}
       />
     </div>
   );

@@ -193,29 +193,62 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         """Get job order statistics"""
         queryset = self.get_queryset()
         
-        # Filter by time range if provided
-        time_range = request.query_params.get('time_range')
-        if time_range and time_range.lower() != 'all':
-            from datetime import timedelta
-            now = timezone.now()
-            
-            if time_range == '1d':
-                # Last 24 hours
-                start_date = now - timedelta(days=1)
-            elif time_range == '7d':
-                # Last 7 days
-                start_date = now - timedelta(days=7)
-            elif time_range == '30d':
-                # Last 30 days
-                start_date = now - timedelta(days=30)
-            elif time_range == '90d':
-                # Last 90 days
-                start_date = now - timedelta(days=90)
-            else:
-                start_date = None
-            
-            if start_date:
-                queryset = queryset.filter(created_at__gte=start_date)
+        # Check if we should filter by delivery_date (for delivery stats) or created_at (for job order stats)
+        use_delivery_date = request.query_params.get('use_delivery_date', 'false').lower() == 'true'
+        date_field = 'delivery_date' if use_delivery_date else 'created_at'
+        
+        # Filter by date range if provided (from_date and to_date take precedence over time_range)
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+        
+        if from_date:
+            try:
+                from datetime import datetime, time
+                from_date_obj = datetime.strptime(from_date, '%Y-%m-%d').date()
+                # Use date range starting from beginning of the day
+                from_datetime = datetime.combine(from_date_obj, time.min)
+                if timezone.is_aware(timezone.now()):
+                    from_datetime = timezone.make_aware(from_datetime)
+                queryset = queryset.filter(**{f'{date_field}__gte': from_datetime})
+            except ValueError:
+                pass  # Invalid date format, ignore the filter
+        
+        if to_date:
+            try:
+                from datetime import datetime, time
+                to_date_obj = datetime.strptime(to_date, '%Y-%m-%d').date()
+                # Use date range ending at end of the day
+                to_datetime = datetime.combine(to_date_obj, time.max)
+                if timezone.is_aware(timezone.now()):
+                    to_datetime = timezone.make_aware(to_datetime)
+                queryset = queryset.filter(**{f'{date_field}__lte': to_datetime})
+            except ValueError:
+                pass  # Invalid date format, ignore the filter
+        
+        # Filter by time range if provided (only if from_date/to_date not provided)
+        if not from_date and not to_date:
+            time_range = request.query_params.get('time_range')
+            if time_range and time_range.lower() != 'all':
+                from datetime import timedelta
+                now = timezone.now()
+                
+                if time_range == '1d':
+                    # Last 24 hours
+                    start_date = now - timedelta(days=1)
+                elif time_range == '7d':
+                    # Last 7 days
+                    start_date = now - timedelta(days=7)
+                elif time_range == '30d':
+                    # Last 30 days
+                    start_date = now - timedelta(days=30)
+                elif time_range == '90d':
+                    # Last 90 days
+                    start_date = now - timedelta(days=90)
+                else:
+                    start_date = None
+                
+                if start_date:
+                    queryset = queryset.filter(**{f'{date_field}__gte': start_date})
         
         stats = {
             'total_orders': queryset.count(),

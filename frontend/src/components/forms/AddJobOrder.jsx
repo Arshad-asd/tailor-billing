@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Search, Save, X, User, Ruler, Calculator, Calendar } from 'lucide-react';
 import CustomerSearchModal from '../modals/CustomerSearchModal';
 import CustomerModal from '../modals/CustomerModal';
@@ -31,6 +31,15 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const [showMaterialNameDropdown, setShowMaterialNameDropdown] = useState(false);
   const [isSearchingMaterialName, setIsSearchingMaterialName] = useState(false);
   const [billItems, setBillItems] = useState([]);
+  
+  // Memoize excludeMaterialIds to prevent unnecessary re-renders
+  const excludeMaterialIds = useMemo(() => {
+    if (materialSearchType === 'measurement') {
+      return selectedMaterials.map(m => m.id || m.material_id).filter(Boolean);
+    } else {
+      return billItems.map(item => item.material_id).filter(Boolean);
+    }
+  }, [materialSearchType, selectedMaterials, billItems]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
@@ -887,6 +896,11 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
+      
+      // Focus the first input field of the newly added material
+      setTimeout(() => {
+        materialInputRefs.current[material.id]?.custom_thool?.focus();
+      }, 100);
     }
     
     setMaterialNameSearchQuery('');
@@ -997,6 +1011,11 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
       setIsMaterialSearchOpen(false);
+      
+      // Focus the first input field of the newly added material
+      setTimeout(() => {
+        materialInputRefs.current[material.id]?.custom_thool?.focus();
+      }, 100);
     }
   };
 
@@ -1043,6 +1062,17 @@ export default function AddJobOrder({ onClose, onSuccess }) {
 
   const handleUnlockMaterial = (materialId) => {
     setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
+    // Focus the first input field after unlocking
+    setTimeout(() => {
+      const firstInput = materialInputRefs.current[materialId]?.custom_thool;
+      if (firstInput) {
+        firstInput.focus();
+        // Select text if any exists for better UX
+        if (firstInput.value) {
+          firstInput.select();
+        }
+      }
+    }, 50);
   };
 
   const handleResetMeasurements = (materialId) => {
@@ -1539,6 +1569,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_thool || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1551,6 +1582,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_kethet || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_kethet', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_kethet', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1563,6 +1595,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_thool_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_thool_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_thool_kum', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1575,6 +1608,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_ardh_f_kum || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ardh_f_kum', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ardh_f_kum', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1587,6 +1621,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_jamba || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_jamba', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_jamba', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1599,6 +1634,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                           value={material.custom_ragab || ''}
                           onChange={(e) => handleMeasurementChange(material.id, 'custom_ragab', e.target.value)}
                           onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'custom_ragab', e)}
+                          onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                           readOnly={isMaterialLocked(material.id)}
                           className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                         />
@@ -1616,6 +1652,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             value={material.note1 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note1', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note1', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 1"
@@ -1629,6 +1666,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             value={material.note2 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note2', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note2', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 2"
@@ -1642,6 +1680,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             value={material.note3 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note3', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note3', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 3"
@@ -1655,6 +1694,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                             value={material.note4 || ''}
                             onChange={(e) => handleMeasurementChange(material.id, 'note4', e.target.value)}
                             onKeyDown={(e) => handleMeasurementKeyDown(material.id, 'note4', e)}
+                            onClick={(e) => { if (!isMaterialLocked(material.id)) e.target.focus(); }}
                             readOnly={isMaterialLocked(material.id)}
                             className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${isMaterialLocked(material.id) ? 'cursor-default bg-gray-100 dark:bg-gray-600' : ''}`}
                             placeholder="Note 4 (Enter: save material)"
@@ -1667,7 +1707,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleUnlockMaterial(material.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUnlockMaterial(material.id);
+                          }}
                           className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900"
                         >
                           Edit
@@ -2046,6 +2089,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         onEditMaterial={() => {}}
         onCreateMaterial={() => {}}
         filterByMeasurementRequired={materialSearchType === 'measurement' ? true : null}
+        excludeMaterialIds={excludeMaterialIds}
       />
     </div>
   );

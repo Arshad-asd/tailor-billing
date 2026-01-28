@@ -58,7 +58,7 @@ const AdminDashboard = () => {
         
         // Fetch stats and recent job orders in parallel
         const [statsResponse, recentResponse] = await Promise.all([
-          jobOrdersApi.getJobOrderStats(timeRange),
+          jobOrdersApi.getJobOrderStats({ time_range: timeRange }),
           jobOrdersApi.getRecentJobOrders(5)
         ])
         
@@ -149,17 +149,8 @@ const AdminDashboard = () => {
     }
   }
 
-  // Show loading spinner
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  // Show error message
-  if (error) {
+  // Show error message (only on initial load, not on filter changes)
+  if (error && recentJobOrders.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -185,7 +176,8 @@ const AdminDashboard = () => {
         <div className="flex items-center space-x-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" disabled={loading} className="relative bg-transparent">
+                {loading && <div className="absolute inset-0 bg-gray-100 opacity-20 rounded-md" />}
                 {timeRange === "all" ? "All time" :
                  timeRange === "1d" ? "Last 24 hours" :
                  timeRange === "7d" ? "Last 7 days" :
@@ -211,11 +203,11 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statsData.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <Card key={index} className="hover:shadow-lg transition-shadow">
+            <Card key={index} className={`hover:shadow-lg transition-all ${loading ? "opacity-60" : "opacity-100"}`}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -250,7 +242,7 @@ const AdminDashboard = () => {
         {/* Recent Job Orders */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <CardTitle>Recent Job Orders</CardTitle>
                 <CardDescription>Latest job orders and their status</CardDescription>
@@ -263,7 +255,8 @@ const AdminDashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -271,9 +264,8 @@ const AdminDashboard = () => {
                     <TableHead>Customer</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Delivery Date</TableHead>
+                    <TableHead>Delivery</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -283,18 +275,15 @@ const AdminDashboard = () => {
                       <TableRow key={jobOrder.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{jobOrder.job_order_number}</div>
-                            <div className="text-sm text-gray-500">
-                              Delivery {new Date(jobOrder.delivery_date).toLocaleDateString()}
-                            </div>
+                            <div className="font-medium text-sm">{jobOrder.job_order_number}</div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{jobOrder.customer_name}</div>
-                          <div className="text-sm text-gray-500">{jobOrder.customer_phone}</div>
+                          <div className="font-medium text-sm">{jobOrder.customer_name}</div>
+                          <div className="text-xs text-gray-500">{jobOrder.customer_phone}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">
+                          <div className="text-sm max-w-xs truncate">
                             {jobOrder.job_order_items?.length > 0 
                               ? jobOrder.job_order_items.map(item => item.material_name).join(', ')
                               : 'No items'
@@ -305,16 +294,11 @@ const AdminDashboard = () => {
                           <Badge className={getStatusBadge(jobOrder.status)}>
                             <div className="flex items-center space-x-1">
                               {getStatusIcon(jobOrder.status)}
-                              <span className="capitalize">{jobOrder.status.replace('_', ' ')}</span>
+                              <span className="capitalize text-xs">{jobOrder.status.replace('_', ' ')}</span>
                             </div>
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge className="bg-gray-100 text-gray-800">
-                            {jobOrder.balance_amount > 0 ? 'Outstanding' : 'Paid'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">QAR {parseFloat(jobOrder.total_amount).toFixed(2)}</TableCell>
+                        <TableCell className="font-medium text-sm">QAR {parseFloat(jobOrder.total_amount).toFixed(2)}</TableCell>
                         <TableCell>
                           <div className="text-sm">{new Date(jobOrder.delivery_date).toLocaleDateString()}</div>
                         </TableCell>
@@ -353,7 +337,7 @@ const AdminDashboard = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-8">
                         <div className="text-gray-500">
                           <Scissors className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <p>No job orders found</p>
@@ -364,57 +348,136 @@ const AdminDashboard = () => {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Tablet & Mobile Card View */}
+            <div className="lg:hidden space-y-4">
+              {recentJobOrders.length > 0 ? (
+                recentJobOrders.map((jobOrder) => (
+                  <div key={jobOrder.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-sm">{jobOrder.job_order_number}</p>
+                        <p className="text-xs text-gray-600">{jobOrder.customer_name}</p>
+                      </div>
+                      <Badge className={getStatusBadge(jobOrder.status)}>
+                        <span className="text-xs capitalize">{jobOrder.status.replace('_', ' ')}</span>
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-600">Services</p>
+                        <p className="text-sm line-clamp-2">
+                          {jobOrder.job_order_items?.length > 0 
+                            ? jobOrder.job_order_items.map(item => item.material_name).join(', ')
+                            : 'No items'
+                          }
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-gray-600">Price</p>
+                          <p className="font-medium">QAR {parseFloat(jobOrder.total_amount).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Delivery</p>
+                          <p className="font-medium">{new Date(jobOrder.delivery_date).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full bg-transparent">
+                          <MoreHorizontal className="w-4 h-4 mr-2" />
+                          Actions
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Ruler className="w-4 h-4 mr-2" />
+                          View Measurements
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit Order
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Print Invoice
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Cancel Order
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">
+                    <Scissors className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No job orders found</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
         {/* Quick Stats */}
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Business Overview</CardTitle>
             <CardDescription>Key performance indicators</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Scissors className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-medium">Total Orders</span>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Scissors className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Total Orders</span>
               </div>
-              <Badge className="bg-blue-100 text-blue-800">{stats.total_orders}</Badge>
+              <Badge className="bg-blue-100 text-blue-800 flex-shrink-0">{stats.total_orders}</Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm font-medium">Pending Orders</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Pending</span>
               </div>
-              <Badge className="bg-yellow-100 text-yellow-800">{stats.pending}</Badge>
+              <Badge className="bg-yellow-100 text-yellow-800 flex-shrink-0">{stats.pending}</Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Completed Orders</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Completed</span>
               </div>
-              <Badge className="bg-green-100 text-green-800">{stats.completed}</Badge>
+              <Badge className="bg-green-100 text-green-800 flex-shrink-0">{stats.completed}</Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Truck className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-medium">Delivered Orders</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Truck className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Delivered</span>
               </div>
-              <Badge className="bg-purple-100 text-purple-800">{stats.delivered}</Badge>
+              <Badge className="bg-purple-100 text-purple-800 flex-shrink-0">{stats.delivered}</Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <DollarSign className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Total Revenue</span>
+            <div className="flex items-center justify-between gap-2 py-2 border-t">
+              <div className="flex items-center space-x-2 min-w-0">
+                <DollarSign className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Revenue</span>
               </div>
-              <span className="text-sm font-medium">QAR {stats.total_revenue?.toFixed(2) || '0.00'}</span>
+              <span className="text-sm font-medium flex-shrink-0">QAR {stats.total_revenue?.toFixed(2) || '0.00'}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <CreditCard className="w-4 h-4 text-orange-500" />
-                <span className="text-sm font-medium">Outstanding Balance</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <CreditCard className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">Balance</span>
               </div>
-              <span className="text-sm font-medium">QAR {stats.total_balance?.toFixed(2) || '0.00'}</span>
+              <span className="text-sm font-medium flex-shrink-0">QAR {stats.total_balance?.toFixed(2) || '0.00'}</span>
             </div>
           </CardContent>
         </Card>
@@ -500,7 +563,7 @@ const AdminDashboard = () => {
       </Card> */}
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/admin/job-orders">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
             <CardContent className="p-6">
@@ -570,6 +633,3 @@ const AdminDashboard = () => {
 }
 
 export default AdminDashboard
-
-
-

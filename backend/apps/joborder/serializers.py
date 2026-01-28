@@ -15,7 +15,7 @@ class JobOrderItemSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
     material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
     material_price = serializers.DecimalField(source='material.price', max_digits=10, decimal_places=2, read_only=True)
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all())
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all().order_by('material_number'))
     
     class Meta:
         model = jobOrderItem
@@ -26,7 +26,7 @@ class JobOrderItemSerializer(serializers.ModelSerializer):
 class JobOrderMeasurementSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
     material_arabic_name = serializers.CharField(source='material.arabic_name', read_only=True)
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all())
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.all().order_by('material_number'))
     
     class Meta:
         model = jobOrderMeasurement
@@ -104,7 +104,7 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
         # Set customer and generate job order number
         validated_data['customer'] = customer
         if not validated_data.get('job_order_number'):
-            validated_data['job_order_number'] = f"JO-{JobOrder.objects.count() + 1:04d}"
+            validated_data['job_order_number'] = f"JOB-{JobOrder.objects.count() + 1:04d}"
         
         # Set default delivery date if not provided
         if not validated_data.get('delivery_date'):
@@ -372,11 +372,11 @@ class JobOrderListSerializer(serializers.ModelSerializer):
     job_order_measurements = serializers.SerializerMethodField()
     
     def get_job_order_measurements(self, obj):
-        measurements = obj.jobordermeasurement_set.filter(is_active=True)
+        measurements = obj.jobordermeasurement_set.filter(is_active=True).select_related('material').order_by('material__material_number')
         return JobOrderMeasurementSerializer(measurements, many=True).data
     
     def get_job_order_items(self, obj):
-        items = obj.joborderitem_set.filter(is_active=True)
+        items = obj.joborderitem_set.filter(is_active=True).select_related('material').order_by('material__material_number')
         return JobOrderItemSerializer(items, many=True).data
     
     class Meta:

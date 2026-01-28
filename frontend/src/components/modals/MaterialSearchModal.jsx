@@ -3,21 +3,17 @@ import { Search, X, Package, CheckCircle } from 'lucide-react';
 import materialsApi from '../../services/materialsApi';
 import { formatCurrency } from '../../utils/currencyUtils';
 
-export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial, onEditMaterial, onCreateMaterial, filterByMeasurementRequired = null }) {
+export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial, onEditMaterial, onCreateMaterial, filterByMeasurementRequired = null, excludeMaterialIds = [] }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
 
-
-  useEffect(() => {
-    if (isOpen) {
-      loadMaterials();
-    }
-  }, [isOpen, filterByMeasurementRequired]);
-
-  const loadMaterials = async () => {
+  const loadMaterials = useCallback(async () => {
+    // Don't reload if modal is closing
+    if (!isOpen) return;
+    
     setLoading(true);
     setError(null);
     try {
@@ -30,6 +26,10 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
       let filteredData = data || [];
       if (filterByMeasurementRequired !== null) {
         filteredData = filteredData.filter(m => m.is_measurement_required === filterByMeasurementRequired);
+      }
+      // Filter out already selected materials
+      if (excludeMaterialIds && excludeMaterialIds.length > 0) {
+        filteredData = filteredData.filter(m => !excludeMaterialIds.includes(m.id));
       }
       setMaterials(filteredData);
     } catch (error) {
@@ -45,7 +45,16 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterByMeasurementRequired, excludeMaterialIds, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset search query when modal opens
+      setSearchQuery('');
+      setError(null);
+      loadMaterials();
+    }
+  }, [isOpen, loadMaterials]);
 
   const handleSearch = useCallback(async (query) => {
     setSearchQuery(query);
@@ -68,6 +77,10 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
       if (filterByMeasurementRequired !== null) {
         data = data.filter(m => m.is_measurement_required === filterByMeasurementRequired);
       }
+      // Filter out already selected materials
+      if (excludeMaterialIds && excludeMaterialIds.length > 0) {
+        data = data.filter(m => !excludeMaterialIds.includes(m.id));
+      }
       
       setMaterials(data || []);
     } catch (error) {
@@ -83,7 +96,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
     } finally {
       setLoading(false);
     }
-  }, [filterByMeasurementRequired]);
+  }, [filterByMeasurementRequired, excludeMaterialIds]);
 
   // Debounced search effect
   useEffect(() => {
@@ -110,8 +123,12 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
         ragab: material.ragab
       }
     };
-    onSelectMaterial(materialWithMeasurements);
+    // Close modal first to prevent flickering
     onClose();
+    // Then update state after a small delay to ensure modal is closed
+    setTimeout(() => {
+      onSelectMaterial(materialWithMeasurements);
+    }, 0);
   };
 
   const handleEditMaterial = (material) => {

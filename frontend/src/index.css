@@ -109,3 +109,43 @@
 .focus\:border-primary:focus {
   border-color: var(--primary-color);
 }
+
+/* Smooth page transition animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Prevent layout shift during transitions */
+.page-transition-wrapper {
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  contain: layout style paint;
+}
+
+/* Optimize sidebar rendering */
+aside {
+  contain: layout style paint;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Smooth sidebar transitions */
+aside nav a {
+  will-change: background-color, color;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}

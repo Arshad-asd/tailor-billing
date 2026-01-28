@@ -50,6 +50,7 @@ class CustomerMeasurement(models.Model):
     
     class Meta:
         unique_together = [['customer', 'material']]
+        ordering = ['material__material_number']
     
     def __str__(self):
         return self.customer.name + ' - ' + self.material.name
