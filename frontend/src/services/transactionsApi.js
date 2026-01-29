@@ -30,4 +30,14 @@ export const transactionAPI = {
       throw error;
     }
   },
+  getMonthDailyReport: async (year, month) => {
+    try {
+      const params = { year, month };
+      const response = await api.get('/accounts/transactions/month-daily-report/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching month daily report:', error);
+      throw error;
+    }
+  },
 }; 

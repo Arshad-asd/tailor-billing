@@ -575,10 +575,10 @@ const Reports = () => {
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">{order.job_order_number}</TableCell>
                       <TableCell>{order.customer_name || order.customer?.name}</TableCell>
-                      <TableCell>${parseFloat(order.advance_amount || 0).toFixed(2)}</TableCell>
-                      <TableCell>${parseFloat(order.balance_amount || 0).toFixed(2)}</TableCell>
-                      <TableCell>${parseFloat(order.cash_amount || 0).toFixed(2)}</TableCell>
-                      <TableCell>${parseFloat(order.card_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(order.advance_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(order.balance_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(order.cash_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(order.card_amount || 0).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
                           {order.payment_method?.replace('_', ' ')}
@@ -635,31 +635,31 @@ const Reports = () => {
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Advance</div>
-                <div className="text-lg font-semibold">${(jobOrderTotals?.total_advance || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(jobOrderTotals?.total_advance || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Balance</div>
-                <div className="text-lg font-semibold">${(jobOrderTotals?.total_balance || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(jobOrderTotals?.total_balance || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Cash</div>
-                <div className="text-lg font-semibold">${(jobOrderTotals?.total_cash || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(jobOrderTotals?.total_cash || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Card</div>
-                <div className="text-lg font-semibold">${(jobOrderTotals?.total_card || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(jobOrderTotals?.total_card || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Grand Total</div>
-                <div className="text-lg font-semibold text-green-600">${(jobOrderTotals?.grand_total || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold text-green-600">QAR {(jobOrderTotals?.grand_total || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
           </div>
@@ -814,7 +814,7 @@ const Reports = () => {
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">{sale.sale_number}</TableCell>
                       <TableCell>{sale.customer_name}</TableCell>
-                      <TableCell>${parseFloat(sale.amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(sale.amount || 0).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
                           {sale.payment_method?.replace('_', ' ')}
@@ -882,25 +882,25 @@ const Reports = () => {
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Amount</div>
-                <div className="text-lg font-semibold">${(salesTotals?.total_amount || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(salesTotals?.total_amount || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Cash Sales</div>
-                <div className="text-lg font-semibold">${(salesTotals?.total_cash || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(salesTotals?.total_cash || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Bank Sales</div>
-                <div className="text-lg font-semibold">${(salesTotals?.total_bank || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(salesTotals?.total_bank || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Mixed Sales</div>
-                <div className="text-lg font-semibold">${(salesTotals?.total_cash_bank || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(salesTotals?.total_cash_bank || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
           </div>
@@ -971,13 +971,13 @@ const Reports = () => {
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Amount</div>
-                <div className="text-lg font-semibold">${(customerTotals?.total_amount || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(customerTotals?.total_amount || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Total Balance</div>
-                <div className="text-lg font-semibold">${(customerTotals?.total_balance || 0).toFixed(2)}</div>
+                <div className="text-lg font-semibold">QAR {(customerTotals?.total_balance || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
           </div>
@@ -1053,8 +1053,8 @@ const Reports = () => {
                       <TableCell>{customer.phone}</TableCell>
                       <TableCell>{customer.email}</TableCell>
                       <TableCell>{customer.total_orders || 0}</TableCell>
-                      <TableCell>${parseFloat(customer.total_amount || 0).toFixed(2)}</TableCell>
-                      <TableCell>${parseFloat(customer.balance_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(customer.total_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>QAR {parseFloat(customer.balance_amount || 0).toFixed(2)}</TableCell>
                       <TableCell>
                         {customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'No orders'}
                       </TableCell>
@@ -1136,7 +1136,7 @@ const Reports = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Total Revenue</p>
-                    <p className="text-2xl font-bold">$0.00</p>
+                    <p className="text-2xl font-bold">QAR 0.00</p>
                   </div>
                 </div>
               </CardContent>

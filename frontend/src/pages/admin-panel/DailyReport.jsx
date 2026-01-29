@@ -38,6 +38,12 @@ export default function DailyReport() {
   const [monthlyData2024, setMonthlyData2024] = useState([]);
   const [loadingMonthly, setLoadingMonthly] = useState(true);
 
+  // Selected month → show daily breakdown for that month
+  const [selectedMonthBreakdown, setSelectedMonthBreakdown] = useState(null);
+  const [monthDailyData, setMonthDailyData] = useState([]);
+  const [loadingMonthDaily, setLoadingMonthDaily] = useState(false);
+  const [closingBreakdown, setClosingBreakdown] = useState(false);
+
   // Fetch daily report data
   const fetchDailyReport = async (date) => {
     try {
@@ -156,6 +162,45 @@ export default function DailyReport() {
     fetchAllMonthlyData();
   }, []);
 
+  // Fetch daily breakdown when a month is selected
+  const fetchMonthDailyBreakdown = async (year, monthNum) => {
+    try {
+      setLoadingMonthDaily(true);
+      setMonthDailyData([]);
+      const data = await transactionAPI.getMonthDailyReport(year, monthNum);
+      setMonthDailyData(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching month daily breakdown:', err);
+      setMonthDailyData([]);
+    } finally {
+      setLoadingMonthDaily(false);
+    }
+  };
+
+  const handleMonthClick = (year, monthNum, monthName) => {
+    const same = selectedMonthBreakdown?.year === year && selectedMonthBreakdown?.monthNum === monthNum;
+    if (same) {
+      closeMonthBreakdown();
+      return;
+    }
+    setClosingBreakdown(false);
+    setSelectedMonthBreakdown({ year, monthNum, monthName });
+    fetchMonthDailyBreakdown(year, monthNum);
+  };
+
+  const closeMonthBreakdown = () => {
+    setClosingBreakdown(true);
+    setTimeout(() => {
+      setSelectedMonthBreakdown(null);
+      setMonthDailyData([]);
+      setClosingBreakdown(false);
+    }, 280);
+  };
+
+  const handleDayClick = (dateStr) => {
+    setSelectedDate(dateStr);
+  };
+
   // Calculate totals for monthly data
   const total2025 = monthlyData2025.reduce((acc, month) => ({
     advance: acc.advance + (month?.advance || 0),
@@ -171,6 +216,15 @@ export default function DailyReport() {
     sales: acc.sales + (month?.sales || 0),
     receipt: acc.receipt + (month?.receipt || 0),
     total: acc.total + (month?.total || 0)
+  }), { advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 });
+
+  // Day-wise grand total (for selected month's daily breakdown)
+  const monthDailyTotal = monthDailyData.reduce((acc, day) => ({
+    advance: acc.advance + (day?.advance || 0),
+    delivery: acc.delivery + (day?.delivery || 0),
+    sales: acc.sales + (day?.sales || 0),
+    receipt: acc.receipt + (day?.receipt || 0),
+    total: acc.total + (day?.total || 0)
   }), { advance: 0, delivery: 0, sales: 0, receipt: 0, total: 0 });
 
   // Print Daily Report function
@@ -510,15 +564,89 @@ export default function DailyReport() {
     }, 250);
   };
 
+  // Print selected month's day-wise report
+  const printMonthDailyReport = () => {
+    if (!selectedMonthBreakdown || !monthDailyData?.length) return;
+    const printWindow = window.open('', '_blank');
+    const monthName = selectedMonthBreakdown.monthName || '';
+    const year = selectedMonthBreakdown.year || '';
+
+    const dayRows = monthDailyData.map(day => `
+      <tr>
+        <td>${day.dateDisplay || day.date}</td>
+        <td style="text-align: right;">${(day.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${(day.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${(day.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">${(day.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align: right; font-weight: bold;">${(day.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Daily Report — ${monthName} ${year}</title>
+          <style>
+            @page { size: A4; margin: 15mm; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
+            .header { text-align: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000; }
+            .header h1 { font-size: 16pt; font-weight: bold; margin-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            th { background-color: #e0e0e0; padding: 8px; text-align: left; font-weight: bold; border: 1px solid #000; font-size: 9pt; }
+            th.text-right { text-align: right; }
+            td { padding: 6px 8px; border: 1px solid #ddd; font-size: 9pt; }
+            .total-row { background-color: #e3f2fd; font-weight: bold; border-top: 2px solid #000; }
+            .total-row td { border: 1px solid #000; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Daily Report — ${monthName} ${year}</h1>
+            <p>Generated on ${new Date().toLocaleDateString()}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="text-right">Advance</th>
+                <th class="text-right">Delivery</th>
+                <th class="text-right">Sales</th>
+                <th class="text-right">Receipt</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dayRows}
+              <tr class="total-row">
+                <td>GRAND TOTAL (${monthName})</td>
+                <td style="text-align: right;">${monthDailyTotal.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="text-align: right;">${monthDailyTotal.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="text-align: right;">${monthDailyTotal.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="text-align: right;">${monthDailyTotal.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="text-align: right;">${monthDailyTotal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Cash IN and OUT</h1>
-          <p className="text-gray-600 dark:text-gray-400">Daily financial summary and cash flow</p>
-        </div>
-        <div className="flex items-center space-x-4">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Cash IN and OUT</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Daily financial summary and cash flow</p>
+        {/* Date filter below header */}
+        <div className="flex flex-wrap items-center gap-3 mt-4">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
           <input
             type="date"
             value={selectedDate}
@@ -644,120 +772,300 @@ export default function DailyReport() {
 
         {/* Right Side: Monthly Data Tables */}
         <div className="space-y-6" ref={monthlyDataRef}>
-          {/* 2025 Data */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {new Date().getFullYear()} Monthly Data
-              </h3>
-              <div className="flex items-center space-x-2">
-                <div className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
-                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Current Year</span>
+          {/* Current Year: show monthly table OR day-wise in same place */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-opacity duration-200">
+            {selectedMonthBreakdown?.year === new Date().getFullYear() && (selectedMonthBreakdown || closingBreakdown) && !closingBreakdown ? (
+              /* Day-wise table in place of current year monthly table */
+              <>
+                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Daily report — {selectedMonthBreakdown?.monthName || ''} {selectedMonthBreakdown?.year || ''}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={printMonthDailyReport}
+                      disabled={loadingMonthDaily || !monthDailyData?.length}
+                      className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1.5 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Print month day-wise report"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeMonthBreakdown}
+                      className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Close — back to monthly table
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={printMonthlyData}
-                  className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Print Monthly Data"
-                  disabled={loadingMonthly}
-                >
-                  <Printer className="w-3 h-3" />
-                  <span>Print</span>
-                </button>
-              </div>
-            </div>
-            {loadingMonthly ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                <span className="ml-2 text-gray-600 dark:text-gray-400">Loading monthly data...</span>
-              </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Click a day to view full daily report on the left.
+                </p>
+                {loadingMonthDaily ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">Loading daily breakdown...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {monthDailyData.map((day, index) => (
+                          <tr
+                            key={index}
+                            onClick={() => handleDayClick(day.date)}
+                            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                          >
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{day.dateDisplay || day.date}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(day.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold border-t-2 border-blue-200 dark:border-blue-700">
+                          <td className="px-3 py-2 text-blue-800 dark:text-blue-200">GRAND TOTAL ({selectedMonthBreakdown?.monthName || ''})</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {monthlyData2025.map((month, index) => (
-                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-3 py-2 text-gray-900 dark:text-white">{month?.month || ''}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(month?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold">
-                      <td className="px-3 py-2 text-blue-800 dark:text-blue-200">TOTAL ({new Date().getFullYear()})</td>
-                      <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              /* Current year monthly table */
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {new Date().getFullYear()} Monthly Data
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Current Year</span>
+                    </div>
+                    <button
+                      onClick={printMonthlyData}
+                      className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center space-x-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Print Monthly Data"
+                      disabled={loadingMonthly}
+                    >
+                      <Printer className="w-3 h-3" />
+                      <span>Print</span>
+                    </button>
+                  </div>
+                </div>
+                {loadingMonthly ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">Loading monthly data...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {monthlyData2025.map((month, index) => {
+                          const year = new Date().getFullYear();
+                          const monthNum = index + 1;
+                          const isSelected = selectedMonthBreakdown?.year === year && selectedMonthBreakdown?.monthNum === monthNum;
+                          return (
+                            <tr
+                              key={index}
+                              onClick={() => handleMonthClick(year, monthNum, month?.month || '')}
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30 ring-1 ring-blue-500' : ''}`}
+                            >
+                              <td className="px-3 py-2 text-gray-900 dark:text-white">{month?.month || ''}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(month?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold">
+                          <td className="px-3 py-2 text-blue-800 dark:text-blue-200">TOTAL ({new Date().getFullYear()})</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{total2025.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          {/* Previous Year Data */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {new Date().getFullYear() - 1} Monthly Data
-              </h3>
-              <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Previous Year</span>
-              </div>
-            </div>
-            {loadingMonthly ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                <span className="ml-2 text-gray-600 dark:text-gray-400">Loading monthly data...</span>
-              </div>
+          {/* Previous Year: show monthly table OR day-wise in same place */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-opacity duration-200">
+            {selectedMonthBreakdown?.year === new Date().getFullYear() - 1 && (selectedMonthBreakdown || closingBreakdown) && !closingBreakdown ? (
+              /* Day-wise table in place of previous year monthly table */
+              <>
+                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Daily report — {selectedMonthBreakdown?.monthName || ''} {selectedMonthBreakdown?.year || ''}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={printMonthDailyReport}
+                      disabled={loadingMonthDaily || !monthDailyData?.length}
+                      className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1.5 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Print month day-wise report"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeMonthBreakdown}
+                      className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Close — back to monthly table
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Click a day to view full daily report on the left.
+                </p>
+                {loadingMonthDaily ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">Loading daily breakdown...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {monthDailyData.map((day, index) => (
+                          <tr
+                            key={index}
+                            onClick={() => handleDayClick(day.date)}
+                            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                          >
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{day.dateDisplay || day.date}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(day.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(day.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold border-t-2 border-blue-200 dark:border-blue-700">
+                          <td className="px-3 py-2 text-blue-800 dark:text-blue-200">GRAND TOTAL ({selectedMonthBreakdown?.monthName || ''})</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-blue-800 dark:text-blue-200">{monthDailyTotal.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {monthlyData2024.map((month, index) => (
-                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-3 py-2 text-gray-900 dark:text-white">{month?.month || ''}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(month?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-gray-50 dark:bg-gray-700 font-semibold">
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">TOTAL ({new Date().getFullYear() - 1})</td>
-                      <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              /* Previous year monthly table */
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {new Date().getFullYear() - 1} Monthly Data
+                  </h3>
+                  <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Previous Year</span>
+                  </div>
+                </div>
+                {loadingMonthly ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">Loading monthly data...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Month</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Advance</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Delivery</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sales</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receipt</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {monthlyData2024.map((month, index) => {
+                          const year = new Date().getFullYear() - 1;
+                          const monthNum = index + 1;
+                          const isSelected = selectedMonthBreakdown?.year === year && selectedMonthBreakdown?.monthNum === monthNum;
+                          return (
+                            <tr
+                              key={index}
+                              onClick={() => handleMonthClick(year, monthNum, month?.month || '')}
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30 ring-1 ring-blue-500' : ''}`}
+                            >
+                              <td className="px-3 py-2 text-gray-900 dark:text-white">{month?.month || ''}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.advance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.delivery || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{(month?.receipt || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{(month?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-gray-50 dark:bg-gray-700 font-semibold">
+                          <td className="px-3 py-2 text-gray-800 dark:text-gray-200">TOTAL ({new Date().getFullYear() - 1})</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.advance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.delivery.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.sales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.receipt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">{total2024.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

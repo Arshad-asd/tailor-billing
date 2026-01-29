@@ -6,6 +6,7 @@ from django.db import transaction as db_transaction
 from django.db.models import Sum, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
+from calendar import monthrange
 from .models import Transaction, TransactionLine
 from apps.joborder.models import JobOrder
 from apps.sale.models import Sale
@@ -426,5 +427,98 @@ class TransactionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {'error': f'Failed to generate monthly report: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='month-daily-report')
+    def month_daily_report(self, request):
+        """
+        Get daily report breakdown for each day in a given month.
+
+        Query params:
+        - year: Year in YYYY format (required)
+        - month: Month 1-12 (required)
+
+        Returns:
+        - Array of daily data: date, dateDisplay, advance, delivery, sales, receipt, total
+        """
+        try:
+            year_str = request.query_params.get('year')
+            month_str = request.query_params.get('month')
+            if not year_str or not month_str:
+                return Response(
+                    {'error': 'Query params year and month are required (e.g. year=2025&month=1)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                target_year = int(year_str)
+                target_month = int(month_str)
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid year or month. Use year=YYYY and month=1-12'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if target_month < 1 or target_month > 12:
+                return Response(
+                    {'error': 'Month must be between 1 and 12'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if target_year < 2000 or target_year > 2100:
+                return Response(
+                    {'error': 'Year must be between 2000 and 2100'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            _, last_day = monthrange(target_year, target_month)
+            daily_data = []
+
+            for day in range(1, last_day + 1):
+                target_date = datetime(target_year, target_month, day).date()
+                start_datetime = timezone.make_aware(
+                    datetime.combine(target_date, datetime.min.time())
+                )
+                end_datetime = timezone.make_aware(
+                    datetime.combine(target_date, datetime.max.time())
+                )
+
+                transaction_lines = TransactionLine.objects.filter(
+                    transaction__transaction_date__gte=start_datetime,
+                    transaction__transaction_date__lte=end_datetime,
+                    is_active=True
+                )
+
+                advance = transaction_lines.filter(
+                    transaction_line_method='job_order_advance'
+                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                delivery = transaction_lines.filter(
+                    transaction_line_method='job_order_delivery'
+                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                sales = transaction_lines.filter(
+                    transaction_line_method='sale'
+                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                receipt = transaction_lines.filter(
+                    transaction_line_method='receipt'
+                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                total = advance + delivery + sales + receipt
+
+                date_display = target_date.strftime('%d-%m-%Y')
+                weekday = target_date.strftime('%A')
+                date_iso = target_date.strftime('%Y-%m-%d')
+
+                daily_data.append({
+                    'date': date_iso,
+                    'dateDisplay': f"{date_display} {weekday}",
+                    'advance': float(advance),
+                    'delivery': float(delivery),
+                    'sales': float(sales),
+                    'receipt': float(receipt),
+                    'total': float(total),
+                })
+
+            return Response(daily_data)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to generate month daily report: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
