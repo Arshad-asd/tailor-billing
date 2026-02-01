@@ -5,11 +5,12 @@ from apps.inventory.models import Item
 
 class SaleItemSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.name', read_only=True)
+    item_number = serializers.CharField(source='item.item_number', read_only=True)
     item_sku = serializers.CharField(source='item.sku', read_only=True)
     
     class Meta:
         model = SaleItem
-        fields = ['id', 'item', 'item_name', 'item_sku', 'quantity', 'price', 'total_amount', 'created_at', 'updated_at', 'is_active']
+        fields = ['id', 'item', 'item_name', 'item_number', 'item_sku', 'quantity', 'price', 'total_amount', 'created_at', 'updated_at', 'is_active']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate_quantity(self, value):

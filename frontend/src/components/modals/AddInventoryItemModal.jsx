@@ -9,6 +9,7 @@ import { Textarea } from "../ui/textarea";
 
 export default function AddInventoryItemModal({ open, onClose, onSubmit, categories = [] }) {
   const [form, setForm] = useState({
+    item_number: "",
     name: "",
     sku: "",
     description: "",
@@ -43,6 +44,7 @@ export default function AddInventoryItemModal({ open, onClose, onSubmit, categor
 
   const resetForm = () => {
     setForm({
+      item_number: "",
       name: "",
       sku: "",
       description: "",
@@ -70,6 +72,16 @@ export default function AddInventoryItemModal({ open, onClose, onSubmit, categor
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="item_number">Item Number</Label>
+              <Input 
+                id="item_number" 
+                name="item_number" 
+                placeholder="e.g. ITM-001" 
+                value={form.item_number} 
+                onChange={handleChange} 
+              />
+            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Item Name</Label>
               <Input 

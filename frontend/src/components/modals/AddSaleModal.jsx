@@ -16,7 +16,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
     status: "completed",
     notes: "",
   });
-  const [saleItems, setSaleItems] = useState([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
+  const [saleItems, setSaleItems] = useState([{ id: Date.now(), item: null, item_name: "", item_number: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
   const [allItems, setAllItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const itemSearchInputRef = useRef(null);
@@ -69,6 +69,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
         ...prev[currentIndex],
         item: selectedItem.id,
         item_name: selectedItem.name,
+        item_number: selectedItem.item_number || "",
         item_sku: selectedItem.sku || "",
         searchTerm: selectedItem.name,
         isSearching: false
@@ -77,6 +78,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
         id: Date.now() + Math.random(),
         item: null,
         item_name: "",
+        item_number: "",
         item_sku: "",
         quantity: 1,
         price: 0,
@@ -113,10 +115,11 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
   const getFilteredItems = (itemId) => {
     const saleItem = saleItems.find(item => item.id === itemId);
     if (!saleItem || !saleItem.searchTerm) return [];
-    
+    const term = saleItem.searchTerm.toLowerCase();
     return allItems.filter(item => {
-      const matchesSearch = item.name?.toLowerCase().includes(saleItem.searchTerm.toLowerCase()) ||
-                           item.sku?.toLowerCase().includes(saleItem.searchTerm.toLowerCase());
+      const matchesSearch = item.name?.toLowerCase().includes(term) ||
+                           item.sku?.toLowerCase().includes(term) ||
+                           (item.item_number || "").toLowerCase().includes(term);
       const notAlreadySelected = !saleItems.some(si => si.item === item.id && si.id !== itemId);
       return matchesSearch && notAlreadySelected;
     }).slice(0, 10); // Limit to 10 results
@@ -127,7 +130,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       const filtered = prev.filter(item => item.id !== itemId);
       // Always keep at least one empty row
       if (filtered.length === 0) {
-        return [{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }];
+        return [{ id: Date.now(), item: null, item_name: "", item_number: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }];
       }
       return filtered;
     });
@@ -185,7 +188,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       status: "completed",
       notes: "",
     });
-    setSaleItems([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
+    setSaleItems([{ id: Date.now(), item: null, item_name: "", item_number: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
   };
 
   const handleClose = () => {
@@ -196,7 +199,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       status: "completed",
       notes: "",
     });
-    setSaleItems([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
+    setSaleItems([{ id: Date.now(), item: null, item_name: "", item_number: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
     onClose();
   };
 
@@ -338,13 +341,21 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                               className="p-3 hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors"
                             >
                               <div className="font-medium text-gray-900 dark:text-white">{item.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">SKU: {item.sku || "N/A"}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {item.item_number ? `Item #: ${item.item_number}` : ""}
+                                {item.item_number && item.sku ? " · " : ""}
+                                SKU: {item.sku || "N/A"}
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
-                      {saleItem.item_sku && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-1">SKU: {saleItem.item_sku}</p>
+                      {(saleItem.item_number || saleItem.item_sku) && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-1">
+                          {saleItem.item_number ? `Item #: ${saleItem.item_number}` : ""}
+                          {saleItem.item_number && saleItem.item_sku ? " · " : ""}
+                          {saleItem.item_sku ? `SKU: ${saleItem.item_sku}` : ""}
+                        </p>
                       )}
                     </div>
 

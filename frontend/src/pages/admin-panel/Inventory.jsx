@@ -43,7 +43,7 @@ import { useNotification } from "../../hooks/useNotification"
 const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [sortBy, setSortBy] = useState("name")
+  const [sortBy, setSortBy] = useState("item_number")
   const [activeTab, setActiveTab] = useState("items") // "categories", "items", "stock"
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -93,14 +93,29 @@ const Inventory = () => {
     }
   }
 
-  const filteredItems = inventoryItems.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || 
-                           (item.category_name && item.category_name === selectedCategory) ||
-                           (item.category && typeof item.category === 'object' && item.category.name === selectedCategory)
-    return matchesSearch && matchesCategory
-  })
+  const filteredItems = inventoryItems
+    .filter((item) => {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch = (item.name || "").toLowerCase().includes(term) ||
+                           (item.sku || "").toLowerCase().includes(term) ||
+                           (item.item_number || "").toLowerCase().includes(term)
+      const matchesCategory = selectedCategory === "all" || 
+                             (item.category_name && item.category_name === selectedCategory) ||
+                             (item.category && typeof item.category === 'object' && item.category.name === selectedCategory)
+      return matchesSearch && matchesCategory
+    })
+    .sort((a, b) => {
+      if (sortBy === "item_number") {
+        const an = (a.item_number || "").toString()
+        const bn = (b.item_number || "").toString()
+        return an.localeCompare(bn, undefined, { numeric: true })
+      }
+      if (sortBy === "name") return (a.name || "").localeCompare(b.name || "")
+      if (sortBy === "quantity") return (a.current_stock || 0) - (b.current_stock || 0)
+      if (sortBy === "category") return (a.category_name || "").localeCompare(b.category_name || "")
+      if (sortBy === "lastUpdated") return 0
+      return 0
+    })
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -323,6 +338,7 @@ const Inventory = () => {
               onChange={(e) => setSortBy(e.target.value)}
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
+              <option value="item_number">Sort by Item Number</option>
               <option value="name">Sort by Name</option>
               <option value="quantity">Sort by Quantity</option>
               <option value="category">Sort by Category</option>
@@ -338,6 +354,9 @@ const Inventory = () => {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Item #
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Item
                 </th>
@@ -364,6 +383,11 @@ const Inventory = () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {item.item_number || "—"}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">

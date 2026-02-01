@@ -33,6 +33,7 @@ export default function Delivery() {
   const [editingCell, setEditingCell] = useState(null); // { deliveryId, field }
   const [editValue, setEditValue] = useState('');
   const [currentEditingDeliveryId, setCurrentEditingDeliveryId] = useState(null);
+  const [deliveryAmountError, setDeliveryAmountError] = useState(null); // validation error when received amount > balance
 
   // Fetch deliveries on component mount
   useEffect(() => {
@@ -153,12 +154,14 @@ export default function Delivery() {
     setEditingCell({ deliveryId, field });
     setEditValue(currentValue || '');
     setCurrentEditingDeliveryId(deliveryId);
+    setDeliveryAmountError(null);
   };
 
   const handleCellEditCancel = () => {
     setEditingCell(null);
     setEditValue('');
     setCurrentEditingDeliveryId(null);
+    setDeliveryAmountError(null);
   };
 
   const handleCellEditSave = async (deliveryId) => {
@@ -172,6 +175,13 @@ export default function Delivery() {
 
       if (editingCell.field === 'received_amount') {
         const numericValue = safeParseFloat(editValue, 0);
+        const balanceAmount = safeParseFloat(delivery.balanceAmount ?? delivery.balance_amount, 0);
+        // Received on delivery cannot exceed balance amount (amount left to collect)
+        if (numericValue > balanceAmount) {
+          setDeliveryAmountError(`Received amount cannot exceed balance amount (${formatCurrency(balanceAmount)})`);
+          return;
+        }
+        setDeliveryAmountError(null);
         updateData = {
           received_on_delivery_amount: numericValue
         };
@@ -224,6 +234,7 @@ export default function Delivery() {
         setEditingCell(null);
         setEditValue('');
         setCurrentEditingDeliveryId(null);
+        setDeliveryAmountError(null);
       }
     } catch (err) {
       console.error(`Error updating ${editingCell.field}:`, err);
@@ -231,6 +242,7 @@ export default function Delivery() {
       setEditingCell(null);
       setEditValue('');
       setCurrentEditingDeliveryId(null);
+      setDeliveryAmountError(null);
     }
   };
 
@@ -674,39 +686,50 @@ export default function Delivery() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingCell?.deliveryId === delivery.id && editingCell?.field === 'received_amount' ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          data-delivery-id={delivery.id}
-                          data-field="received_amount"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCellEditSave(delivery.id);
-                            } else if (e.key === 'Escape') {
-                              handleCellEditCancel();
-                            }
-                          }}
-                          className="w-32 px-2 py-1 border border-blue-500 rounded text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                          onClick={() => handleCellEditSave(delivery.id)}
-                          className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                          title="Save"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={handleCellEditCancel}
-                          className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                          title="Cancel"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            data-delivery-id={delivery.id}
+                            data-field="received_amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={safeParseFloat(delivery.balanceAmount ?? delivery.balance_amount, 0)}
+                            value={editValue}
+                            onChange={(e) => {
+                              setEditValue(e.target.value);
+                              setDeliveryAmountError(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleCellEditSave(delivery.id);
+                              } else if (e.key === 'Escape') {
+                                handleCellEditCancel();
+                              }
+                            }}
+                            className={`w-32 px-2 py-1 border rounded text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${deliveryAmountError ? 'border-red-500 focus:ring-red-500' : 'border-blue-500'}`}
+                          />
+                          <button
+                            onClick={() => handleCellEditSave(delivery.id)}
+                            className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                            title="Save"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleCellEditCancel}
+                            className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                            title="Cancel"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {deliveryAmountError && (
+                          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                            {deliveryAmountError}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div

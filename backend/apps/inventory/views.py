@@ -55,14 +55,21 @@ class ItemViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         
-        # Search by name or SKU
+        # Search by name, SKU, or item_number
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.filter(
-                models.Q(name__icontains=search) | 
-                models.Q(sku__icontains=search)
+                models.Q(name__icontains=search) |
+                models.Q(sku__icontains=search) |
+                models.Q(item_number__icontains=search)
             )
         
+        # Default order: item_number (nulls last), then name
+        from django.db.models import Case, Value, When
+        queryset = queryset.order_by(
+            Case(When(item_number__isnull=True, then=Value(1)), default=Value(0)),
+            'item_number', 'name'
+        )
         return queryset
     
     @action(detail=True, methods=['get'])

@@ -9,6 +9,7 @@ import { Textarea } from "../ui/textarea";
 
 export default function EditInventoryItemModal({ open, onClose, onSubmit, editingItem, categories = [] }) {
   const [form, setForm] = useState({
+    item_number: "",
     name: "",
     sku: "",
     description: "",
@@ -18,43 +19,26 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
     is_raw_material: true,
   });
 
-  // Debug categories prop
-  useEffect(() => {
-    console.log('EditInventoryItemModal - Categories prop:', categories);
-  }, [categories]);
-
-  // Debug open prop
-  useEffect(() => {
-    console.log('EditInventoryItemModal - Open prop changed:', open);
-  }, [open]);
-
-  // Debug editingItem prop
-  useEffect(() => {
-    console.log('EditInventoryItemModal - EditingItem prop changed:', editingItem);
-  }, [editingItem]);
-
   // Handle form initialization when editingItem changes
   useEffect(() => {
     if (editingItem && open) {
-      console.log('EditInventoryItemModal - Initializing form with editingItem:', editingItem);
-      
-      // Handle category - it might be an object with id or just the id
+      // Resolve category id: API may send category as pk (number), nested { id }, or we fall back to category_name
       let categoryId = "none";
       if (editingItem.category !== null && editingItem.category !== undefined) {
-        if (typeof editingItem.category === 'object' && editingItem.category.id) {
-          categoryId = editingItem.category.id.toString();
-        } else if (typeof editingItem.category === 'number' || typeof editingItem.category === 'string') {
-          categoryId = editingItem.category.toString();
+        if (typeof editingItem.category === "object" && editingItem.category !== null && editingItem.category.id != null) {
+          categoryId = String(editingItem.category.id);
+        } else if (typeof editingItem.category === "number" || typeof editingItem.category === "string") {
+          categoryId = String(editingItem.category);
         }
       }
-      
-      console.log('EditInventoryItemModal - Setting form with:', {
-        editingItem,
-        categoryId,
-        unit: editingItem.unit
-      });
-      
+      // Fallback: match by category_name if category id didn't resolve (e.g. different API shape)
+      if (categoryId === "none" && categories.length > 0 && editingItem.category_name) {
+        const matched = categories.find((c) => c.name && c.name === editingItem.category_name);
+        if (matched) categoryId = String(matched.id);
+      }
+
       setForm({
+        item_number: editingItem.item_number || "",
         name: editingItem.name || "",
         sku: editingItem.sku || "",
         description: editingItem.description || "",
@@ -64,13 +48,13 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
         is_raw_material: editingItem.is_raw_material !== undefined ? editingItem.is_raw_material : true,
       });
     }
-  }, [editingItem, open]);
+  }, [editingItem, open, categories]);
 
   // Handle form reset when modal closes
   useEffect(() => {
     if (!open && !editingItem) {
-      console.log('EditInventoryItemModal - Modal closed and no editing item, resetting form');
       setForm({
+        item_number: "",
         name: "",
         sku: "",
         description: "",
@@ -81,11 +65,6 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
       });
     }
   }, [open, editingItem]);
-
-  // Debug form state changes
-  useEffect(() => {
-    console.log('EditInventoryItemModal - Form state changed:', form);
-  }, [form]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -113,6 +92,7 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
   const handleClose = () => {
     // Reset form when closing
     setForm({
+      item_number: "",
       name: "",
       sku: "",
       description: "",
@@ -140,6 +120,16 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="item_number">Item Number</Label>
+              <Input 
+                id="item_number" 
+                name="item_number" 
+                placeholder="e.g. ITM-001" 
+                value={form.item_number} 
+                onChange={handleChange} 
+              />
+            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Item Name</Label>
               <Input 
@@ -169,22 +159,23 @@ export default function EditInventoryItemModal({ open, onClose, onSubmit, editin
             
             <div className="flex flex-col gap-2">
               <Label htmlFor="category">Category</Label>
-              <Select value={form.category} onValueChange={(value) => handleSelectChange("category", value)}>
+              <Select
+                key={`category-${editingItem?.id}-${form.category}`}
+                value={form.category}
+                onValueChange={(value) => handleSelectChange("category", value)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999]">
                   <SelectItem value="none">No Category</SelectItem>
                   {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id.toString()}>
+                    <SelectItem key={category.id} value={String(category.id)}>
                       {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Selected category ID: {form.category === "none" ? "None" : form.category}
-              </p>
             </div>
             
             <div className="flex flex-col gap-2">

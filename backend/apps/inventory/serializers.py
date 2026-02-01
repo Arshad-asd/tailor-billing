@@ -16,11 +16,12 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = [
-            'id', 'name', 'sku', 'description', 'category', 'category_name',
+            'id', 'item_number', 'name', 'sku', 'description', 'category', 'category_name',
             'unit', 'is_active', 'is_raw_material', 'current_stock'
         ]
         read_only_fields = ['id', 'current_stock']
         extra_kwargs = {
+            'item_number': {'required': False, 'allow_blank': True, 'allow_null': True},
             'sku': {'required': False, 'allow_blank': True, 'allow_null': True}
         }
     
@@ -36,11 +37,12 @@ class ItemSerializer(serializers.ModelSerializer):
 class StockSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.name', read_only=True)
     item_sku = serializers.CharField(source='item.sku', read_only=True)
+    item_number = serializers.CharField(source='item.item_number', read_only=True)
     
     class Meta:
         model = Stock
         fields = [
-            'id', 'item', 'item_name', 'item_sku', 'quantity', 
+            'id', 'item', 'item_name', 'item_number', 'item_sku', 'quantity', 
             'location', 'last_updated'
         ]
         read_only_fields = ['id', 'last_updated']
@@ -49,12 +51,13 @@ class StockSerializer(serializers.ModelSerializer):
 class StockMovementSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.name', read_only=True)
     item_sku = serializers.CharField(source='item.sku', read_only=True)
+    item_number = serializers.CharField(source='item.item_number', read_only=True)
     movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
     
     class Meta:
         model = StockMovement
         fields = [
-            'id', 'item', 'item_name', 'item_sku', 'date', 'quantity',
+            'id', 'item', 'item_name', 'item_number', 'item_sku', 'date', 'quantity',
             'movement_type', 'movement_type_display', 'reference', 'remarks'
         ]
         read_only_fields = ['id', 'date']
