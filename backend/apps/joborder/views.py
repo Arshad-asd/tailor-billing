@@ -286,14 +286,17 @@ class JobOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def update_delivery(self, request, pk=None):
         """Update delivery status and received amount"""
+        from decimal import Decimal
         job_order = self.get_object()
-        received_amount = request.data.get('received_on_delivery_amount', 0)
+        received_amount_raw = request.data.get('received_on_delivery_amount', 0)
         new_status = request.data.get('status', 'delivered')
+        # Coerce to Decimal so transaction_create_or_update_job_order gets numeric values
+        received_amount = Decimal(str(received_amount_raw)) if received_amount_raw not in (None, '') else Decimal('0')
         
         try:
             with transaction.atomic():
                 # Update received amount
-                if received_amount:
+                if received_amount and received_amount > 0:
                     job_order.recived_on_delivery_amount = received_amount
                     # Recalculate balance amount
                     job_order.balance_amount = job_order.total_amount - job_order.advance_amount - received_amount

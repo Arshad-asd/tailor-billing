@@ -7,6 +7,7 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from calendar import monthrange
+from decimal import Decimal
 from .models import Transaction, TransactionLine
 from apps.joborder.models import JobOrder
 from apps.sale.models import Sale
@@ -66,14 +67,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     transaction_obj.transaction_remarks = f'Transaction for Job Order {job_order.job_order_number}'
                     transaction_obj.save()
                 
+                # Coerce amounts to Decimal so string values from API don't cause TypeError
+                advance_amount = Decimal(str(job_order.advance_amount)) if job_order.advance_amount is not None else Decimal('0')
+                delivery_amount = Decimal(str(job_order.recived_on_delivery_amount)) if job_order.recived_on_delivery_amount is not None else Decimal('0')
+                
                 # Handle advance_amount TransactionLine
-                if job_order.advance_amount and job_order.advance_amount > 0:
+                if advance_amount > 0:
                     advance_line, advance_created = TransactionLine.objects.get_or_create(
                         transaction=transaction_obj,
                         transaction_line_method='job_order_advance',
                         defaults={
                             'transaction_line_type': 'credit',
-                            'transaction_line_amount': job_order.advance_amount,
+                            'transaction_line_amount': advance_amount,
                             'transaction_line_description': f'Advance payment for Job Order {job_order.job_order_number}',
                             'is_active': True,
                         }
@@ -81,18 +86,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     
                     # If updating and advance amount changed, update the line
                     if not advance_created and is_update:
-                        advance_line.transaction_line_amount = job_order.advance_amount
+                        advance_line.transaction_line_amount = advance_amount
                         advance_line.transaction_line_description = f'Advance payment for Job Order {job_order.job_order_number}'
                         advance_line.save()
                 
                 # Handle delivery_amount (recived_on_delivery_amount) TransactionLine
-                if job_order.recived_on_delivery_amount and job_order.recived_on_delivery_amount > 0:
+                if delivery_amount > 0:
                     delivery_line, delivery_created = TransactionLine.objects.get_or_create(
                         transaction=transaction_obj,
                         transaction_line_method='job_order_delivery',
                         defaults={
                             'transaction_line_type': 'credit',
-                            'transaction_line_amount': job_order.recived_on_delivery_amount,
+                            'transaction_line_amount': delivery_amount,
                             'transaction_line_description': f'Delivery payment for Job Order {job_order.job_order_number}',
                             'is_active': True,
                         }
@@ -100,7 +105,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     
                     # If updating and delivery amount changed, update the line
                     if not delivery_created and is_update:
-                        delivery_line.transaction_line_amount = job_order.recived_on_delivery_amount
+                        delivery_line.transaction_line_amount = delivery_amount
                         delivery_line.transaction_line_description = f'Delivery payment for Job Order {job_order.job_order_number}'
                         delivery_line.save()
                 
@@ -249,10 +254,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
             start_datetime = timezone.make_aware(datetime.combine(target_date, datetime.min.time()))
             end_datetime = timezone.make_aware(datetime.combine(target_date, datetime.max.time()))
             
-            # Get TransactionLines for the date
+            # Get TransactionLines for the date (by transaction_date for advance/sale/receipt)
             transaction_lines = TransactionLine.objects.filter(
                 transaction__transaction_date__gte=start_datetime,
                 transaction__transaction_date__lte=end_datetime,
+                is_active=True
+            )
+            
+            # Delivery lines: use line created_at (when user entered delivery amount), not transaction date
+            delivery_lines = TransactionLine.objects.filter(
+                transaction_line_method='job_order_delivery',
+                created_at__gte=start_datetime,
+                created_at__lte=end_datetime,
                 is_active=True
             )
             
@@ -261,9 +274,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 transaction_line_method='job_order_advance'
             ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
             
-            delivery = transaction_lines.filter(
-                transaction_line_method='job_order_delivery'
-            ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+            delivery = delivery_lines.aggregate(total=Sum('transaction_line_amount'))['total'] or 0
             
             cash_on_sales = transaction_lines.filter(
                 transaction_line_method='sale'
@@ -387,10 +398,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 start_datetime = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
                 end_datetime = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
                 
-                # Get TransactionLines for the month
+                # Get TransactionLines for the month (by transaction_date for advance/sale/receipt)
                 transaction_lines = TransactionLine.objects.filter(
                     transaction__transaction_date__gte=start_datetime,
                     transaction__transaction_date__lte=end_datetime,
+                    is_active=True
+                )
+                # Delivery: use line created_at (when user entered delivery amount)
+                delivery_lines = TransactionLine.objects.filter(
+                    transaction_line_method='job_order_delivery',
+                    created_at__gte=start_datetime,
+                    created_at__lte=end_datetime,
                     is_active=True
                 )
                 
@@ -399,9 +417,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     transaction_line_method='job_order_advance'
                 ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
                 
-                delivery = transaction_lines.filter(
-                    transaction_line_method='job_order_delivery'
-                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                delivery = delivery_lines.aggregate(total=Sum('transaction_line_amount'))['total'] or 0
                 
                 sales = transaction_lines.filter(
                     transaction_line_method='sale'
@@ -486,13 +502,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     transaction__transaction_date__lte=end_datetime,
                     is_active=True
                 )
+                # Delivery: use line created_at (when user entered delivery amount)
+                delivery_lines = TransactionLine.objects.filter(
+                    transaction_line_method='job_order_delivery',
+                    created_at__gte=start_datetime,
+                    created_at__lte=end_datetime,
+                    is_active=True
+                )
 
                 advance = transaction_lines.filter(
                     transaction_line_method='job_order_advance'
                 ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
-                delivery = transaction_lines.filter(
-                    transaction_line_method='job_order_delivery'
-                ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
+                delivery = delivery_lines.aggregate(total=Sum('transaction_line_amount'))['total'] or 0
                 sales = transaction_lines.filter(
                     transaction_line_method='sale'
                 ).aggregate(total=Sum('transaction_line_amount'))['total'] or 0
