@@ -209,3 +209,13 @@ class CustomerViewSet(viewsets.ModelViewSet):
         total_count = Customer.objects.count()
         next_id = str(total_count + 1)
         return Response({'next_customer_id': next_id})
+
+    @action(detail=False, methods=['get'])
+    def count(self, request):
+        """Get customer count. Optional query param: is_active=true for active only."""
+        queryset = self.get_queryset()
+        is_active_param = request.query_params.get('is_active')
+        if is_active_param is not None and is_active_param.lower() == 'true':
+            queryset = queryset.filter(is_active=True)
+        count = queryset.count()
+        return Response({'count': count})

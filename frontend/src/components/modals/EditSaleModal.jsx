@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -19,6 +19,11 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
   const [saleItems, setSaleItems] = useState([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
   const [allItems, setAllItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const itemSearchInputRef = useRef(null);
+  const qtyRefs = useRef({});
+  const priceRefs = useRef({});
+  const notesRef = useRef(null);
+  const saveButtonRef = useRef(null);
 
   // Debug form state changes
   useEffect(() => {
@@ -33,6 +38,14 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
     }
   }, [open]);
 
+  // Focus item search input when modal opens
+  useEffect(() => {
+    if (open && editingSale) {
+      const timer = setTimeout(() => itemSearchInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open, editingSale]);
+
   const loadItems = async () => {
     try {
       setLoadingItems(true);
@@ -46,16 +59,24 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
     }
   };
 
-  // Force payment method update when editingSale changes
+  // Force payment and status update when editingSale changes (so Selects show API values)
   useEffect(() => {
-    if (editingSale && editingSale.payment_method) {
-      console.log('EditSaleModal - Force setting payment method:', editingSale.payment_method);
-      setForm(prev => ({
-        ...prev,
-        paymentMethod: editingSale.payment_method
-      }));
+    if (!editingSale) return;
+    const updates = {};
+    if (editingSale.payment_method) {
+      let pm = editingSale.payment_method.toLowerCase();
+      if (pm === "cash bank") pm = "cash_bank";
+      updates.paymentMethod = pm;
     }
-  }, [editingSale?.payment_method]);
+    if (editingSale.status != null && editingSale.status !== "") {
+      const s = String(editingSale.status).toLowerCase();
+      const statusMap = { completed: "completed", pending: "pending", cancelled: "cancelled" };
+      updates.status = statusMap[s] || s || "pending";
+    }
+    if (Object.keys(updates).length > 0) {
+      setForm(prev => ({ ...prev, ...updates }));
+    }
+  }, [editingSale?.id, editingSale?.payment_method, editingSale?.status]);
 
   useEffect(() => {
     if (editingSale) {
@@ -66,7 +87,7 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
         customerName: editingSale.customer_name || "",
         date: editingSale.date ? editingSale.date.split('T')[0] : "",
         paymentMethod: editingSale.payment_method || "",
-        status: editingSale.status || "pending",
+        status: (editingSale.status || "pending").toLowerCase(),
         notes: editingSale.notes || "",
       };
       
@@ -82,6 +103,9 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
           formData.paymentMethod = 'cash';
         }
       }
+      // Ensure status matches Select values (completed, pending, cancelled)
+      const statusMap = { completed: "completed", pending: "pending", cancelled: "cancelled" };
+      formData.status = statusMap[formData.status] || "pending";
       console.log('EditSaleModal - Setting form data:', formData);
       console.log('EditSaleModal - Payment method from API:', editingSale.payment_method);
       setForm(formData);
@@ -140,8 +164,6 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
         searchTerm: selectedItem.name,
         isSearching: false
       };
-      
-      // Create a new empty row at the top
       const newRow = {
         id: Date.now() + Math.random(),
         item: null,
@@ -153,12 +175,10 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
         searchTerm: "",
         isSearching: false
       };
-      
-      const newItems = [...prev];
-      newItems[currentIndex] = updatedItem;
-      // Add new row at the beginning (top) instead of after current item
-      newItems.unshift(newRow);
-      return newItems;
+      const rest = prev.filter((_, i) => i !== currentIndex);
+      // Keep only one empty row: drop other empty rows to avoid duplicates
+      const restWithoutEmpty = rest.filter((row) => row.item != null);
+      return [updatedItem, newRow, ...restWithoutEmpty];
     });
   };
 
@@ -169,6 +189,16 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
       }
       return item;
     }));
+  };
+
+  const handleItemSearchKeyDown = (e, saleItem) => {
+    if (e.key !== "Enter") return;
+    const filtered = getFilteredItems(saleItem.id);
+    if (filtered.length > 0) {
+      e.preventDefault();
+      handleItemSelect(saleItem.id, filtered[0]);
+      setTimeout(() => qtyRefs.current[saleItem.id]?.focus(), 0);
+    }
   };
 
   const getFilteredItems = (itemId) => {
@@ -317,8 +347,8 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="status" className="text-sm">Status</Label>
               <Select 
-                key={`status-${editingSale?.id || 'new'}`}
-                value={form.status} 
+                key={`status-${editingSale?.id ?? "new"}-${form.status || "pending"}`}
+                value={form.status || "pending"} 
                 onValueChange={(value) => handleSelectChange("status", value)}
               >
                 <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
@@ -351,8 +381,9 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
               {/* Scrollable Items Container - Fixed height for exactly 3 items */}
               <div className="overflow-y-auto space-y-2 pr-2 h-[180px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
                 {/* Item Rows */}
-                {saleItems.map((saleItem) => {
+                {saleItems.map((saleItem, index) => {
                 const filteredItems = getFilteredItems(saleItem.id);
+                const isFirstRow = index === 0;
                 return (
                   <div key={saleItem.id} className="grid grid-cols-12 gap-2 items-start p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                     {/* Item Name - Search/Select */}
@@ -360,11 +391,13 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                         <Input
+                          ref={isFirstRow ? itemSearchInputRef : undefined}
                           type="text"
                           placeholder="Search item..."
                           value={saleItem.searchTerm || ""}
                           onChange={(e) => handleItemSearchChange(saleItem.id, e.target.value)}
                           onFocus={() => handleItemSearchChange(saleItem.id, saleItem.searchTerm || "")}
+                          onKeyDown={(e) => handleItemSearchKeyDown(e, saleItem)}
                           className="pl-9 pr-9 h-10 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {saleItem.item_name && (
@@ -400,9 +433,16 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
                     {/* Quantity */}
                     <div className="col-span-2">
                       <Input
+                        ref={(el) => { if (el) qtyRefs.current[saleItem.id] = el; }}
                         type="text"
                         value={saleItem.quantity === "" || (saleItem.quantity === 1 && !saleItem.item) ? "" : String(saleItem.quantity || "")}
                         onChange={(e) => handleItemQuantityChange(saleItem.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            priceRefs.current[saleItem.id]?.focus();
+                          }
+                        }}
                         placeholder="Qty"
                         className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -411,9 +451,16 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
                     {/* Price */}
                     <div className="col-span-2">
                       <Input
+                        ref={(el) => { if (el) priceRefs.current[saleItem.id] = el; }}
                         type="text"
                         value={saleItem.price === "" || (saleItem.price === 0 && !saleItem.item) ? "" : String(saleItem.price || "")}
                         onChange={(e) => handleItemPriceChange(saleItem.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            notesRef.current?.focus();
+                          }
+                        }}
                         placeholder="Price"
                         className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -458,11 +505,18 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
           <div className="flex flex-col gap-2 flex-shrink-0">
             <Label htmlFor="notes" className="text-sm">Notes</Label>
             <Textarea
+              ref={notesRef}
               id="notes"
               name="notes"
               value={form.notes}
               onChange={handleChange}
-              placeholder="Enter any additional notes"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  saveButtonRef.current?.focus();
+                }
+              }}
+              placeholder="Enter any additional notes (Shift+Enter for new line)"
               rows={2}
               className="text-sm"
             />
@@ -472,7 +526,7 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button ref={saveButtonRef} type="submit">
               Update Sale
             </Button>
           </DialogFooter>

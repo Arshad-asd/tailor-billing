@@ -171,36 +171,30 @@ export default function JobOrders() {
     const generateHeader = () => `
       <div class="hdr" dir="rtl">
         <div class="hdr-top">
-      <div class="right brand">الخرطوم لتفصيل وخياطة الملابس السودانية</div>
+      <div class="right brand-main">الخرطوم</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 1mm;">
+        <div class="brand-subtitle" style="text-align: left;">لتفصيل وخياطة الملابس السودانية</div>
+        <div class="small" style="text-align: left; color: black;"><strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 0.5mm;">
+        <div class="small" style="text-align: right; color: black;"><span>جوال:</span> <strong>50377968</strong></div>
+        <div style="text-align: left; direction: ltr; font-size: 10.5pt; margin-bottom: 0.25mm;"><span>التاريخ:</span> <strong>${a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date}</strong></div>
+      </div>
      </div>
-        <div class="hdr-phone small">
-          <div class="hdr-phone-left">
-          <strong style="color: black;">${a5.invoiceNumber}</strong><span style="color: black;">:الرقم فاتورة</span> 
+        <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 0.25mm; margin-bottom: 1mm; gap: 4mm; direction: ltr;">
+          <div style="text-align: left; direction: ltr; font-size: 10.5pt;">
+            ${a5.dateTime ? `<span>الوقت:</span> <strong>${a5.dateTime.split(' ')[1] || ''}</strong>` : '&nbsp;'}
           </div>
-          <div class="hdr-phone-right">
-            <span style="color: black;">جوال:</span> <strong style="color: black;">50377968</strong>
+          <div style="text-align: center; justify-self: center;">
+            ${copyType === 'customer' ? `
+            <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
+            <div style="font-size: 10pt; font-weight: 700; margin-top: 1mm;">(customer copy)</div>
+            ` : `
+            <div style="font-size: 10pt; font-weight: 700;">(file copy)</div>
+            `}
           </div>
+          <div></div>
         </div>
-        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
-          <span>التاريخ:</span> <strong>${a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date}</strong>
-        </div>
-        ${a5.dateTime ? `
-        <div style="text-align: left; direction: ltr; margin-top: 1mm; font-size: 10.5pt; display: block; clear: both;">
-          <span>الوقت:</span> <strong>${a5.dateTime.split(' ')[1] || ''}</strong>
-        </div>
-        ` : ''}
-        ${copyType === 'customer' ? `
-        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm;">
-          <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
-        </div>
-        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
-          (customer copy)
-        </div>
-        ` : `
-        <div style="text-align: center; margin-top: 1mm; margin-bottom: 1mm; font-size: 10pt; font-weight: 700;">
-          (file copy)
-        </div>
-        `}
         <div class="row submeta">
           <div class="cell left">
             <span>رقم العميل:</span> <strong>${a5.customerNumber}</strong>
@@ -324,7 +318,7 @@ export default function JobOrders() {
             <style>
               @page { 
                 size: A5 portrait; 
-                margin: 4mm 3mm 15mm 3mm; 
+                margin: 4mm 2mm 15mm 2mm; 
               }
               html, body { 
                 margin: 0; 
@@ -334,12 +328,12 @@ export default function JobOrders() {
                 font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; 
               }
               .a5-sheet { 
-                width: 142mm; 
+                width: 144mm; 
                 min-height: auto;
                 max-height: 210mm;
                 background: #fff; 
                 color: #111827; 
-                padding: 3mm 2mm 3mm 2mm; 
+                padding: 3mm 0 3mm 0; 
                 page-break-after: always;
                 page-break-inside: avoid;
               }
@@ -352,6 +346,8 @@ export default function JobOrders() {
               .hdr-phone-left { text-align: left; justify-self: start; }
               .hdr-phone-right { text-align: right; justify-self: end; }
               .brand { font-weight: 700; text-align: right; font-size: 14pt; }
+              .brand-main { font-weight: 700; text-align: right; font-size: 20pt; line-height: 1.2; }
+              .brand-subtitle { font-weight: 600; text-align: center; font-size: 12pt; margin-top: 1mm; color: #374151; }
               .small { font-size: 9pt; color: #4b5563; }
               .left { text-align: left; }
               .right { text-align: right; }
@@ -401,7 +397,7 @@ export default function JobOrders() {
                 /* Prevent blank pages - only print pages with content */
                 @page {
                   size: A5 portrait;
-                  margin: 4mm 3mm 15mm 3mm;
+                  margin: 4mm 2mm 15mm 2mm;
                 }
                 /* Avoid breaking inside important sections */
                 .hdr, .tbl, .ftr {

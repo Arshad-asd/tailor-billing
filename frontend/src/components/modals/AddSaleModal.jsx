@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -10,15 +10,20 @@ import { inventoryAPI } from "../../services/inventoryApi";
 
 export default function AddSaleModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState({
-    customerName: "Khartoum",
+    customerName: "Al-Kharthoum Shop",
     date: "",
-    paymentMethod: "",
-    status: "pending",
+    paymentMethod: "cash",
+    status: "completed",
     notes: "",
   });
   const [saleItems, setSaleItems] = useState([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
   const [allItems, setAllItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const itemSearchInputRef = useRef(null);
+  const qtyRefs = useRef({});
+  const priceRefs = useRef({});
+  const notesRef = useRef(null);
+  const saveButtonRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -33,6 +38,14 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
   useEffect(() => {
     if (open) {
       loadItems();
+    }
+  }, [open]);
+
+  // Focus item search input when modal opens
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => itemSearchInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -60,8 +73,6 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
         searchTerm: selectedItem.name,
         isSearching: false
       };
-      
-      // Create a new empty row at the top
       const newRow = {
         id: Date.now() + Math.random(),
         item: null,
@@ -73,12 +84,10 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
         searchTerm: "",
         isSearching: false
       };
-      
-      const newItems = [...prev];
-      newItems[currentIndex] = updatedItem;
-      // Add new row at the beginning (top) instead of after current item
-      newItems.unshift(newRow);
-      return newItems;
+      const rest = prev.filter((_, i) => i !== currentIndex);
+      // Keep only one empty row: drop other empty rows to avoid duplicates
+      const restWithoutEmpty = rest.filter((row) => row.item != null);
+      return [updatedItem, newRow, ...restWithoutEmpty];
     });
   };
 
@@ -89,6 +98,16 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       }
       return item;
     }));
+  };
+
+  const handleItemSearchKeyDown = (e, saleItem) => {
+    if (e.key !== "Enter") return;
+    const filtered = getFilteredItems(saleItem.id);
+    if (filtered.length > 0) {
+      e.preventDefault();
+      handleItemSelect(saleItem.id, filtered[0]);
+      setTimeout(() => qtyRefs.current[saleItem.id]?.focus(), 0);
+    }
   };
 
   const getFilteredItems = (itemId) => {
@@ -162,8 +181,8 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
     setForm({
       customerName: "Khartoum",
       date: "",
-      paymentMethod: "",
-      status: "pending",
+      paymentMethod: "cash",
+      status: "completed",
       notes: "",
     });
     setSaleItems([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
@@ -173,22 +192,24 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
     setForm({
       customerName: "Khartoum",
       date: "",
-      paymentMethod: "",
-      status: "pending",
+      paymentMethod: "cash",
+      status: "completed",
       notes: "",
     });
     setSaleItems([{ id: Date.now(), item: null, item_name: "", item_sku: "", quantity: 1, price: 0, total_amount: 0, searchTerm: "", isSearching: false }]);
     onClose();
   };
 
-  // Set default date to today and default customer name to Khartoum
+  // Set default date, customer name, status, and payment method when modal opens
   React.useEffect(() => {
     if (open) {
       const today = new Date().toISOString().split('T')[0];
       setForm(prev => ({ 
         ...prev, 
         date: prev.date || today,
-        customerName: prev.customerName || "Khartoum"
+        customerName: prev.customerName || "Al-Kharthoum Shop",
+        paymentMethod: prev.paymentMethod || "cash",
+        status: prev.status || "completed"
       }));
     }
   }, [open]);
@@ -278,8 +299,9 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
               {/* Scrollable Items Container - Fixed height for exactly 3 items */}
               <div className="overflow-y-auto space-y-2 pr-2 h-[180px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
                 {/* Item Rows */}
-                {saleItems.map((saleItem) => {
+                {saleItems.map((saleItem, index) => {
                 const filteredItems = getFilteredItems(saleItem.id);
+                const isFirstRow = index === 0;
                 return (
                   <div key={saleItem.id} className="grid grid-cols-12 gap-2 items-start p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                     {/* Item Name - Search/Select */}
@@ -287,11 +309,13 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                         <Input
+                          ref={isFirstRow ? itemSearchInputRef : undefined}
                           type="text"
                           placeholder="Search item..."
                           value={saleItem.searchTerm || ""}
                           onChange={(e) => handleItemSearchChange(saleItem.id, e.target.value)}
                           onFocus={() => handleItemSearchChange(saleItem.id, saleItem.searchTerm || "")}
+                          onKeyDown={(e) => handleItemSearchKeyDown(e, saleItem)}
                           className="pl-9 pr-9 h-10 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {saleItem.item_name && (
@@ -327,9 +351,16 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                     {/* Quantity */}
                     <div className="col-span-2">
                       <Input
+                        ref={(el) => { if (el) qtyRefs.current[saleItem.id] = el; }}
                         type="text"
                         value={saleItem.quantity === "" || (saleItem.quantity === 1 && !saleItem.item) ? "" : String(saleItem.quantity || "")}
                         onChange={(e) => handleItemQuantityChange(saleItem.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            priceRefs.current[saleItem.id]?.focus();
+                          }
+                        }}
                         placeholder="Qty"
                         className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -338,9 +369,16 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                     {/* Price */}
                     <div className="col-span-2">
                       <Input
+                        ref={(el) => { if (el) priceRefs.current[saleItem.id] = el; }}
                         type="text"
                         value={saleItem.price === "" || (saleItem.price === 0 && !saleItem.item) ? "" : String(saleItem.price || "")}
                         onChange={(e) => handleItemPriceChange(saleItem.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            notesRef.current?.focus();
+                          }
+                        }}
                         placeholder="Price"
                         className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -385,11 +423,18 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
           <div className="flex flex-col gap-2 flex-shrink-0">
             <Label htmlFor="notes" className="text-sm">Notes</Label>
             <Textarea
+              ref={notesRef}
               id="notes"
               name="notes"
               value={form.notes}
               onChange={handleChange}
-              placeholder="Enter any additional notes"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  saveButtonRef.current?.focus();
+                }
+              }}
+              placeholder="Enter any additional notes (Shift+Enter for new line)"
               rows={2}
               className="text-sm"
             />
@@ -399,7 +444,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button ref={saveButtonRef} type="submit">
               Add Sale
             </Button>
           </DialogFooter>

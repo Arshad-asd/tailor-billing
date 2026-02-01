@@ -40,6 +40,8 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   }, [materialSearchType, selectedMaterials, billItems]);
   // Material measurement cards: when Save is clicked, inputs become read-only until Edit is clicked
   const [lockedMaterialIds, setLockedMaterialIds] = useState([]);
+  // Index of the material currently shown in the single card (for editing); chips at top for selection
+  const [activeMaterialIndex, setActiveMaterialIndex] = useState(0);
   
   // Refs for customer input fields
   const customerNameInputRef = useRef(null);
@@ -914,6 +916,16 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     setLockedMaterialIds(prev => prev.filter(id => selectedMaterials.some(m => m.id === id)));
   }, [selectedMaterials]);
 
+  // Keep activeMaterialIndex in valid range when selectedMaterials changes (e.g. on load)
+  useEffect(() => {
+    const len = selectedMaterials.length;
+    setActiveMaterialIndex(prev => {
+      if (len === 0) return 0;
+      if (prev >= len) return len - 1;
+      return prev;
+    });
+  }, [selectedMaterials.length]);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1010,12 +1022,13 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
+      setActiveMaterialIndex(newMaterials.length - 1);
       // Don't lock newly added material - keep it editable by default
       
-      // Focus the first input field of the newly added material
+      // Focus the first input after the new material card is rendered
       setTimeout(() => {
         materialInputRefs.current[material.id]?.custom_thool?.focus();
-      }, 100);
+      }, 150);
     }
     
     setMaterialNameSearchQuery('');
@@ -1128,19 +1141,28 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       
       const newMaterials = [...selectedMaterials, measurementItem];
       handleMaterialsChange(newMaterials);
+      setActiveMaterialIndex(newMaterials.length - 1);
       // Don't lock newly added material - keep it editable by default
       setIsMaterialSearchOpen(false);
       
-      // Focus the first input field of the newly added material
+      // Focus the first input after modal closes and the new material card is rendered
       setTimeout(() => {
         materialInputRefs.current[material.id]?.custom_thool?.focus();
-      }, 100);
+      }, 200);
     }
   };
 
   const handleRemoveMaterial = (materialId) => {
+    const removedIndex = selectedMaterials.findIndex(m => m.id === materialId);
     const newMaterials = selectedMaterials.filter(m => m.id !== materialId);
     handleMaterialsChange(newMaterials);
+    if (newMaterials.length === 0) {
+      setActiveMaterialIndex(0);
+    } else if (removedIndex === activeMaterialIndex) {
+      setActiveMaterialIndex(0);
+    } else if (removedIndex < activeMaterialIndex) {
+      setActiveMaterialIndex(prev => Math.max(0, prev - 1));
+    }
   };
 
   const handleMeasurementChange = (materialId, field, value) => {
@@ -2003,14 +2025,38 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
             </div>
           </div>
           
-          {/* Selected Materials Display - Card Format with Individual Notes */}
+          {/* Selected Materials: top chips (8 per row) + single card below */}
           {selectedMaterials.length > 0 ? (
             <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Selected Materials with Measurements:</h4>
-              <div className="space-y-4">
-                {selectedMaterials.map((material, index) => (
-                  <div key={material.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
-                    {/* Material Header */}
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Selected Materials (click to edit):</h4>
+              {/* Material name chips - 8 per row, wraps to next row dynamically */}
+              <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 mb-4">
+                {selectedMaterials.map((material, index) => {
+                  const isActive = index === activeMaterialIndex;
+                  return (
+                    <button
+                      key={material.id}
+                      type="button"
+                      onClick={() => setActiveMaterialIndex(index)}
+                      className={`min-w-0 px-2 py-1.5 rounded-lg border text-xs font-medium truncate text-left transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 border-blue-600 text-white dark:bg-blue-500 dark:border-blue-500'
+                          : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      title={material.material_name}
+                    >
+                      {material.material_name}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Single material card - shows active material only */}
+              {(() => {
+                const material = selectedMaterials[activeMaterialIndex];
+                if (!material) return null;
+                const index = activeMaterialIndex;
+                return (
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
                         <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2 py-1 rounded-full">
@@ -2047,8 +2093,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-
-                    {/* Individual Measurement Fields for each material */}
                     <div className="grid grid-cols-6 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Thool</label>
@@ -2129,8 +2173,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                         />
                       </div>
                     </div>
-
-                    {/* Notes section for each material */}
                     <div className="mt-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -2191,8 +2233,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Edit/Save buttons for each material */}
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
@@ -2234,14 +2274,10 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       </div>
                       <div className="flex items-center space-x-2">
                         {isMaterialLocked(material.id) && (
-                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            Saved
-                          </span>
+                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">Saved</span>
                         )}
                         {!isMaterialLocked(material.id) && material.is_customized && (
-                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                            Customized
-                          </span>
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">Customized</span>
                         )}
                         {measurementError[material.id] && (
                           <span className={`text-xs font-medium ${
@@ -2255,8 +2291,8 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">

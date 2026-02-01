@@ -155,6 +155,17 @@ const customerApi = {
       console.error('Error fetching next customer ID:', error);
       throw error;
     }
+  },
+
+  // Get active customer count (for dashboard stats)
+  getActiveCustomerCount: async () => {
+    try {
+      const response = await api.get('/crm/customers/count/', { params: { is_active: 'true' } });
+      return response.data?.count ?? 0;
+    } catch (error) {
+      console.error('Error fetching active customer count:', error);
+      throw error;
+    }
   }
 };
 

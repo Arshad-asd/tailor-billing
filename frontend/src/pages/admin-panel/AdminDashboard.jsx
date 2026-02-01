@@ -8,6 +8,7 @@ import { Badge } from "../../components/ui/badge"
 import { Button } from "../../components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu"
 import { jobOrdersApi } from "../../services/jobOrdersApi"
+import customerApi from "../../services/customerApi"
 import LoadingSpinner from "../../components/LoadingSpinner"
 import {
   Scissors,
@@ -47,6 +48,7 @@ const AdminDashboard = () => {
     total_revenue: 0,
     total_balance: 0,
   })
+  const [activeCustomerCount, setActiveCustomerCount] = useState(0)
   const [recentJobOrders, setRecentJobOrders] = useState([])
 
   // Fetch dashboard data
@@ -56,14 +58,23 @@ const AdminDashboard = () => {
         setLoading(true)
         setError(null)
         
-        // Fetch stats and recent job orders in parallel
-        const [statsResponse, recentResponse] = await Promise.all([
+        // Fetch stats, active customer count, and recent job orders in parallel
+        const [statsResult, customerCountResult, recentResult] = await Promise.allSettled([
           jobOrdersApi.getJobOrderStats({ time_range: timeRange }),
+          customerApi.getActiveCustomerCount(),
           jobOrdersApi.getRecentJobOrders(5)
         ])
-        
-        setStats(statsResponse)
-        setRecentJobOrders(recentResponse)
+
+        if (statsResult.status === 'fulfilled') setStats(statsResult.value)
+        if (recentResult.status === 'fulfilled') setRecentJobOrders(recentResult.value)
+        const count = customerCountResult.status === 'fulfilled' && typeof customerCountResult.value === 'number'
+          ? customerCountResult.value
+          : 0
+        setActiveCustomerCount(count)
+
+        if (statsResult.status === 'rejected' || recentResult.status === 'rejected') {
+          setError('Failed to load dashboard data')
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err)
         setError('Failed to load dashboard data')
@@ -88,7 +99,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Active Customers",
-      value: "89", // This would need to come from customer API
+      value: activeCustomerCount?.toString() ?? "0",
       change: "+12%",
       trend: "up",
       icon: Users,
