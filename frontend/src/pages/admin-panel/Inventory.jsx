@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Package,
   Plus,
@@ -17,6 +17,9 @@ import {
   Grid3X3,
   List,
   Activity,
+  Upload,
+  Download,
+  X,
 } from "lucide-react"
 import InventoryCategoryModal from "../../components/modals/InventoryCategoryModal"
 import AddInventoryItemModal from "../../components/modals/AddInventoryItemModal"
@@ -28,6 +31,8 @@ import {
   updateCategory,
   deleteCategory,
   getItems,
+  uploadItems,
+  downloadItems,
   createItem,
   updateItem,
   deleteItem,
@@ -56,6 +61,9 @@ const Inventory = () => {
   const [inventoryItems, setInventoryItems] = useState([])
   const [stockMovements, setStockMovements] = useState([])
   const [loading, setLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState(null)
+  const fileInputRef = useRef(null)
   
   const { showNotification } = useNotification()
 
@@ -90,6 +98,60 @@ const Inventory = () => {
       showNotification('Error loading data', 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleUploadClick = () => {
+    setUploadMessage(null)
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const name = (file.name || "").toLowerCase()
+    if (!name.endsWith(".csv") && !name.endsWith(".xlsx")) {
+      setUploadMessage({ type: "error", text: "Please select a .csv or .xlsx file." })
+      e.target.value = ""
+      return
+    }
+    setIsUploading(true)
+    setUploadMessage(null)
+    try {
+      const result = await uploadItems(file)
+      await loadData()
+      const msg = result.message || ""
+      const errs = result.errors || []
+      const detail = errs.length ? ` ${errs.length} row(s) had errors.` : ""
+      setUploadMessage({ type: "success", text: `${msg}${detail}` })
+      showNotification(msg, "success")
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.detail || err.message || "Upload failed."
+      setUploadMessage({ type: "error", text: msg })
+      showNotification(msg, "error")
+    } finally {
+      setIsUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleDownload = async () => {
+    try {
+      const response = await downloadItems()
+      const blob = response.data
+      const disposition = response.headers?.["content-disposition"] || ""
+      const match = disposition.match(/filename="?([^";]+)"?/i)
+      const filename = match ? match[1].trim() : "items_export.csv"
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      a.click()
+      window.URL.revokeObjectURL(url)
+      showNotification("Download started", "success")
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.detail || err.message || "Download failed."
+      showNotification(msg, "error")
     }
   }
 
@@ -291,16 +353,51 @@ const Inventory = () => {
 
   const renderItemsContent = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Inventory Items</h2>
-        <button 
-          onClick={handleCreateModal}
-          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.csv"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleUploadClick}
+            disabled={isUploading}
+            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <Upload className={`w-4 h-4 mr-2 ${isUploading ? "animate-pulse" : ""}`} />
+            {isUploading ? "Uploading…" : "Upload xlsx/csv"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </button>
+          <button 
+            onClick={handleCreateModal}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Item
+          </button>
+        </div>
       </div>
+
+      {uploadMessage && (
+        <div className={`rounded-lg p-4 flex items-center justify-between ${uploadMessage.type === "success" ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700" : "bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700"}`}>
+          <p className={uploadMessage.type === "success" ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}>{uploadMessage.text}</p>
+          <button onClick={() => setUploadMessage(null)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-200 dark:border-gray-700">

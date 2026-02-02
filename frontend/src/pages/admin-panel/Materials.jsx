@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRef } from "react"
 import {
   Plus,
   Search,
@@ -17,6 +18,8 @@ import {
   Ruler,
   List,
   Printer,
+  Upload,
+  Download,
 } from "lucide-react"
 import AddMaterialModal from "../../components/modals/AddMaterialModal"
 import EditMaterialModal from "../../components/modals/EditMaterialModal"
@@ -40,6 +43,9 @@ export default function Materials() {
   const [selectedJobOrder, setSelectedJobOrder] = useState(null)
   const [selectedJobOrders, setSelectedJobOrders] = useState([])
   const [selectAll, setSelectAll] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState(null)
+  const fileInputRef = useRef(null)
   
   // Date filter state - default to today
   const getTodayDate = () => {
@@ -98,6 +104,59 @@ export default function Materials() {
     }
   }
 
+  const handleUploadClick = () => {
+    setUploadMessage(null)
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const name = (file.name || "").toLowerCase()
+    if (!name.endsWith(".csv") && !name.endsWith(".xlsx")) {
+      setUploadMessage({ type: "error", text: "Please select a .csv or .xlsx file." })
+      e.target.value = ""
+      return
+    }
+    setIsUploading(true)
+    setUploadMessage(null)
+    setError(null)
+    try {
+      const result = await materialsApi.uploadMaterials(file)
+      await loadMaterials()
+      const msg = result.message || ""
+      const errs = result.errors || []
+      const detail = errs.length ? ` ${errs.length} row(s) had errors.` : ""
+      setUploadMessage({ type: "success", text: `${msg}${detail}` })
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.detail || err.message || "Upload failed."
+      setUploadMessage({ type: "error", text: msg })
+    } finally {
+      setIsUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleDownload = async () => {
+    setError(null)
+    try {
+      const response = await materialsApi.downloadMaterials()
+      const blob = response.data
+      const disposition = response.headers?.["content-disposition"] || ""
+      const match = disposition.match(/filename="?([^";]+)"?/i)
+      const filename = match ? match[1].trim() : "materials_export.csv"
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.detail || err.message || "Download failed."
+      setError(msg)
+    }
+  }
+
   const getStockStatus = (quantity, minStock) => {
     if (quantity === 0) return "out-of-stock"
     if (quantity <= minStock) return "low-stock"
@@ -130,15 +189,16 @@ export default function Materials() {
     }
   }
 
-  const filteredMaterials = materials.filter((material) => {
-    const matchesSearch =
-      material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      material.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (material.material_number && material.material_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (material.arabic_name && material.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    // Note: API materials don't have category field, so we'll skip category filtering for now
-    return matchesSearch
-  })
+  const filteredMaterials = materials
+    .filter((material) => {
+      const matchesSearch =
+        material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        material.id.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (material.material_number && material.material_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (material.arabic_name && material.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()))
+      return matchesSearch
+    })
+    .sort((a, b) => (a.id || 0) - (b.id || 0))
 
   const filteredJobOrders = jobOrders.filter((jobOrder) => {
     const matchesSearch =
@@ -529,6 +589,12 @@ export default function Materials() {
           printWindow.document.close()
           printWindow.focus()
           printWindow.print()
+          try {
+            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, measurements.map((m) => m.id))
+            loadJobOrders()
+          } catch (e) {
+            console.error("Failed to mark measurements as printed:", e)
+          }
         } else {
           alert("Please allow popups for this site to print measurements.")
         }
@@ -636,6 +702,12 @@ export default function Materials() {
           if (!measurements || measurements.length === 0) {
             console.log(`⚠ No measurements found for job order: ${jobOrder.job_order_number}`)
             continue
+          }
+
+          try {
+            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, measurements.map((m) => m.id))
+          } catch (e) {
+            console.error(`Failed to mark measurements as printed for ${jobOrder.job_order_number}:`, e)
           }
 
           // Create a map of material_id to total quantity from job_order_items
@@ -1156,6 +1228,8 @@ export default function Materials() {
       
       console.log(`\n=== All prints completed! ===`)
       
+      loadJobOrders()
+      
       // Close the print window after all prints are done
       if (printWindow && !printWindow.closed) {
         try {
@@ -1234,13 +1308,39 @@ export default function Materials() {
             <span>Refresh</span>
           </button>
           {activeTab === "materials" && (
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Material</span>
-            </button>
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center space-x-2 disabled:opacity-50"
+              >
+                <Upload className={`w-4 h-4 ${isUploading ? "animate-pulse" : ""}`} />
+                <span>{isUploading ? "Uploading…" : "Upload xlsx/csv"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download</span>
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Material</span>
+              </button>
+            </>
           )}
           {activeTab === "measurements" && selectedJobOrders.length > 0 && (
             <button
@@ -1264,6 +1364,26 @@ export default function Materials() {
             <button
               onClick={() => setError(null)}
               className="ml-auto text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload message (success / error) */}
+      {uploadMessage && (
+        <div className={`rounded-lg p-4 ${uploadMessage.type === "success" ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700" : "bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700"}`}>
+          <div className="flex items-center">
+            {uploadMessage.type === "success" ? (
+              <Package className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+            )}
+            <p className={uploadMessage.type === "success" ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}>{uploadMessage.text}</p>
+            <button
+              onClick={() => setUploadMessage(null)}
+              className="ml-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1644,8 +1764,13 @@ export default function Materials() {
                     </td>
                   </tr>
                 ) : (
-                  filteredJobOrders.map((jobOrder) => (
-                    <tr key={jobOrder.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  filteredJobOrders.map((jobOrder) => {
+                    const allMeasurementsPrinted = (jobOrder.job_order_measurements?.length ?? 0) > 0 && jobOrder.job_order_measurements.every((m) => m.is_printed)
+                    return (
+                    <tr
+                      key={jobOrder.id}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${allMeasurementsPrinted ? "bg-green-50 dark:bg-green-900/20" : ""}`}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
@@ -1669,6 +1794,9 @@ export default function Materials() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {jobOrder.job_order_measurements?.length || 0} measurements
+                          {allMeasurementsPrinted && (
+                            <span className="ml-1 text-green-600 dark:text-green-400 font-medium">(printed)</span>
+                          )}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {jobOrder.job_order_items?.length || 0} items
@@ -1713,7 +1841,8 @@ export default function Materials() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>

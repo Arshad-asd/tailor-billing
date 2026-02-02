@@ -30,8 +30,8 @@ class JobOrderMeasurementSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = jobOrderMeasurement
-        fields = ['id', 'material', 'material_name', 'material_arabic_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
-        read_only_fields = ['id']
+        fields = ['id', 'material', 'material_name', 'material_arabic_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active', 'is_printed', 'printed_at']
+        read_only_fields = ['id', 'is_printed', 'printed_at']
 
 
 class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
@@ -42,7 +42,7 @@ class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = jobOrderMeasurement
-        fields = ['id', 'material', 'material_id', 'material_name', 'material_arabic_name', 'quantity', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active']
+        fields = ['id', 'material', 'material_id', 'material_name', 'material_arabic_name', 'quantity', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active', 'is_printed', 'printed_at']
         read_only_fields = ['id']
     
     def get_quantity(self, obj):

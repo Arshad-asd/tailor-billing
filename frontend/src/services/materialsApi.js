@@ -122,6 +122,24 @@ const materialsApi = {
       console.error('Error fetching material statistics:', error);
       throw error;
     }
+  },
+
+  // Upload materials from xlsx/csv file (add or update by material_no)
+  uploadMaterials: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/materials/materials/upload_materials/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Download materials CSV or template (if no data)
+  downloadMaterials: async () => {
+    const response = await api.get('/materials/materials/download/', {
+      responseType: 'blob',
+    });
+    return response;
   }
 };
 

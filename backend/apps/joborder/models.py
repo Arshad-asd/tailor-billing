@@ -62,6 +62,8 @@ class jobOrderMeasurement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-    
+    is_printed = models.BooleanField(default=False)
+    printed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['material__material_number']

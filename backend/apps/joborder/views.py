@@ -188,6 +188,21 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         serializer = JobOrderMeasurementReadSerializer(measurements, many=True)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['post'])
+    def mark_measurements_printed(self, request, pk=None):
+        """Mark job order measurements as printed. POST body: { "measurement_ids": [1,2,3] } or omit to mark all."""
+        job_order = self.get_object()
+        measurement_ids = request.data.get('measurement_ids')
+        now = timezone.now()
+        qs = job_order.jobordermeasurement_set.filter(is_active=True)
+        if measurement_ids is not None:
+            qs = qs.filter(id__in=measurement_ids)
+        updated = qs.update(is_printed=True, printed_at=now)
+        return Response({
+            'message': f'{updated} measurement(s) marked as printed.',
+            'updated_count': updated,
+        }, status=status.HTTP_200_OK)
+    
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get job order statistics"""

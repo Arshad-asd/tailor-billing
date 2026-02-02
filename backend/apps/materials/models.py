@@ -12,7 +12,7 @@ class Material(models.Model):
     is_measurement_required = models.BooleanField(default=False)
     
     class Meta:
-        ordering = ['material_number']
+        ordering = ['id']
     
     def __str__(self):
         return self.name

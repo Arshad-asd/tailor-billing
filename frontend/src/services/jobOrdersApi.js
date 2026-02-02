@@ -109,6 +109,19 @@ export const jobOrdersApi = {
     }
   },
 
+  // Mark job order measurements as printed (after print)
+  markMeasurementsPrinted: async (jobOrderId, measurementIds) => {
+    try {
+      const response = await api.post(`${JOB_ORDERS_BASE_URL}${jobOrderId}/mark_measurements_printed/`, {
+        measurement_ids: measurementIds || [],
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error marking measurements as printed:', error);
+      throw error;
+    }
+  },
+
   // Get job order statistics
   getJobOrderStats: async (params = {}) => {
     try {

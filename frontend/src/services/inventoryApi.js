@@ -37,6 +37,22 @@ const getItem = async (id) => {
   return response.data;
 };
 
+const uploadItems = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post('/inventory/items/upload_items/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+const downloadItems = async () => {
+  const response = await api.get('/inventory/items/download/', {
+    responseType: 'blob',
+  });
+  return response;
+};
+
 const createItem = async (data) => {
   const response = await api.post('/inventory/items/', data);
   return response.data;
@@ -139,6 +155,8 @@ export const inventoryAPI = {
   // Items
   getItems,
   getItem,
+  uploadItems,
+  downloadItems,
   createItem,
   updateItem,
   deleteItem,
@@ -173,6 +191,8 @@ export {
   deleteCategory,
   getItems,
   getItem,
+  uploadItems,
+  downloadItems,
   createItem,
   updateItem,
   deleteItem,
