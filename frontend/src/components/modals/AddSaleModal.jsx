@@ -10,7 +10,7 @@ import { inventoryAPI } from "../../services/inventoryApi";
 
 export default function AddSaleModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState({
-    customerName: "Al-Kharthoum Shop",
+    customerName: "Al-Kharthoum Sale Shop Bill",
     date: "",
     paymentMethod: "cash",
     status: "completed",
@@ -89,7 +89,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       const rest = prev.filter((_, i) => i !== currentIndex);
       // Keep only one empty row: drop other empty rows to avoid duplicates
       const restWithoutEmpty = rest.filter((row) => row.item != null);
-      return [updatedItem, newRow, ...restWithoutEmpty];
+      return [newRow, updatedItem, ...restWithoutEmpty];
     });
   };
 
@@ -210,7 +210,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
       setForm(prev => ({ 
         ...prev, 
         date: prev.date || today,
-        customerName: prev.customerName || "Al-Kharthoum Shop",
+        customerName: prev.customerName || "Al-Kharthoum Sale Shop Bill",
         paymentMethod: prev.paymentMethod || "cash",
         status: prev.status || "completed"
       }));
@@ -228,8 +228,8 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-shrink-0">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-4 gap-3 flex-shrink-0">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <Label htmlFor="customerName" className="text-sm">Customer Name</Label>
               <Input
                 id="customerName"
@@ -238,12 +238,10 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 onChange={handleChange}
                 placeholder="Enter customer name"
                 required
+                className="w-full"
               />
             </div>
-
-
-
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <Label htmlFor="date" className="text-sm">Date</Label>
               <Input
                 id="date"
@@ -252,13 +250,13 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 value={form.date}
                 onChange={handleChange}
                 required
+                className="w-full"
               />
             </div>
-
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <Label htmlFor="paymentMethod" className="text-sm">Payment Method</Label>
               <Select value={form.paymentMethod} onValueChange={(value) => handleSelectChange("paymentMethod", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
+                <SelectTrigger className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
@@ -268,11 +266,10 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <Label htmlFor="status" className="text-sm">Status</Label>
               <Select value={form.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
+                <SelectTrigger className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
@@ -282,14 +279,13 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 </SelectContent>
               </Select>
             </div>
-
           </div>
 
-          {/* Sale Items Section */}
-          <div className="flex flex-col gap-3">
-            <Label className="text-base font-semibold text-gray-900 dark:text-white">Sale Items</Label>
+          {/* Sale Items Section - takes remaining space so 6 rows visible by default */}
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
+            <Label className="text-base font-semibold text-gray-900 dark:text-white flex-shrink-0">Sale Items</Label>
             
-            <div className="flex flex-col bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div className="flex flex-col flex-1 min-h-0 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide pb-2 border-b border-gray-300 dark:border-gray-600 flex-shrink-0 mb-2">
                 <div className="col-span-4">Item Name</div>
@@ -299,17 +295,17 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 <div className="col-span-2"></div>
               </div>
 
-              {/* Scrollable Items Container - Fixed height for exactly 3 items */}
-              <div className="overflow-y-auto space-y-2 pr-2 h-[180px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+              {/* Scrollable Items Container - fills remaining space (6 rows visible by default) */}
+              <div className="flex-1 min-h-[294px] overflow-y-auto space-y-1.5 pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
                 {/* Item Rows */}
                 {saleItems.map((saleItem, index) => {
                 const filteredItems = getFilteredItems(saleItem.id);
                 const isFirstRow = index === 0;
                 return (
-                  <div key={saleItem.id} className="grid grid-cols-12 gap-2 items-start p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+                  <div key={saleItem.id} className="grid grid-cols-12 gap-2 items-center p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors min-h-[44px]">
                     {/* Item Name - Search/Select */}
-                    <div className="col-span-4 relative">
-                      <div className="relative">
+                    <div className="col-span-4 relative flex items-center gap-2 min-w-0">
+                      <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                         <Input
                           ref={isFirstRow ? itemSearchInputRef : undefined}
@@ -319,7 +315,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                           onChange={(e) => handleItemSearchChange(saleItem.id, e.target.value)}
                           onFocus={() => handleItemSearchChange(saleItem.id, saleItem.searchTerm || "")}
                           onKeyDown={(e) => handleItemSearchKeyDown(e, saleItem)}
-                          className="pl-9 pr-9 h-10 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="pl-9 pr-9 h-9 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {saleItem.item_name && (
                           <button
@@ -331,9 +327,16 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                           </button>
                         )}
                       </div>
+                      {(saleItem.item_number || saleItem.item_sku) && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap truncate max-w-[100px]" title={saleItem.item_number ? `Item #: ${saleItem.item_number}` : "" + (saleItem.item_sku ? ` SKU: ${saleItem.item_sku}` : "")}>
+                          {saleItem.item_number ? `#${saleItem.item_number}` : ""}
+                          {saleItem.item_number && saleItem.item_sku ? " · " : ""}
+                          {saleItem.item_sku ? saleItem.item_sku : ""}
+                        </span>
+                      )}
                       {/* Dropdown Results */}
                       {saleItem.isSearching && filteredItems.length > 0 && (
-                        <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                        <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                           {filteredItems.map((item) => (
                             <div
                               key={item.id}
@@ -349,13 +352,6 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                             </div>
                           ))}
                         </div>
-                      )}
-                      {(saleItem.item_number || saleItem.item_sku) && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-1">
-                          {saleItem.item_number ? `Item #: ${saleItem.item_number}` : ""}
-                          {saleItem.item_number && saleItem.item_sku ? " · " : ""}
-                          {saleItem.item_sku ? `SKU: ${saleItem.item_sku}` : ""}
-                        </p>
                       )}
                     </div>
 
@@ -373,7 +369,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                           }
                         }}
                         placeholder="Qty"
-                        className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full h-9 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
 
@@ -391,13 +387,13 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                           }
                         }}
                         placeholder="Price"
-                        className="w-full h-10 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full h-9 text-center bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
 
                     {/* Total */}
                     <div className="col-span-2 flex items-center justify-end">
-                      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded text-sm font-semibold text-gray-900 dark:text-white min-w-[80px] text-right">
+                      <div className="px-2 py-1.5 bg-gray-100 dark:bg-gray-700 rounded text-sm font-semibold text-gray-900 dark:text-white min-w-[70px] text-right">
                         {parseFloat(saleItem.total_amount || 0).toFixed(2)}
                       </div>
                     </div>
@@ -409,7 +405,7 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleRemoveItem(saleItem.id)}
-                        className="h-10 w-10 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                        className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -419,14 +415,12 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
               })}
               </div>
               
-              {/* Total Amount - Fixed at bottom */}
-              <div className="flex justify-end pt-3 mt-2 border-t-2 border-gray-300 dark:border-gray-600 flex-shrink-0">
-                <div className="text-right">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-0.5">Total Amount</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {calculateTotal().toFixed(2)}
-                  </p>
-                </div>
+              {/* Total Amount - compact so more space for item rows */}
+              <div className="flex justify-end items-center gap-3 pt-1.5 mt-1 border-t border-gray-300 dark:border-gray-600 flex-shrink-0">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Amount</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+                  {calculateTotal().toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
@@ -446,8 +440,8 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
                 }
               }}
               placeholder="Enter any additional notes (Shift+Enter for new line)"
-              rows={2}
-              className="text-sm"
+              rows={1}
+              className="text-sm min-h-[32px] py-2 resize-none"
             />
           </div>
 

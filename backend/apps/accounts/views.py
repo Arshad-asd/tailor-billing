@@ -349,6 +349,118 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'], url_path='daily-report-transactions')
+    def daily_report_transactions(self, request):
+        """
+        Get line-by-line transaction details for a specific date and cash-in type.
+        Used when user clicks Advance on Order, Delivery, Cash on Sales, or Receipt in daily report.
+
+        Query params:
+        - date: Date in YYYY-MM-DD format (required)
+        - type: One of advance_on_order, delivery, cash_on_sales, receipt (required)
+
+        Returns:
+        - items: list of { referenceNo, amount } (referenceNo = job_order_number, sale_number, or receipt_id)
+        """
+        try:
+            date_str = request.query_params.get('date')
+            type_param = request.query_params.get('type')
+            if not date_str or not type_param:
+                return Response(
+                    {'error': 'Query params date (YYYY-MM-DD) and type are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid date format. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            valid_types = ['advance_on_order', 'delivery', 'cash_on_sales', 'receipt']
+            if type_param not in valid_types:
+                return Response(
+                    {'error': f'type must be one of: {", ".join(valid_types)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            start_datetime = timezone.make_aware(datetime.combine(target_date, datetime.min.time()))
+            end_datetime = timezone.make_aware(datetime.combine(target_date, datetime.max.time()))
+
+            items = []
+
+            if type_param == 'advance_on_order':
+                lines = TransactionLine.objects.filter(
+                    transaction__transaction_date__gte=start_datetime,
+                    transaction__transaction_date__lte=end_datetime,
+                    transaction_line_method='job_order_advance',
+                    is_active=True
+                ).select_related('transaction', 'transaction__job_order')
+                for line in lines:
+                    jo = line.transaction.job_order
+                    ref_no = jo.job_order_number if jo else 'N/A'
+                    items.append({
+                        'referenceNo': ref_no,
+                        'amount': float(line.transaction_line_amount),
+                    })
+
+            elif type_param == 'delivery':
+                lines = TransactionLine.objects.filter(
+                    transaction_line_method='job_order_delivery',
+                    created_at__gte=start_datetime,
+                    created_at__lte=end_datetime,
+                    is_active=True
+                ).select_related('transaction', 'transaction__job_order')
+                for line in lines:
+                    jo = line.transaction.job_order
+                    ref_no = jo.job_order_number if jo else 'N/A'
+                    items.append({
+                        'referenceNo': ref_no,
+                        'amount': float(line.transaction_line_amount),
+                    })
+
+            elif type_param == 'cash_on_sales':
+                lines = TransactionLine.objects.filter(
+                    transaction__transaction_date__gte=start_datetime,
+                    transaction__transaction_date__lte=end_datetime,
+                    transaction_line_method='sale',
+                    is_active=True
+                ).select_related('transaction', 'transaction__sale')
+                for line in lines:
+                    sale = line.transaction.sale
+                    ref_no = sale.sale_number if sale else 'N/A'
+                    items.append({
+                        'referenceNo': ref_no,
+                        'amount': float(line.transaction_line_amount),
+                    })
+
+            elif type_param == 'receipt':
+                lines = TransactionLine.objects.filter(
+                    transaction__transaction_date__gte=start_datetime,
+                    transaction__transaction_date__lte=end_datetime,
+                    transaction_line_method='receipt',
+                    is_active=True
+                ).select_related('transaction', 'transaction__receipt')
+                for line in lines:
+                    receipt = line.transaction.receipt
+                    ref_no = receipt.receipt_id if receipt else 'N/A'
+                    items.append({
+                        'referenceNo': ref_no,
+                        'amount': float(line.transaction_line_amount),
+                    })
+
+            return Response({
+                'date': target_date.strftime('%Y-%m-%d'),
+                'type': type_param,
+                'items': items,
+            })
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to get transaction details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'], url_path='monthly-report')
     def monthly_report(self, request):
         """

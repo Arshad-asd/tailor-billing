@@ -318,7 +318,7 @@ export default function JobOrders() {
             <style>
               @page { 
                 size: A5 portrait; 
-                margin: 4mm 2mm 15mm 2mm; 
+                margin: 4mm 3mm 15mm 3mm; 
               }
               html, body { 
                 margin: 0; 
@@ -328,7 +328,7 @@ export default function JobOrders() {
                 font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; 
               }
               .a5-sheet { 
-                width: 144mm; 
+                width: 142mm; 
                 min-height: auto;
                 max-height: 210mm;
                 background: #fff; 
@@ -397,7 +397,7 @@ export default function JobOrders() {
                 /* Prevent blank pages - only print pages with content */
                 @page {
                   size: A5 portrait;
-                  margin: 4mm 2mm 15mm 2mm;
+                  margin: 4mm 3mm 15mm 3mm;
                 }
                 /* Avoid breaking inside important sections */
                 .hdr, .tbl, .ftr {

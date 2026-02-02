@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, X, Package, CheckCircle } from 'lucide-react';
 import materialsApi from '../../services/materialsApi';
-import { formatCurrency } from '../../utils/currencyUtils';
 
 export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial, onEditMaterial, onCreateMaterial, filterByMeasurementRequired = null, excludeMaterialIds = [] }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,9 +142,9 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
 
   return (
     <div className="fixed inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-md flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Search Materials</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -176,7 +175,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
         </div>
 
         {/* Search Bar */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex-shrink-0 p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="relative">
             {loading ? (
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -196,7 +195,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
         </div>
 
         {/* Materials List */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -251,9 +250,6 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
                           Number: {material.material_number}
                         </p>
                       )}
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Price: {formatCurrency(material.price || 0)}
-                      </p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
@@ -275,7 +271,7 @@ export default function MaterialSearchModal({ isOpen, onClose, onSelectMaterial,
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+        <div className="flex-shrink-0 bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {loading ? (

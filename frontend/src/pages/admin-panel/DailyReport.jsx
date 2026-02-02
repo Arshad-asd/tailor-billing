@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, DollarSign, TrendingUp, Users, Package, Clock, BarChart3, Download, Printer, ArrowUp, ArrowDown, Plus, Minus, Loader2 } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, Users, Package, Clock, BarChart3, Download, Printer, ArrowUp, ArrowDown, Plus, Minus, Loader2, X } from 'lucide-react';
 import { transactionAPI } from '../../services/transactionsApi';
 
 export default function DailyReport() {
@@ -43,6 +43,15 @@ export default function DailyReport() {
   const [monthDailyData, setMonthDailyData] = useState([]);
   const [loadingMonthDaily, setLoadingMonthDaily] = useState(false);
   const [closingBreakdown, setClosingBreakdown] = useState(false);
+
+  // Cash-in section click → show transaction details modal
+  const [transactionDetailModal, setTransactionDetailModal] = useState({
+    open: false,
+    type: null,
+    title: '',
+    items: [],
+    loading: false,
+  });
 
   // Fetch daily report data
   const fetchDailyReport = async (date) => {
@@ -199,6 +208,55 @@ export default function DailyReport() {
 
   const handleDayClick = (dateStr) => {
     setSelectedDate(dateStr);
+  };
+
+  // Map cash-in section to API type
+  const CASH_IN_TYPES = {
+    advanceOnOrder: { type: 'advance_on_order', title: 'Advance on Order', refLabel: 'Job Order No' },
+    delivery: { type: 'delivery', title: 'Delivery', refLabel: 'Job Order No' },
+    cashOnSales: { type: 'cash_on_sales', title: 'Cash on Sales', refLabel: 'Sale No' },
+    receipt: { type: 'receipt', title: 'Receipt', refLabel: 'Receipt No' },
+  };
+
+  const handleCashInSectionClick = async (sectionKey) => {
+    const config = CASH_IN_TYPES[sectionKey];
+    if (!config) return;
+    setTransactionDetailModal((prev) => ({
+      ...prev,
+      open: true,
+      type: config.type,
+      title: config.title,
+      refLabel: config.refLabel,
+      items: [],
+      loading: true,
+    }));
+    try {
+      // selectedDate is YYYY-MM-DD from date input
+      const data = await transactionAPI.getDailyReportTransactions(selectedDate, config.type);
+      setTransactionDetailModal((prev) => ({
+        ...prev,
+        items: data?.items ?? [],
+        loading: false,
+      }));
+    } catch (err) {
+      console.error('Error fetching transaction details:', err);
+      setTransactionDetailModal((prev) => ({
+        ...prev,
+        items: [],
+        loading: false,
+      }));
+    }
+  };
+
+  const closeTransactionDetailModal = () => {
+    setTransactionDetailModal({
+      open: false,
+      type: null,
+      title: '',
+      refLabel: '',
+      items: [],
+      loading: false,
+    });
   };
 
   // Calculate totals for monthly data
@@ -706,19 +764,43 @@ export default function DailyReport() {
                 </div>
               ) : (
               <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCashInSectionClick('advanceOnOrder')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCashInSectionClick('advanceOnOrder')}
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                >
                   <span className="text-gray-700 dark:text-gray-300">Advance on Order</span>
                   <span className="font-medium text-gray-900 dark:text-white">{(dailyCashFlow?.cashIn?.advanceOnOrder || 0).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCashInSectionClick('delivery')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCashInSectionClick('delivery')}
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                >
                   <span className="text-gray-700 dark:text-gray-300">Delivery</span>
                   <span className="font-medium text-gray-900 dark:text-white">{(dailyCashFlow?.cashIn?.delivery || 0).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCashInSectionClick('cashOnSales')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCashInSectionClick('cashOnSales')}
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                >
                   <span className="text-gray-700 dark:text-gray-300">Cash on Sales</span>
                   <span className="font-medium text-gray-900 dark:text-white">{(dailyCashFlow?.cashIn?.cashOnSales || 0).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCashInSectionClick('receipt')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCashInSectionClick('receipt')}
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                >
                   <span className="text-gray-700 dark:text-gray-300">Receipt</span>
                   <span className="font-medium text-gray-900 dark:text-white">{(dailyCashFlow?.cashIn?.receipt || 0).toFixed(2)}</span>
                 </div>
@@ -1070,6 +1152,61 @@ export default function DailyReport() {
           </div>
         </div>
       </div>
+
+      {/* Transaction detail modal: show line-by-line transactions for selected cash-in type and date */}
+      {transactionDetailModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeTransactionDetailModal}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {transactionDetailModal.title} — {dailyCashFlow?.date || selectedDate}
+              </h3>
+              <button
+                type="button"
+                onClick={closeTransactionDetailModal}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {transactionDetailModal.loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              ) : transactionDetailModal.items?.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-6">No transactions for this date.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        {transactionDetailModal.refLabel}
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {transactionDetailModal.items.map((row, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-gray-900 dark:text-white">{row.referenceNo}</td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">
+                          {(row.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
