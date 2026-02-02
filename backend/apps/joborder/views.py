@@ -363,35 +363,8 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         if payment_method:
             queryset = queryset.filter(payment_method=payment_method)
         
-        # Filter by delivery_date range (this is the key difference from regular job orders)
-        from_date = request.query_params.get('from_date')
-        to_date = request.query_params.get('to_date')
-        
-        if from_date:
-            try:
-                from datetime import datetime, time
-                from_date_obj = datetime.strptime(from_date, '%Y-%m-%d').date()
-                # Use date range starting from beginning of the day
-                from_datetime = datetime.combine(from_date_obj, time.min)
-                if timezone.is_aware(timezone.now()):
-                    from_datetime = timezone.make_aware(from_datetime)
-                queryset = queryset.filter(delivery_date__gte=from_datetime)
-            except ValueError:
-                pass  # Invalid date format, ignore the filter
-        
-        if to_date:
-            try:
-                from datetime import datetime, time
-                to_date_obj = datetime.strptime(to_date, '%Y-%m-%d').date()
-                # Use date range ending at end of the day
-                to_datetime = datetime.combine(to_date_obj, time.max)
-                if timezone.is_aware(timezone.now()):
-                    to_datetime = timezone.make_aware(to_datetime)
-                queryset = queryset.filter(delivery_date__lte=to_datetime)
-            except ValueError:
-                pass  # Invalid date format, ignore the filter
-        
-        # Search by job order number, customer name, customer phone, or customer ID
+        # When search is provided: global search (do not apply date range).
+        # When no search: filter by delivery_date range for listing.
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(
@@ -400,6 +373,30 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 models.Q(customer__phone__icontains=search) |
                 models.Q(customer__customer_id__icontains=search)
             )
+        else:
+            # Filter by delivery_date range for listing (from_date / to_date)
+            from_date = request.query_params.get('from_date')
+            to_date = request.query_params.get('to_date')
+            if from_date:
+                try:
+                    from datetime import datetime, time
+                    from_date_obj = datetime.strptime(from_date, '%Y-%m-%d').date()
+                    from_datetime = datetime.combine(from_date_obj, time.min)
+                    if timezone.is_aware(timezone.now()):
+                        from_datetime = timezone.make_aware(from_datetime)
+                    queryset = queryset.filter(delivery_date__gte=from_datetime)
+                except ValueError:
+                    pass
+            if to_date:
+                try:
+                    from datetime import datetime, time
+                    to_date_obj = datetime.strptime(to_date, '%Y-%m-%d').date()
+                    to_datetime = datetime.combine(to_date_obj, time.max)
+                    if timezone.is_aware(timezone.now()):
+                        to_datetime = timezone.make_aware(to_datetime)
+                    queryset = queryset.filter(delivery_date__lte=to_datetime)
+                except ValueError:
+                    pass
         
         serializer = JobOrderListSerializer(queryset, many=True)
         return Response(serializer.data)
