@@ -116,7 +116,7 @@ try {
         exit 1
     }
     
-    # Find Python executable - check for virtual environment first
+    # Find Python executable - check for virtual environment first (most reliable)
     $pythonExe = $null
     $venvPath = Join-Path $backendDir "venv"
     $venvPython = Join-Path $venvPath "Scripts\python.exe"
@@ -125,56 +125,58 @@ try {
         $pythonExe = $venvPython
         Write-Log "Using Python from virtual environment: $pythonExe"
     } else {
-        # Try other Python paths
-        $pythonPaths = @(
-            "C:\Python313\python.exe",
-            "C:\Users\USER\AppData\Local\Programs\Python\Python310\python.exe",
-            "python.exe"
+        # Try PATH first (works when Python is in system PATH)
+        try {
+            $pythonExe = (Get-Command python -ErrorAction Stop).Source
+            Write-Log "Using Python from PATH: $pythonExe"
+        } catch {
+            # Try common locations (no username - works on any computer)
+            $pythonPaths = @(
+                "C:\Python313\python.exe",
+                "C:\Python312\python.exe",
+                "C:\Python311\python.exe",
+                "C:\Python310\python.exe",
+                (Join-Path $env:ProgramFiles "Python313\python.exe"),
+                (Join-Path $env:ProgramFiles "Python312\python.exe"),
+                (Join-Path $env:ProgramFiles "Python311\python.exe"),
+                (Join-Path $env:LocalAppData "Programs\Python\Python313\python.exe"),
+                (Join-Path $env:LocalAppData "Programs\Python\Python312\python.exe")
+            )
+            foreach ($path in $pythonPaths) {
+                if ($path -and (Test-Path $path)) {
+                    $pythonExe = $path
+                    Write-Log "Using Python: $pythonExe"
+                    break
+                }
+            }
+        }
+        if (-not $pythonExe) {
+            Write-ErrorLog "Python not found! Create backend venv: cd backend; python -m venv venv; .\venv\Scripts\pip install -r requirements.txt"
+            exit 1
+        }
+    }
+    
+    # Find Node.js executable - try PATH first, then common location
+    $nodeExe = $null
+    try {
+        $nodeExe = (Get-Command node -ErrorAction Stop).Source
+        Write-Log "Using Node.js from PATH: $nodeExe"
+    } catch {
+        $nodePaths = @(
+            (Join-Path $env:ProgramFiles "nodejs\node.exe"),
+            "C:\Program Files\nodejs\node.exe"
         )
-        
-        foreach ($path in $pythonPaths) {
-            if (Test-Path $path) {
-                $pythonExe = $path
-                Write-Log "Using Python: $pythonExe"
+        foreach ($path in $nodePaths) {
+            if ($path -and (Test-Path $path)) {
+                $nodeExe = $path
+                Write-Log "Using Node.js: $nodeExe"
                 break
             }
         }
-        
-        if (-not $pythonExe) {
-            # Try to find Python in PATH
-            try {
-                $pythonExe = (Get-Command python -ErrorAction Stop).Source
-                Write-Log "Using Python from PATH: $pythonExe"
-            } catch {
-                Write-ErrorLog "Python not found! Please install Python or update the script with the correct path."
-                exit 1
-            }
-        }
     }
-    
-    # Find Node.js executable
-    $nodeExe = $null
-    $nodePaths = @(
-        "C:\Program Files\nodejs\node.exe",
-        "node.exe"
-    )
-    
-    foreach ($path in $nodePaths) {
-        if (Test-Path $path) {
-            $nodeExe = $path
-            Write-Log "Using Node.js: $nodeExe"
-            break
-        }
-    }
-    
     if (-not $nodeExe) {
-        try {
-            $nodeExe = (Get-Command node -ErrorAction Stop).Source
-            Write-Log "Using Node.js from PATH: $nodeExe"
-        } catch {
-            Write-ErrorLog "Node.js not found! Please install Node.js or update the script with the correct path."
-            exit 1
-        }
+        Write-ErrorLog "Node.js not found! Install from https://nodejs.org and ensure it is in PATH."
+        exit 1
     }
     
     # Start backend in a separate process

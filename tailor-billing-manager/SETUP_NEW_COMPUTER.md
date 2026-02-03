@@ -8,11 +8,14 @@ Use this guide after cloning the repo on a new computer to set up and run the GU
 
 When you open the manager and see **"Not Installed"** and **"Not running as Administrator"**:
 
-1. **Install the Windows service first** (required for Start/Stop/Restart):
+1. **Set up the backend first** (so the service can start when you install it):
+   - In the project root: `cd backend`, then `python -m venv venv`, then activate venv and `pip install -r requirements.txt`.
+   - Or follow the main project **SETUP_GUIDE.md** for full backend/frontend setup.
+2. **Install the Windows service**:
    - Open the **project root** folder (the folder that contains `backend`, `frontend`, and `install-service.bat`).
    - Right‑click **`install-service.bat`** → **Run as administrator**.
-   - Wait until it says the service was installed (and optionally started).
-2. **Optional:** To use Start/Stop/Restart from the manager, run the manager as Administrator (right‑click `main.py` or the exe → **Run as administrator**).
+   - If you see **“Service installed but failed to start!”**, see the **Troubleshooting** section below (check `logs\startup-errors.log` and `logs\service-error.log`).
+3. **Optional:** To use Start/Stop/Restart from the manager, run the manager as Administrator (right‑click `main.py` or the exe → **Run as administrator**).
 
 Until the service is installed, Start/Stop/Restart will stay disabled; Git Sync and other buttons can still work.
 
@@ -171,6 +174,35 @@ If you get “Access is denied” on service actions, run the app (or the exe) *
 ### “Git pull” or “Sync” fails
 - Check: `git --version`, `git remote -v`, and network (e.g. can reach GitHub).
 - See `NETWORK_TROUBLESHOOTING.md` in the same folder if needed.
+
+### “Service installed but failed to start”
+
+If **install-service.bat** says **“Service installed but failed to start!”** or **“SERVICE_STOPPED in response to START”**:
+
+1. **Check the logs** (they show the real error):
+   - Open the project folder → **`logs`**.
+   - Read **`startup-errors.log`** and **`service-error.log`** (and **`backend-errors.log`** if it exists).
+   - The last lines usually say why the service stopped (e.g. “Python not found”, “No module named 'django'”).
+
+2. **Set up the backend** (required before the service can start):
+   ```powershell
+   cd backend
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   cd ..
+   ```
+   Then run **install-service.bat** again as Administrator.
+
+3. **Ensure Python and Node are available**:
+   - Install **Python** and **Node.js** and make sure they are on the **system PATH** (not only in your user session).
+   - Or use the backend **venv** (step 2) so the service uses `backend\venv\Scripts\python.exe`.
+
+4. **Start the service manually** after fixing:
+   ```powershell
+   nssm start TailorBillingApp
+   ```
+   If it fails again, check **`logs\service-error.log`** and **`logs\startup-errors.log`** again.
 
 ### Want to run the main Tailor Billing app as a Windows service
 - That is separate from the manager. Use the project’s **install-service.bat** (from the repo root) and the main setup docs for the backend/frontend and NSSM service install.
