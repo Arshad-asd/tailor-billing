@@ -4,6 +4,20 @@ Use this guide after cloning the repo on a new computer to set up and run the GU
 
 ---
 
+## If the manager shows "Not Installed"
+
+When you open the manager and see **"Not Installed"** and **"Not running as Administrator"**:
+
+1. **Install the Windows service first** (required for Start/Stop/Restart):
+   - Open the **project root** folder (the folder that contains `backend`, `frontend`, and `install-service.bat`).
+   - Right‑click **`install-service.bat`** → **Run as administrator**.
+   - Wait until it says the service was installed (and optionally started).
+2. **Optional:** To use Start/Stop/Restart from the manager, run the manager as Administrator (right‑click `main.py` or the exe → **Run as administrator**).
+
+Until the service is installed, Start/Stop/Restart will stay disabled; Git Sync and other buttons can still work.
+
+---
+
 ## 1. Prerequisites
 
 Install these **before** running the manager:

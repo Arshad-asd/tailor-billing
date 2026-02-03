@@ -151,6 +151,16 @@ class TailorBillingManager:
         self.sync_time_label = ttk.Label(status_frame, text="Never", font=("Segoe UI", 9))
         self.sync_time_label.grid(row=3, column=1, sticky=tk.W, pady=4)
         
+        # Hint when service is not installed (new computer)
+        self.not_installed_hint = ttk.Label(
+            status_frame,
+            text="",
+            font=("Segoe UI", 9),
+            foreground=COLOR_INFO,
+            wraplength=500
+        )
+        self.not_installed_hint.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        
         # Administrator Controls Frame - NEW SECTION
         admin_frame = ttk.LabelFrame(main_frame, text="  Administrator Controls  ", padding="12")
         admin_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -533,11 +543,22 @@ class TailorBillingManager:
             self.start_btn.config(state='disabled')
             self.stop_btn.config(state='disabled')
             self.restart_btn.config(state='disabled')
+            try:
+                from config import PROJECT_ROOT
+                self.not_installed_hint.config(
+                    text=f"Install first: go to project folder, right‑click install-service.bat → Run as administrator. Path: {PROJECT_ROOT}"
+                )
+            except Exception:
+                self.not_installed_hint.config(text="Install first: Run install-service.bat as Administrator from the project root.")
         else:
             self.status_label.config(text="❓ Unknown", foreground=COLOR_INFO)
             self.start_btn.config(state='normal')
             self.stop_btn.config(state='normal')
             self.restart_btn.config(state='normal')
+        
+        # Clear "not installed" hint when service is installed
+        if self.service_status != 'not_installed':
+            self.not_installed_hint.config(text="")
         
         if self.last_sync_time:
             self.sync_time_label.config(text=self.last_sync_time.strftime("%Y-%m-%d %H:%M:%S"))
