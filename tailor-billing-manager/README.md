@@ -17,6 +17,10 @@ A user-friendly Windows desktop application to manage your Tailor Billing applic
 - NSSM installed (for service management)
 - Git installed (for sync functionality)
 
+## New Computer? Cloned the Repo?
+
+See **[SETUP_NEW_COMPUTER.md](SETUP_NEW_COMPUTER.md)** for step-by-step setup on a fresh clone.
+
 ## Installation
 
 ### Option 1: Run from Source
