@@ -62,14 +62,15 @@ export default function Delivery() {
       
       if (searchTerm) {
         params.search = searchTerm;
-      }
-      
-      if (fromDate) {
-        params.from_date = fromDate;
-      }
-      
-      if (toDate) {
-        params.to_date = toDate;
+        // When searching, do not send date range — global search across all deliveries
+      } else {
+        // When not searching, apply from_date and to_date for listing
+        if (fromDate) {
+          params.from_date = fromDate;
+        }
+        if (toDate) {
+          params.to_date = toDate;
+        }
       }
       
       const data = await deliveryApi.getDeliveries(params);

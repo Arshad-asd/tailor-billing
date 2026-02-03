@@ -316,32 +316,35 @@ export default function JobOrders() {
           <head>
             <title>Print Job Order</title>
             <style>
+              *, *::before, *::after { box-sizing: border-box; }
               @page { 
                 size: A5 portrait; 
-                margin: 4mm 3mm 15mm 3mm; 
+                margin: 5mm; 
               }
               html, body { 
                 margin: 0; 
                 padding: 0; 
                 height: auto;
-                overflow: visible;
+                overflow-x: hidden;
+                overflow-y: visible;
                 font-family: "Noto Naskh Arabic", "Tahoma", "Segoe UI", Arial, sans-serif; 
               }
               .a5-sheet { 
-                width: 142mm; 
+                width: 100%;
+                max-width: 100%;
                 min-height: auto;
-                max-height: 210mm;
+                max-height: none;
                 background: #fff; 
                 color: #111827; 
-                padding: 3mm 0 3mm 0; 
+                padding: 2mm 0 2mm 0; 
                 page-break-after: always;
                 page-break-inside: avoid;
               }
               .a5-sheet:last-child {
                 page-break-after: avoid;
               }
-              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; page-break-inside: avoid; }
-              .hdr-top { margin-bottom: 0.5mm; margin-top: -1mm; }
+              .hdr { padding-bottom: 2mm; margin-bottom: 2mm; page-break-inside: avoid; min-width: 0; overflow: hidden; }
+              .hdr-top { margin-bottom: 0.5mm; margin-top: -1mm; min-width: 0; }
               .hdr-phone { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1mm; gap: 4mm; direction: ltr; }
               .hdr-phone-left { text-align: left; justify-self: start; }
               .hdr-phone-right { text-align: right; justify-self: end; }
@@ -351,8 +354,8 @@ export default function JobOrders() {
               .small { font-size: 9pt; color: #4b5563; }
               .left { text-align: left; }
               .right { text-align: right; }
-              .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; align-items: center; margin-top: 1mm; font-size: 10.5pt; }
-              .row .cell { text-align: right; }
+              .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; align-items: center; margin-top: 1mm; font-size: 10.5pt; min-width: 0; }
+              .row .cell { text-align: right; min-width: 0; overflow: hidden; }
               .row .cell.left { text-align: left; }
               .row .cell.center { text-align: center; }
               .title { font-weight: 700; font-size: 12pt; }
@@ -360,13 +363,13 @@ export default function JobOrders() {
               .submeta .cell.left { text-align: left; justify-self: start; }
               .submeta .cell:not(.left) { text-align: right; justify-self: end; }
               table.items { width: 100%; max-width: 100%; border: 1px solid #9ca3af; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; page-break-inside: avoid; }
-              .tbl { width: 100%; }
+              .tbl { width: 100%; min-width: 0; overflow: hidden; }
               table.items th, table.items td { border: none; padding: 4px 6px; vertical-align: middle; }
               table.items thead tr { border-bottom: 1px solid #9ca3af; }
               table.items thead th { background: #f3f4f6; font-weight: 700; text-align: right; white-space: nowrap; }
               table.items thead th.col-qty { text-align: center; }
               table.items thead th.col-unit { text-align: center; }
-              .col-details { width: 55%; }
+              .col-details { width: 55%; min-width: 0; overflow: hidden; word-wrap: break-word; }
               .col-qty { width: 15%; text-align: center; }
               .col-unit { width: 15%; text-align: center; }
               .col-amt { width: 15%; text-align: right; }
@@ -374,16 +377,20 @@ export default function JobOrders() {
               table.items tfoot .totals-separator td { padding: 2px 6px; }
               .tbl { margin-bottom: 0; }
               .ftr { margin-top: 1mm; padding-top: 1mm; font-size: 9.5pt; color: #374151; page-break-inside: avoid; }
-              .hours { text-align: center; white-space: nowrap; }
-              
+              .hours { text-align: center; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; }
+
               @media print {
                 html, body {
                   height: auto !important;
-                  overflow: visible !important;
-                  margin: 0;
-                  padding: 0;
+                  overflow-x: hidden !important;
+                  overflow-y: visible !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100% !important;
                 }
                 .a5-sheet {
+                  width: 100% !important;
+                  max-width: 100% !important;
                   page-break-after: always !important;
                   page-break-inside: avoid !important;
                   height: auto !important;
@@ -394,10 +401,11 @@ export default function JobOrders() {
                 .a5-sheet:last-child {
                   page-break-after: avoid !important;
                 }
+                .hours { white-space: normal !important; word-wrap: break-word !important; overflow-wrap: break-word !important; }
                 /* Prevent blank pages - only print pages with content */
                 @page {
                   size: A5 portrait;
-                  margin: 4mm 3mm 15mm 3mm;
+                  margin: 5mm;
                 }
                 /* Avoid breaking inside important sections */
                 .hdr, .tbl, .ftr {
