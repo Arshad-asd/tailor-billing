@@ -117,14 +117,16 @@ echo ==========================================
 echo.
 echo Service Name: %SERVICE_NAME%
 echo.
+echo *** To fix PAUSED and auto-start after reboot ***
+echo Run once (as Administrator):
+echo   powershell -ExecutionPolicy Bypass -File "%PROJECT_ROOT%fix-paused-service.ps1"
+echo That will run the service as your user so it shows RUNNING and starts after power off/on.
+echo.
 echo Useful commands:
 echo   Start service:   nssm start %SERVICE_NAME%
 echo   Stop service:    nssm stop %SERVICE_NAME%
 echo   Restart service: nssm restart %SERVICE_NAME%
 echo   View status:     nssm status %SERVICE_NAME%
-echo   View logs:       nssm edit %SERVICE_NAME%
-echo.
-echo The application will now start automatically on system boot!
 echo.
 pause
 exit /b 0
