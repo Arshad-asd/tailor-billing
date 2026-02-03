@@ -92,6 +92,19 @@ class ServiceManager:
                 'access_denied': False
             }
 
+    def _is_not_installed_error(self, result):
+        """Check if the error indicates the service is not installed"""
+        err = (result.get('error') or '').lower()
+        out = (result.get('output') or '').lower()
+        combined = err + ' ' + out
+        return (
+            'does not exist' in combined or
+            'not exist' in combined or
+            'cannot open service' in combined or
+            'not installed' in combined or
+            'no installed service' in combined
+        )
+
     def get_service_status(self):
         """Get the current status of the service"""
         result = self.run_command(f'{self.nssm_command} status {self.service_name}')
@@ -107,23 +120,29 @@ class ServiceManager:
                 return 'unknown'
         else:
             # Service might not exist
-            if 'does not exist' in result['error'].lower() or 'cannot open service' in result['error'].lower():
+            if self._is_not_installed_error(result):
                 return 'not_installed'
             return 'error'
 
     def start_service(self):
         """Start the service"""
         result = self.run_command(f'{self.nssm_command} start {self.service_name}')
+        if not result['success'] and self._is_not_installed_error(result):
+            result['not_installed'] = True
         return result
 
     def stop_service(self):
         """Stop the service"""
         result = self.run_command(f'{self.nssm_command} stop {self.service_name}')
+        if not result['success'] and self._is_not_installed_error(result):
+            result['not_installed'] = True
         return result
 
     def restart_service(self):
         """Restart the service"""
         result = self.run_command(f'{self.nssm_command} restart {self.service_name}')
+        if not result['success'] and self._is_not_installed_error(result):
+            result['not_installed'] = True
         return result
 
     def check_nssm_installed(self):

@@ -74,6 +74,24 @@ class TailorBillingManager:
                 messagebox.showerror("Error", f"Failed to restart as Administrator:\n{str(e)}\n\nPlease manually run as Administrator.")
         else:
             messagebox.showinfo("Info", "Please run the application as Administrator to perform this operation.")
+
+    def show_service_not_installed_error(self, operation):
+        """Show clear message when service is not installed (e.g. on new computer)"""
+        from config import PROJECT_ROOT
+        install_bat = PROJECT_ROOT / "install-service.bat"
+        msg = (
+            f"The Tailor Billing service is not installed on this computer.\n\n"
+            f"You cannot {operation} the service until it is installed.\n\n"
+            f"To install the service:\n"
+            f"1. Open Command Prompt or PowerShell as Administrator\n"
+            f"2. Go to the project folder:\n"
+            f"   cd \"{PROJECT_ROOT}\"\n"
+            f"3. Run: .\\install-service.bat\n\n"
+            f"Or double-click install-service.bat (right-click → Run as administrator)\n"
+            f"from the project root folder.\n\n"
+            f"See SETUP_GUIDE.md or SETUP_NEW_COMPUTER.md in the project for full setup."
+        )
+        messagebox.showerror("Service Not Installed", msg)
     
     def create_ui(self):
         """Create the user interface"""
@@ -499,22 +517,27 @@ class TailorBillingManager:
             self.status_label.config(text="🟢 Running", foreground=COLOR_RUNNING)
             self.start_btn.config(state='disabled')
             self.stop_btn.config(state='normal')
+            self.restart_btn.config(state='normal')
         elif self.service_status == 'stopped':
             self.status_label.config(text="🔴 Stopped", foreground=COLOR_STOPPED)
             self.start_btn.config(state='normal')
             self.stop_btn.config(state='disabled')
+            self.restart_btn.config(state='normal')
         elif self.service_status == 'paused':
             self.status_label.config(text="⏸ Paused", foreground=COLOR_WARNING)
             self.start_btn.config(state='normal')
             self.stop_btn.config(state='normal')
+            self.restart_btn.config(state='normal')
         elif self.service_status == 'not_installed':
             self.status_label.config(text="⚠ Not Installed", foreground=COLOR_WARNING)
             self.start_btn.config(state='disabled')
             self.stop_btn.config(state='disabled')
+            self.restart_btn.config(state='disabled')
         else:
             self.status_label.config(text="❓ Unknown", foreground=COLOR_INFO)
             self.start_btn.config(state='normal')
             self.stop_btn.config(state='normal')
+            self.restart_btn.config(state='normal')
         
         if self.last_sync_time:
             self.sync_time_label.config(text=self.last_sync_time.strftime("%Y-%m-%d %H:%M:%S"))
@@ -565,6 +588,9 @@ class TailorBillingManager:
     
     def start_service(self):
         """Start the service"""
+        if self.service_status == 'not_installed':
+            self.show_service_not_installed_error("start")
+            return
         def do_start():
             self.progress.grid()
             self.progress.start()
@@ -580,7 +606,9 @@ class TailorBillingManager:
                 messagebox.showinfo("Success", "Service started successfully!")
                 self.service_status = 'running'
             else:
-                if result.get('access_denied', False):
+                if result.get('not_installed', False):
+                    self.root.after(0, lambda: self.show_service_not_installed_error("start"))
+                elif result.get('access_denied', False):
                     self.show_access_denied_error("start")
                 else:
                     messagebox.showerror("Error", f"Failed to start service:\n{result['error']}")
@@ -593,6 +621,9 @@ class TailorBillingManager:
     
     def stop_service(self):
         """Stop the service"""
+        if self.service_status == 'not_installed':
+            self.show_service_not_installed_error("stop")
+            return
         if not messagebox.askyesno("Confirm", "Are you sure you want to stop the service?"):
             return
         
@@ -611,7 +642,9 @@ class TailorBillingManager:
                 messagebox.showinfo("Success", "Service stopped successfully!")
                 self.service_status = 'stopped'
             else:
-                if result.get('access_denied', False):
+                if result.get('not_installed', False):
+                    self.root.after(0, lambda: self.show_service_not_installed_error("stop"))
+                elif result.get('access_denied', False):
                     self.show_access_denied_error("stop")
                 else:
                     messagebox.showerror("Error", f"Failed to stop service:\n{result['error']}")
@@ -624,6 +657,9 @@ class TailorBillingManager:
     
     def restart_service(self):
         """Restart the service"""
+        if self.service_status == 'not_installed':
+            self.show_service_not_installed_error("restart")
+            return
         def do_restart():
             self.progress.grid()
             self.progress.start()
@@ -639,7 +675,9 @@ class TailorBillingManager:
                 messagebox.showinfo("Success", "Service restarted successfully!")
                 self.service_status = 'running'
             else:
-                if result.get('access_denied', False):
+                if result.get('not_installed', False):
+                    self.root.after(0, lambda: self.show_service_not_installed_error("restart"))
+                elif result.get('access_denied', False):
                     self.show_access_denied_error("restart")
                 else:
                     messagebox.showerror("Error", f"Failed to restart service:\n{result['error']}")
