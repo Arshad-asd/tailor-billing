@@ -171,10 +171,10 @@ export default function JobOrders() {
     const generateHeader = () => `
       <div class="hdr" dir="rtl">
         <div class="hdr-top">
-      <div class="right brand-main">الخرطوم</div>
+      <div class="right brand-main">الخرطـــــــــــــــــــــــــــــــــــــــوم</div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 1mm;">
-        <div class="brand-subtitle" style="text-align: left;">لتفصيل وخياطة الملابس السودانية</div>
-        <div class="small" style="text-align: left; color: black;"><strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span></div>
+        <div class="brand-subtitle" style="text-align: left; white-space: nowrap;">لتفصيل وخياطة الملابس السودانية</div>
+        <div class="small" style="text-align: left; color: black;"><span style="white-space: nowrap;"><strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span></span></div>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 0.5mm;">
         <div class="small" style="text-align: right; color: black;"><span>جوال:</span> <strong>50377968</strong></div>
@@ -350,7 +350,7 @@ export default function JobOrders() {
               .hdr-phone-right { text-align: right; justify-self: end; }
               .brand { font-weight: 700; text-align: right; font-size: 14pt; }
               .brand-main { font-weight: 700; text-align: right; font-size: 20pt; line-height: 1.2; }
-              .brand-subtitle { font-weight: 600; text-align: center; font-size: 12pt; margin-top: 1mm; color: #374151; }
+              .brand-subtitle { font-weight: 600; text-align: center; font-size: 12pt; margin-top: 1mm; color: #374151; white-space: nowrap; }
               .small { font-size: 9pt; color: #4b5563; }
               .left { text-align: left; }
               .right { text-align: right; }
@@ -376,8 +376,8 @@ export default function JobOrders() {
               table.items tfoot td { padding: 2px 6px; vertical-align: middle; }
               table.items tfoot .totals-separator td { padding: 2px 6px; }
               .tbl { margin-bottom: 0; }
-              .ftr { margin-top: 1mm; padding-top: 1mm; font-size: 9.5pt; color: #374151; page-break-inside: avoid; }
-              .hours { text-align: center; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; }
+              .ftr { margin-top: 1mm; padding-top: 1mm; font-size: 8pt; color: #374151; page-break-inside: avoid; }
+              .hours { text-align: center; white-space: nowrap; font-size: 8pt; }
 
               @media print {
                 html, body {
@@ -401,7 +401,7 @@ export default function JobOrders() {
                 .a5-sheet:last-child {
                   page-break-after: avoid !important;
                 }
-                .hours { white-space: normal !important; word-wrap: break-word !important; overflow-wrap: break-word !important; }
+                .hours { white-space: nowrap !important; }
                 /* Prevent blank pages - only print pages with content */
                 @page {
                   size: A5 portrait;
