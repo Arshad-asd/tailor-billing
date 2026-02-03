@@ -3,19 +3,41 @@
 
 $ErrorActionPreference = "Continue"
 
-# Get script directory - more reliable method
-$scriptPath = $MyInvocation.MyCommand.Path
-if (-not $scriptPath) {
-    $scriptPath = $PSCommandPath
-}
-if (-not $scriptPath) {
-    $scriptPath = Get-Location
-}
+# Diagnostic log when run as service (write to TEMP so we always have a trace)
+$diagLog = Join-Path $env:TEMP "tailor-billing-service-diag.log"
+try {
+    $diagLine = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Script started. MyInvocation=$($MyInvocation.MyCommand.Path); PSCommandPath=$($PSCommandPath); Get-Location=$((Get-Location).Path)"
+    [System.IO.File]::WriteAllText($diagLog, $diagLine + "`r`n", [System.Text.Encoding]::UTF8)
+} catch { }
 
-$projectRoot = Split-Path -Parent $scriptPath
-if (-not $projectRoot) {
-    $projectRoot = Get-Location
+# Project root: prefer working directory (NSSM AppDirectory) when valid, then env, then script path
+$projectRoot = $null
+try {
+    $cwd = (Get-Location).Path
+    if ($cwd -and (Test-Path (Join-Path $cwd "backend")) -and (Test-Path (Join-Path $cwd "frontend"))) {
+        $projectRoot = $cwd
+    }
+} catch { }
+if (-not $projectRoot -and $env:TAILOR_PROJECT_ROOT) {
+    try {
+        $tr = $env:TAILOR_PROJECT_ROOT.TrimEnd('\')
+        if ((Test-Path (Join-Path $tr "backend")) -and (Test-Path (Join-Path $tr "frontend"))) { $projectRoot = $tr }
+    } catch { }
 }
+if (-not $projectRoot) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    if (-not $scriptPath) { $scriptPath = $PSCommandPath }
+    if ($scriptPath) {
+        $projectRoot = Split-Path -Parent $scriptPath
+        if (-not (Test-Path (Join-Path $projectRoot "backend")) -or -not (Test-Path (Join-Path $projectRoot "frontend"))) { $projectRoot = $null }
+    }
+}
+if (-not $projectRoot) {
+    $projectRoot = (Get-Location).Path
+}
+try {
+    [System.IO.File]::AppendAllText($diagLog, "ProjectRoot=$projectRoot`r`n", [System.Text.Encoding]::UTF8)
+} catch { }
 
 $backendDir = Join-Path $projectRoot "backend"
 $frontendDir = Join-Path $projectRoot "frontend"
