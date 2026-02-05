@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from apps.joborder.models import JobOrder
 
 # Create your models here.
@@ -8,7 +9,7 @@ class Receipt(models.Model):
     receipt_amount = models.DecimalField(max_digits=10, decimal_places=2)
     receipt_remarks = models.TextField(null=True, blank=True)
     job_order = models.ForeignKey(JobOrder, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)  # Set from receipt_date when creating/updating
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     

@@ -3,22 +3,14 @@ import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Truck, CheckCirc
 import { deliveryApi } from '../../services/deliveryApi';
 import DeliveryEditModal from '../../components/modals/DeliveryEditModal';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
+import { formatDateStr, formatTime } from '../../utils/dateUtils';
 
 export default function Delivery() {
-  // Get today's date in YYYY-MM-DD format
-  const getTodayDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [blockedFilter, setBlockedFilter] = useState('unblocked'); // Default to unblocked
-  const [fromDate, setFromDate] = useState(getTodayDate());
-  const [toDate, setToDate] = useState(getTodayDate());
+  const [fromDate, setFromDate] = useState(formatDateStr(new Date()));
+  const [toDate, setToDate] = useState(formatDateStr(new Date()));
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -288,19 +280,11 @@ export default function Delivery() {
       phone: jobOrder.customer_phone,
       service: jobOrder.job_order_items?.[0]?.material_name || 'Service',
       status: jobOrder.status,
-      deliveryDate: deliveryDateTime ? deliveryDateTime.toISOString().split('T')[0] : '',
-      deliveryTime: deliveryDateTime ? deliveryDateTime.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      }) : '',
+      deliveryDate: deliveryDateTime ? formatDateStr(deliveryDateTime) : '',
+      deliveryTime: deliveryDateTime ? formatTime(deliveryDateTime) : '',
       deliveryDateTime: deliveryDateTime ? deliveryDateTime.toISOString() : null, // Keep original datetime for updates
-      createdAt: createdAtDateTime ? createdAtDateTime.toISOString().split('T')[0] : '',
-      createdAtTime: createdAtDateTime ? createdAtDateTime.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      }) : '',
+      createdAt: createdAtDateTime ? formatDateStr(createdAtDateTime) : '',
+      createdAtTime: createdAtDateTime ? formatTime(createdAtDateTime) : '',
       notes: jobOrder.remarks || '',
       totalAmount: jobOrder.total_amount,
       balanceAmount: jobOrder.balance_amount,

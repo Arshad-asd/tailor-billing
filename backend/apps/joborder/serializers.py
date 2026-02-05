@@ -65,6 +65,7 @@ class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
 class JobOrderCreateSerializer(serializers.ModelSerializer):
     customer_data = CustomerSerializer(required=False)
     customer_id = serializers.IntegerField(required=False, allow_null=True)
+    order_date = serializers.DateTimeField(required=False, allow_null=True, write_only=True)
     job_order_items = JobOrderItemSerializer(many=True, required=False)
     job_order_measurements = JobOrderMeasurementSerializer(many=True, required=False)
     
@@ -72,7 +73,7 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
         model = JobOrder
         fields = [
             'id', 'job_order_number', 'customer', 'customer_id', 'customer_data',
-            'status', 'delivery_date', 'total_amount', 'advance_amount', 'balance_amount', 'recived_on_delivery_amount',
+            'status', 'order_date', 'delivery_date', 'total_amount', 'advance_amount', 'balance_amount', 'recived_on_delivery_amount',
             'payment_method', 'cash_amount', 'card_amount', 'remarks', 'is_active', 'is_blocked', 'job_order_items', 'job_order_measurements'
         ]
         read_only_fields = ['id', 'job_order_number', 'balance_amount']
@@ -85,8 +86,13 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
         # Extract nested data
         customer_data = validated_data.pop('customer_data', None)
         customer_id = validated_data.pop('customer_id', None)
+        order_date = validated_data.pop('order_date', None)
         job_order_items_data = validated_data.pop('job_order_items', [])
         job_order_measurements_data = validated_data.pop('job_order_measurements', [])
+        
+        # Use user-selected order date for created_at when provided
+        if order_date is not None:
+            validated_data['created_at'] = order_date
         
         # Handle customer creation/selection
         customer = None
@@ -219,13 +225,14 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
 
 
 class JobOrderUpdateSerializer(serializers.ModelSerializer):
+    order_date = serializers.DateTimeField(required=False, allow_null=True, write_only=True)
     job_order_items = JobOrderItemSerializer(many=True, required=False)
     job_order_measurements = JobOrderMeasurementSerializer(many=True, required=False)
     
     class Meta:
         model = JobOrder
         fields = [
-            'id', 'job_order_number', 'customer', 'status', 'delivery_date',
+            'id', 'job_order_number', 'customer', 'status', 'order_date', 'delivery_date',
             'total_amount', 'advance_amount', 'balance_amount', 'recived_on_delivery_amount', 'payment_method', 'cash_amount', 'card_amount', 'remarks',
             'is_active', 'is_blocked', 'job_order_items', 'job_order_measurements'
         ]
@@ -233,8 +240,13 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         # Extract nested data
+        order_date = validated_data.pop('order_date', None)
         job_order_items_data = validated_data.pop('job_order_items', None)
         job_order_measurements_data = validated_data.pop('job_order_measurements', None)
+        
+        # Use user-selected order date for created_at when provided
+        if order_date is not None:
+            instance.created_at = order_date
         
         # Calculate balance amount if total or advance changed
         if 'total_amount' in validated_data or 'advance_amount' in validated_data:

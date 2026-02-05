@@ -7,6 +7,7 @@ import customerApi from '../../services/customerApi';
 import materialsApi from '../../services/materialsApi';
 import jobOrdersApi from '../../services/jobOrdersApi';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
+import { formatDateStr } from '../../utils/dateUtils';
 
 export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
@@ -174,9 +175,9 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         setFormData(prev => ({
           ...prev,
           bill: {
-            orderDate: jobOrder.created_at ? jobOrder.created_at.split('T')[0] : '',
+            orderDate: jobOrder.created_at ? formatDateStr(jobOrder.created_at) : '',
             orderReference: jobOrder.job_order_number || '',
-            deliveryDate: jobOrder.delivery_date ? jobOrder.delivery_date.split('T')[0] : '',
+            deliveryDate: jobOrder.delivery_date ? formatDateStr(jobOrder.delivery_date) : '',
             total: jobOrder.total_amount || 0,
             advance: jobOrder.advance_amount ? String(jobOrder.advance_amount) : '',
             balance: jobOrder.balance_amount || 0,
@@ -484,7 +485,7 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
           const orderDate = new Date(value);
           const deliveryDate = new Date(orderDate);
           deliveryDate.setDate(deliveryDate.getDate() + 7); // Add 7 days (1 week)
-          newFormData.bill.deliveryDate = deliveryDate.toISOString().split('T')[0];
+          newFormData.bill.deliveryDate = formatDateStr(deliveryDate);
         }
       }
       
@@ -1595,7 +1596,11 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
       // Prepare job order payload for update
       const jobOrderPayload = {
         status: 'pending', // You might want to make this editable
-        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate).toISOString() : null,
+        // Always send order_date (user-selected order date) so backend can set created_at
+        order_date: (formData.bill.orderDate && String(formData.bill.orderDate).trim())
+          ? new Date(formData.bill.orderDate.trim() + 'T12:00:00').toISOString()
+          : null,
+        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate + 'T12:00:00').toISOString() : null,
         total_amount: formData.bill.total,
         advance_amount: parseFloat(formData.bill.advance) || 0,
         balance_amount: formData.bill.balance,

@@ -8,13 +8,12 @@ import EditSaleModal from "../../components/modals/EditSaleModal"
 import { salesAPI } from "../../services/salesApi"
 import { useNotification } from "../../hooks/useNotification"
 import { safeParseFloat } from "../../utils/currencyUtils"
+import { formatDateStr, toIsoDate, toIsoDateTime, formatDate, nowTimeString } from "../../utils/dateUtils"
 
 export default function Sales() {
   const location = useLocation()
   const navigate = useNavigate()
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0]
-  
+  const today = formatDateStr(new Date())
   const [searchTerm, setSearchTerm] = useState("")
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
@@ -61,27 +60,6 @@ export default function Sales() {
     window.addEventListener("afterprint", onAfter)
     return () => window.removeEventListener("afterprint", onAfter)
   }, [])
-
-  const toIsoDate = (d) => {
-    if (!d) return ""
-    try {
-      return new Date(d).toLocaleDateString("en-CA")
-    } catch {
-      return ""
-    }
-  }
-
-  const toIsoDateTime = (d) => {
-    if (!d) return ""
-    try {
-      const dt = new Date(d)
-      const date = dt.toLocaleDateString("en-CA")
-      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-      return `${date} ${time}`
-    } catch {
-      return ""
-    }
-  }
 
   const mapToA5 = (sale) => {
     const totalAmount = safeParseFloat(sale?.total_amount ?? sale?.amount ?? 0)
@@ -1087,7 +1065,7 @@ export default function Sales() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {sale.date ? new Date(sale.date).toLocaleDateString() : "N/A"}
+                        {sale.date ? formatDate(sale.date) : "N/A"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

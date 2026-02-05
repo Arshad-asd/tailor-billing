@@ -56,20 +56,23 @@ class SaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         sale_items_data = validated_data.pop('sale_items', [])
         sale = Sale.objects.create(**validated_data)
-        
+        # Sync created_at to sale date (user-selected)
+        if sale.date:
+            sale.created_at = sale.date
+            sale.save(update_fields=['created_at'])
         for item_data in sale_items_data:
             SaleItem.objects.create(sale=sale, **item_data)
-        
         return sale
 
     def update(self, instance, validated_data):
         sale_items_data = validated_data.pop('sale_items', None)
-        
         # Update sale fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        # Sync created_at to sale date when date changes
+        if 'date' in validated_data and instance.date:
+            instance.created_at = instance.date
         instance.save()
-        
         # Update sale items if provided
         if sale_items_data is not None:
             # Delete existing sale items

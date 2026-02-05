@@ -45,7 +45,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             with db_transaction.atomic():
                 customer = job_order.customer
                 
-                # Get or create Transaction for this Job Order
+                # Get or create Transaction for this Job Order (transaction_date/created_at follow job order order date)
+                order_date = job_order.created_at
                 transaction_obj, created = Transaction.objects.get_or_create(
                     job_order=job_order,
                     defaults={
@@ -53,25 +54,38 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         'transaction_id': TransactionViewSet.generate_transaction_id(),
                         'transaction_method': 'job_order',
                         'transaction_amount': job_order.total_amount,
-                        'transaction_date': job_order.created_at if not is_update else timezone.now(),
+                        'transaction_date': order_date,
                         'transaction_status': 'completed' if job_order.status == 'delivered' else 'pending',
                         'transaction_remarks': f'Transaction for Job Order {job_order.job_order_number}',
+                        'created_at': order_date,
                         'is_active': True,
                     }
                 )
+                if created:
+                    # Ensure created_at is set to order date (defaults may not use it in get_or_create)
+                    transaction_obj.created_at = order_date
+                    transaction_obj.save(update_fields=['created_at'])
                 
-                # If updating, update transaction details
+                # If updating, update transaction details and sync order date to transaction/lines
                 if not created and is_update:
                     transaction_obj.transaction_amount = job_order.total_amount
                     transaction_obj.transaction_status = 'completed' if job_order.status == 'delivered' else 'pending'
                     transaction_obj.transaction_remarks = f'Transaction for Job Order {job_order.job_order_number}'
-                    transaction_obj.save()
+                    transaction_obj.transaction_date = order_date
+                    transaction_obj.created_at = order_date
+                    transaction_obj.save(update_fields=['transaction_amount', 'transaction_status', 'transaction_remarks', 'transaction_date', 'created_at'])
+                    # Sync job order order date to job_order_advance line(s) created_at
+                    TransactionLine.objects.filter(
+                        transaction=transaction_obj,
+                        transaction_line_method='job_order_advance',
+                        is_active=True,
+                    ).update(created_at=order_date)
                 
                 # Coerce amounts to Decimal so string values from API don't cause TypeError
                 advance_amount = Decimal(str(job_order.advance_amount)) if job_order.advance_amount is not None else Decimal('0')
                 delivery_amount = Decimal(str(job_order.recived_on_delivery_amount)) if job_order.recived_on_delivery_amount is not None else Decimal('0')
                 
-                # Handle advance_amount TransactionLine
+                # Handle advance_amount TransactionLine (created_at synced to job order order date)
                 if advance_amount > 0:
                     advance_line, advance_created = TransactionLine.objects.get_or_create(
                         transaction=transaction_obj,
@@ -80,9 +94,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
                             'transaction_line_type': 'credit',
                             'transaction_line_amount': advance_amount,
                             'transaction_line_description': f'Advance payment for Job Order {job_order.job_order_number}',
+                            'created_at': order_date,
                             'is_active': True,
                         }
                     )
+                    if advance_created:
+                        advance_line.created_at = order_date
+                        advance_line.save(update_fields=['created_at'])
                     
                     # If updating and advance amount changed, update the line
                     if not advance_created and is_update:

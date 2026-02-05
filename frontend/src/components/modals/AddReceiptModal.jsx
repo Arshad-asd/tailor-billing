@@ -9,6 +9,7 @@ import { Textarea } from "../ui/textarea";
 import { useNotification } from "../../hooks/useNotification";
 import receiptApi from "../../services/receiptApi";
 import jobOrdersApi from "../../services/jobOrdersApi";
+import { nowDateTimeLocal } from "../../utils/dateUtils";
 
 export default function AddReceiptModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState({
@@ -29,9 +30,8 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
   useEffect(() => {
     if (open) {
       fetchJobOrders();
-      // Set default date to today
-      const today = new Date().toISOString().slice(0, 16);
-      setForm(prev => ({ ...prev, receipt_date: today }));
+      // Set default date/time to now in Qatar
+      setForm(prev => ({ ...prev, receipt_date: nowDateTimeLocal() }));
     }
   }, [open]);
 

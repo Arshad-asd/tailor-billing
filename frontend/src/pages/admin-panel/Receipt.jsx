@@ -5,6 +5,7 @@ import AddReceiptModal from '../../components/modals/AddReceiptModal';
 import EditReceiptModal from '../../components/modals/EditReceiptModal';
 import { useNotification } from '../../hooks/useNotification';
 import receiptApi from '../../services/receiptApi';
+import { formatDate } from '../../utils/dateUtils';
 
 export default function ReceiptPage() {
   const location = useLocation();
@@ -290,7 +291,7 @@ export default function ReceiptPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {receipt.receipt_date ? new Date(receipt.receipt_date).toLocaleDateString() : 'N/A'}
+                        {receipt.receipt_date ? formatDate(receipt.receipt_date) : 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

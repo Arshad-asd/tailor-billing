@@ -28,12 +28,14 @@ class ReceiptSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        """Override create to auto-generate receipt_id"""
-        # Auto-generate receipt_id if not provided
+        """Override create to auto-generate receipt_id and sync created_at to receipt_date"""
         if 'receipt_id' not in validated_data or not validated_data['receipt_id']:
             validated_data['receipt_id'] = self.generate_receipt_id()
-        
-        return super().create(validated_data)
+        receipt = super().create(validated_data)
+        if receipt.receipt_date:
+            receipt.created_at = receipt.receipt_date
+            receipt.save(update_fields=['created_at'])
+        return receipt
 
     def generate_receipt_id(self):
         """Generate a unique receipt ID starting from 1"""
@@ -90,6 +92,14 @@ class ReceiptSerializer(serializers.ModelSerializer):
         
         return data
 
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if 'receipt_date' in validated_data and instance.receipt_date:
+            instance.created_at = instance.receipt_date
+        instance.save()
+        return instance
+
 
 class ReceiptCreateSerializer(serializers.ModelSerializer):
     """Simplified serializer for creating receipts"""
@@ -107,11 +117,13 @@ class ReceiptCreateSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        """Override create to auto-generate receipt_id"""
-        # Auto-generate receipt_id
+        """Override create to auto-generate receipt_id and sync created_at to receipt_date"""
         validated_data['receipt_id'] = self.generate_receipt_id()
-        
-        return super().create(validated_data)
+        receipt = super().create(validated_data)
+        if receipt.receipt_date:
+            receipt.created_at = receipt.receipt_date
+            receipt.save(update_fields=['created_at'])
+        return receipt
 
     def generate_receipt_id(self):
         """Generate a unique receipt ID starting from 1"""

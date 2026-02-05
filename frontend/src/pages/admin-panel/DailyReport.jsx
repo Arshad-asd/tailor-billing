@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, DollarSign, TrendingUp, Users, Package, Clock, BarChart3, Download, Printer, ArrowUp, ArrowDown, Plus, Minus, Loader2, X } from 'lucide-react';
 import { transactionAPI } from '../../services/transactionsApi';
+import { formatDateStr, formatDate } from '../../utils/dateUtils';
 
 export default function DailyReport() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatDateStr(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -555,7 +556,7 @@ export default function DailyReport() {
         <body>
           <div class="header">
             <h1>Monthly Data Report</h1>
-            <p>Generated on ${new Date().toLocaleDateString()}</p>
+            <p>Generated on ${formatDate(new Date())}</p>
           </div>
           
           <div class="section">
@@ -663,7 +664,7 @@ export default function DailyReport() {
         <body>
           <div class="header">
             <h1>Daily Report — ${monthName} ${year}</h1>
-            <p>Generated on ${new Date().toLocaleDateString()}</p>
+            <p>Generated on ${formatDate(new Date())}</p>
           </div>
           <table>
             <thead>

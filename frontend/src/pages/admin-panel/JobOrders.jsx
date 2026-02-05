@@ -7,6 +7,7 @@ import AddJobOrder from "../../components/forms/AddJobOrder"
 import EditJobOrder from "../../components/forms/EditJobOrder"
 import jobOrdersApi from "../../services/jobOrdersApi"
 import { formatCurrency, safeParseFloat } from "../../utils/currencyUtils"
+import { formatDateStr, toIsoDate, toIsoDateTime, nowTimeString, formatDate } from "../../utils/dateUtils"
 import JobOrderA5 from "../../components/print/joborder-a5"
 
 export default function JobOrders() {
@@ -39,10 +40,10 @@ export default function JobOrders() {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [pendingPrintOrder, setPendingPrintOrder] = useState(null)
 
-  // Date filter states
+  // Date filter: use Qatar timezone (matches server TIME_ZONE = Asia/Qatar)
   const [dateFilter, setDateFilter] = useState({
-    from: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-    to: new Date().toISOString().split('T')[0]   // Today's date in YYYY-MM-DD format
+    from: formatDateStr(new Date()),
+    to: formatDateStr(new Date())
   })
 
   // Search state
@@ -64,40 +65,6 @@ export default function JobOrders() {
       }
     }
   }, [location.state, isLoading, jobOrders.length, navigate, location.pathname]);
-
-  const toIsoDate = (d) => {
-    if (!d) return ""
-    try {
-      return new Date(d).toLocaleDateString("en-CA")
-    } catch {
-      return ""
-    }
-  }
-
-  const toIsoDateTime = (d) => {
-    if (!d) return ""
-    try {
-      const dt = new Date(d)
-      const date = dt.toLocaleDateString("en-CA")
-      const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-      return `${date} ${time}`
-    } catch {
-      return ""
-    }
-  }
-
-  const toDMY = (d) => {
-    if (!d) return ""
-    try {
-      const dt = new Date(d)
-      const dd = String(dt.getDate()).padStart(2, "0")
-      const mm = String(dt.getMonth() + 1).padStart(2, "0")
-      const yyyy = dt.getFullYear()
-      return `${dd}-${mm}-${yyyy}`
-    } catch {
-      return ""
-    }
-  }
 
   const mapToA5 = (order) => {
     const totalAmount = safeParseFloat(order?.total_amount ?? 0)
@@ -167,6 +134,10 @@ export default function JobOrders() {
       itemChunks.push([])
     }
     
+    // Order date for print; time = current time in Qatar when printing
+    const printDate = a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date
+    const printTime = nowTimeString()
+    
     // Generate header HTML
     const generateHeader = () => `
       <div class="hdr" dir="rtl">
@@ -178,12 +149,12 @@ export default function JobOrders() {
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 0.5mm;">
         <div class="small" style="text-align: right; color: black;"><span>جوال:</span> <strong>50377968</strong></div>
-        <div style="text-align: left; direction: ltr; font-size: 10.5pt; margin-bottom: 0.25mm;"><span>التاريخ:</span> <strong>${a5.dateTime ? a5.dateTime.split(' ')[0] : a5.date}</strong></div>
+        <div style="text-align: left; direction: ltr; font-size: 10.5pt; margin-bottom: 0.25mm;"><span>التاريخ:</span> <strong>${printDate}</strong></div>
       </div>
      </div>
         <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 0.25mm; margin-bottom: 1mm; gap: 4mm; direction: ltr;">
           <div style="text-align: left; direction: ltr; font-size: 10.5pt;">
-            ${a5.dateTime ? `<span>الوقت:</span> <strong>${a5.dateTime.split(' ')[1] || ''}</strong>` : '&nbsp;'}
+            <span>الوقت:</span> <strong>${printTime}</strong>
           </div>
           <div style="text-align: center; justify-self: center;">
             ${copyType === 'customer' ? `
@@ -1089,7 +1060,7 @@ export default function JobOrders() {
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  const today = new Date().toISOString().split('T')[0]
+                  const today = formatDateStr(new Date())
                   setDateFilter({ from: today, to: today })
                 }}
                 disabled={searchTerm.trim() !== ""}
@@ -1330,13 +1301,13 @@ export default function JobOrders() {
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Order Date</label>
                     <p className="text-gray-900 dark:text-white font-medium">
-                      {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleDateString() : 'N/A'}
+                      {selectedOrder.created_at ? formatDate(selectedOrder.created_at) : 'N/A'}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Delivery Date</label>
                     <p className="text-gray-900 dark:text-white font-medium">
-                      {selectedOrder.delivery_date ? new Date(selectedOrder.delivery_date).toLocaleDateString() : 'N/A'}
+                      {selectedOrder.delivery_date ? formatDate(selectedOrder.delivery_date) : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -1517,7 +1488,7 @@ export default function JobOrders() {
                             {order.job_order_number}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : ""}
+                            {order.created_at ? formatDate(order.created_at) : ""}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1534,7 +1505,7 @@ export default function JobOrders() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : ""}
+                            {order.delivery_date ? formatDate(order.delivery_date) : ""}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

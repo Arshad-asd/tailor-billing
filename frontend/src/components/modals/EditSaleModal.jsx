@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../ui/textarea";
 import { Trash2, Search, X } from "lucide-react";
 import { inventoryAPI } from "../../services/inventoryApi";
+import { formatDateStr } from "../../utils/dateUtils";
 
 export default function EditSaleModal({ open, onClose, onSubmit, editingSale = null }) {
   const [form, setForm] = useState({
@@ -65,7 +66,7 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
 
       const formData = {
         customerName: editingSale.customer_name || "",
-        date: editingSale.date ? editingSale.date.split('T')[0] : "",
+        date: editingSale.date ? formatDateStr(editingSale.date) : "",
         paymentMethod,
         status: (editingSale.status || "pending").toLowerCase(),
         notes: editingSale.notes || "",

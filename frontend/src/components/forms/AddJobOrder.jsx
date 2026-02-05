@@ -9,6 +9,7 @@ import customerApi from '../../services/customerApi';
 import materialsApi from '../../services/materialsApi';
 import jobOrdersApi from '../../services/jobOrdersApi';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
+import { formatDateStr } from '../../utils/dateUtils';
 
 export default function AddJobOrder({ onClose, onSuccess }) {
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   const advanceInputRef = useRef(null);
   // Ref for delivery date field
   const deliveryDateInputRef = useRef(null);
-  
+
   // State for bill item name search
   const [billItemNameSearchQueries, setBillItemNameSearchQueries] = useState({}); // { itemSl: searchQuery }
   const [billItemNameSearchResults, setBillItemNameSearchResults] = useState({}); // { itemSl: results[] }
@@ -90,7 +91,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
       extraField2: ''
     },
     bill: {
-      orderDate: new Date().toISOString().split('T')[0],
+      orderDate: formatDateStr(new Date()),
       orderReference: '',
       deliveryDate: '',
       total: 0,
@@ -382,7 +383,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           const orderDate = new Date(value);
           const deliveryDate = new Date(orderDate);
           deliveryDate.setDate(deliveryDate.getDate() + 7); // Add 7 days (1 week)
-          newFormData.bill.deliveryDate = deliveryDate.toISOString().split('T')[0];
+          newFormData.bill.deliveryDate = formatDateStr(deliveryDate);
         }
       }
       
@@ -565,7 +566,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           ...prev,
           bill: {
             ...prev.bill,
-            deliveryDate: deliveryDate.toISOString().split('T')[0]
+            deliveryDate: formatDateStr(deliveryDate)
           }
         };
       }
@@ -1138,7 +1139,11 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           }
         }),
         status: 'pending',
-        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate).toISOString() : null,
+        // Always send order_date (user-selected order date); fallback to today so it is never omitted from payload
+        order_date: (formData.bill.orderDate && String(formData.bill.orderDate).trim())
+          ? new Date(formData.bill.orderDate.trim() + 'T12:00:00').toISOString()
+          : new Date(formatDateStr(new Date()) + 'T12:00:00').toISOString(),
+        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate + 'T12:00:00').toISOString() : null,
         total_amount: formData.bill.total,
         advance_amount: parseFloat(formData.bill.advance) || 0,
         balance_amount: formData.bill.balance,
@@ -1221,7 +1226,7 @@ export default function AddJobOrder({ onClose, onSuccess }) {
           extraField2: ''
         },
         bill: {
-          orderDate: new Date().toISOString().split('T')[0],
+          orderDate: formatDateStr(new Date()),
           orderReference: '',
           deliveryDate: '',
           total: 0,

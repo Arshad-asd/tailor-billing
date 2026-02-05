@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from apps.crm.models import Customer
 from apps.joborder.models import JobOrder
 from apps.sale.models import Sale
@@ -20,7 +21,7 @@ class Transaction(models.Model):
     transaction_date = models.DateTimeField()
     transaction_status = models.CharField(max_length=255)
     transaction_remarks = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)  # Synced from job order order date when job_order
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 
@@ -43,7 +44,7 @@ class TransactionLine(models.Model):
     transaction_line_method = models.CharField(max_length=255, choices=transaction_line_method_choices)
     transaction_line_amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_line_description = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)  # Synced from job order order date for job_order_advance
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 

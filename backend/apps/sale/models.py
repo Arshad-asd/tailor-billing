@@ -15,7 +15,7 @@ class Sale(models.Model):
     status = models.CharField(max_length=255, default='pending')
     notes = models.TextField(null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)  # Set from sale date when creating/updating
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../ui/textarea";
 import { Trash2, Search, X } from "lucide-react";
 import { inventoryAPI } from "../../services/inventoryApi";
+import { formatDateStr } from "../../utils/dateUtils";
 
 export default function AddSaleModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState({
@@ -203,10 +204,10 @@ export default function AddSaleModal({ open, onClose, onSubmit }) {
     onClose();
   };
 
-  // Set default date, customer name, status, and payment method when modal opens
+  // Set default date (Qatar), customer name, status, and payment method when modal opens
   React.useEffect(() => {
     if (open) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateStr(new Date());
       setForm(prev => ({ 
         ...prev, 
         date: prev.date || today,

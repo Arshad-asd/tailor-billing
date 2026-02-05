@@ -9,6 +9,7 @@ import { Textarea } from "../ui/textarea";
 import { useNotification } from "../../hooks/useNotification";
 import receiptApi from "../../services/receiptApi";
 import jobOrdersApi from "../../services/jobOrdersApi";
+import { formatDateTimeLocal, formatDateTime } from "../../utils/dateUtils";
 
 export default function EditReceiptModal({ open, onClose, onSubmit, editingReceipt = null }) {
   const [form, setForm] = useState({
@@ -50,7 +51,7 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
   useEffect(() => {
     if (editingReceipt && open) {
       setForm({
-        receipt_date: editingReceipt.receipt_date ? new Date(editingReceipt.receipt_date).toISOString().slice(0, 16) : "",
+        receipt_date: editingReceipt.receipt_date ? formatDateTimeLocal(editingReceipt.receipt_date) : "",
         receipt_amount: editingReceipt.receipt_amount?.toString() || "",
         receipt_remarks: editingReceipt.receipt_remarks || "",
         job_order: editingReceipt.job_order?.toString() || "",
@@ -344,7 +345,7 @@ export default function EditReceiptModal({ open, onClose, onSubmit, editingRecei
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Created:</span>
                 <span className="ml-2 text-gray-900 dark:text-gray-100">
-                  {editingReceipt.created_at ? new Date(editingReceipt.created_at).toLocaleString() : 'N/A'}
+                  {editingReceipt.created_at ? formatDateTime(editingReceipt.created_at) : 'N/A'}
                 </span>
               </div>
               <div>
