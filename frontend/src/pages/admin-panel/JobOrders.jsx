@@ -150,8 +150,8 @@ export default function JobOrders() {
       <div class="right brand-main">الخرطـــــــــــــــــــــــــــــــــــــــوم</div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 1mm;">
         <div class="brand-subtitle" style="text-align: left; white-space: nowrap;">لتفصيل وخياطة الملابس السودانية</div>
-        <div class="small" style="text-align: left; color: black;"><span style="white-space: nowrap;"><strong>${a5.invoiceNumber}</strong><span>:الرقم فاتورة</span></span></div>
-      </div>
+        <div class="small" style="text-align: left; color: black;"><span style="white-space: nowrap;"><span>الرقم فاتورة: <strong>${a5.invoiceNumber}</strong></span></span></div>
+        </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4mm; margin-top: 0.5mm;">
         <div class="small" style="text-align: right; color: black;"><span>جوال:</span> <strong>50377968</strong></div>
         <div style="text-align: left; direction: ltr; font-size: 10.5pt; margin-bottom: 0.25mm;"><span>التاريخ:</span> <strong>${printDate}</strong></div>
@@ -159,8 +159,8 @@ export default function JobOrders() {
      </div>
         <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 0.25mm; margin-bottom: 1mm; gap: 4mm; direction: ltr;">
           <div style="text-align: left; direction: ltr; font-size: 10.5pt;">
-            <span>الوقت:</span> <strong>${printTime}</strong>
-          </div>
+            <strong>${printTime}</strong><span>:الوقت</span> 
+           </div>
           <div style="text-align: center; justify-self: center;">
             ${copyType === 'customer' ? `
             <div class="title" style="text-decoration: underline; display: inline-block;">فاتورة الخياطة</div>
