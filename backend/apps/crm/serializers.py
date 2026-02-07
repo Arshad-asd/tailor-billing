@@ -169,3 +169,11 @@ class CustomerMeasurementSerializer(serializers.ModelSerializer):
             'is_active'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from apps.joborder.utils import normalize_measurement_display
+        for field in ('thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab'):
+            if data.get(field):
+                data[field] = normalize_measurement_display(data[field])
+        return data

@@ -444,9 +444,11 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                     except Material.DoesNotExist:
                         raise serializers.ValidationError(f"Material with ID {material_id} does not exist")
                     
-                    # Remove material from measurement_data
+                    # Remove material from measurement_data and normalize (e.g. 1.00 -> 1)
                     measurement_data_copy = measurement_data.copy()
                     measurement_data_copy.pop('material', None)
+                    from .utils import normalize_measurement_data
+                    normalize_measurement_data(measurement_data_copy)
                     
                     jobOrderMeasurement.objects.create(
                         job_order=job_order,
@@ -506,11 +508,15 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
                 
-                # Update measurement fields
+                # Update measurement fields (normalize so 1.00 -> 1)
+                from .utils import normalize_measurement_display
                 update_fields = ['thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4']
                 for field in update_fields:
                     if field in request.data:
-                        setattr(measurement, field, request.data[field])
+                        val = request.data[field]
+                        if field in ('thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab'):
+                            val = normalize_measurement_display(val)
+                        setattr(measurement, field, val)
                 
                 measurement.save()
                 

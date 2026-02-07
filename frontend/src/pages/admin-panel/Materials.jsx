@@ -55,6 +55,17 @@ export default function Materials() {
   const [fromDate, setFromDate] = useState(getTodayDate())
   const [toDate, setToDate] = useState(getTodayDate())
 
+  // Format date as DD/MM/YYYY (date/month/year)
+  const formatDateDMY = (dateStr) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return ''
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+
   // Load data on component mount and when dates change
   useEffect(() => {
     if (activeTab === "materials") {
@@ -353,24 +364,17 @@ export default function Materials() {
                   border-bottom: 1px solid #000;
                   padding-bottom: 2mm;
                 }
-                .customer-info, .job-info {
+                .header-left, .header-center, .header-right {
                   flex: 1;
-                  max-width: 35%;
+                  max-width: 33%;
                   display: flex;
                   flex-direction: column;
                   justify-content: flex-start;
                   line-height: 1.4;
                 }
-                .customer-id-center {
-                  flex: 1;
-                  text-align: center;
-                  max-width: 30%;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: flex-start;
-                  align-items: center;
-                  line-height: 1.4;
-                }
+                .header-left { text-align: left; }
+                .header-center { text-align: center; }
+                .header-right { text-align: right; }
                 .header h1 {
                   margin: 0;
                   padding: 0;
@@ -492,28 +496,26 @@ export default function Materials() {
             <body>
               <div class="a5">
                 <div class="header">
-                  <div class="customer-info">
+                  <div class="header-left">
+                    <h1>${jobOrder.customer_id || 'N/A'}</h1>
+                    <p>${formatDateDMY(jobOrder.delivery_date)}</p>
+                  </div>
+                  <div class="header-center">
                     <h1>${jobOrder.customer_name}</h1>
-                    <p>Mobile: ${jobOrder.customer_phone}</p>
                   </div>
-                  <div class="customer-id-center">
-                    <h1>ID: ${jobOrder.customer_id || 'N/A'}</h1>
-                  </div>
-                  <div class="job-info">
+                  <div class="header-right">
                     <h1>${jobOrder.job_order_number}</h1>
-                    <p>Delivery: ${new Date(jobOrder.delivery_date).toLocaleDateString()}</p>
+                    <p>${jobOrder.customer_phone || ''}</p>
                   </div>
                 </div>
 
                 <div class="measurements-container">
                   ${measurements.map(measurement => {
                     // Combine all measurement values into a single string, remove trailing zeros
+                    // Display measurement as full string (e.g. "1--2--2--3" or "103")
                     const formatValue = (val) => {
                       if (val === "" || val === null || val === undefined) return "";
-                      const num = parseFloat(val);
-                      if (isNaN(num)) return "";
-                      // Convert to string and remove trailing zeros and decimal point if not needed
-                      return num.toString().replace(/\.0+$/, '').replace(/(\d+\.\d*?)0+$/, '$1');
+                      return String(val).trim();
                     };
                     
                     const measurementValues = [
@@ -761,24 +763,17 @@ export default function Materials() {
                     border-bottom: 1px solid #000;
                     padding-bottom: 2mm;
                   }
-                  .customer-info, .job-info {
+                  .header-left, .header-center, .header-right {
                     flex: 1;
-                    max-width: 35%;
+                    max-width: 33%;
                     display: flex;
                     flex-direction: column;
                     justify-content: flex-start;
                     line-height: 1.4;
                   }
-                  .customer-id-center {
-                    flex: 1;
-                    text-align: center;
-                    max-width: 30%;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: flex-start;
-                    align-items: center;
-                    line-height: 1.4;
-                  }
+                  .header-left { text-align: left; }
+                  .header-center { text-align: center; }
+                  .header-right { text-align: right; }
                   .header h1 {
                     margin: 0;
                     padding: 0;
@@ -895,28 +890,26 @@ export default function Materials() {
               <body>
                 <div class="a5">
                   <div class="header">
-                    <div class="customer-info">
+                    <div class="header-left">
+                      <h1>${jobOrder.customer_id || 'N/A'}</h1>
+                      <p>${formatDateDMY(jobOrder.delivery_date)}</p>
+                    </div>
+                    <div class="header-center">
                       <h1>${jobOrder.customer_name}</h1>
-                      <p>Mobile: ${jobOrder.customer_phone}</p>
                     </div>
-                    <div class="customer-id-center">
-                      <h1>ID: ${jobOrder.customer_id || 'N/A'}</h1>
-                    </div>
-                    <div class="job-info">
+                    <div class="header-right">
                       <h1>${jobOrder.job_order_number}</h1>
-                      <p>Delivery: ${new Date(jobOrder.delivery_date).toLocaleDateString()}</p>
+                      <p>${jobOrder.customer_phone || ''}</p>
                     </div>
                   </div>
 
                   <div class="measurements-container">
                     ${measurements.map(measurement => {
                       // Combine all measurement values into a single string, remove trailing zeros
+                      // Display measurement as full string (e.g. "1--2--2--3" or "103")
                       const formatValue = (val) => {
                         if (val === "" || val === null || val === undefined) return "";
-                        const num = parseFloat(val);
-                        if (isNaN(num)) return "";
-                        // Convert to string and remove trailing zeros and decimal point if not needed
-                        return num.toString().replace(/\.0+$/, '').replace(/(\d+\.\d*?)0+$/, '$1');
+                        return String(val).trim();
                       };
                       
                       const measurementValues = [
@@ -1819,7 +1812,7 @@ export default function Materials() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {new Date(jobOrder.delivery_date).toLocaleDateString()}
+                          {formatDateDMY(jobOrder.delivery_date)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

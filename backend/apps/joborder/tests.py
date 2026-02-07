@@ -30,13 +30,7 @@ class JobOrderAPITestCase(APITestCase):
         # Create test material
         self.material = Material.objects.create(
             name='Test Material',
-            price=100.00,
-            thool=145.00,
-            kethet=43.00,
-            thool_kum=61.00,
-            ardh_f_kum=17.00,
-            jamba=9.00,
-            ragab=12.00
+            price=100.00
         )
         
         # Authenticate user
@@ -62,12 +56,12 @@ class JobOrderAPITestCase(APITestCase):
             'job_order_measurements': [
                 {
                     'material': self.material.id,
-                    'thool': 145.00,
-                    'kethet': 43.00,
-                    'thool_kum': 61.00,
-                    'ardh_f_kum': 17.00,
-                    'jamba': 9.00,
-                    'ragab': 12.00
+                    'thool': '145',
+                    'kethet': '43',
+                    'thool_kum': '61',
+                    'ardh_f_kum': '17',
+                    'jamba': '9',
+                    'ragab': '12'
                 }
             ]
         }
@@ -94,7 +88,7 @@ class JobOrderAPITestCase(APITestCase):
         self.assertEqual(job_order.jobordermeasurement_set.count(), 1)
         measurement = job_order.jobordermeasurement_set.first()
         self.assertEqual(measurement.material, self.material)
-        self.assertEqual(measurement.thool, 145.00)
+        self.assertEqual(measurement.thool, '145')
     
     def test_create_job_order_with_new_customer(self):
         """Test creating job order with new customer"""

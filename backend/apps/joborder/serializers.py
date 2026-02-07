@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import JobOrder, jobOrderItem, jobOrderMeasurement
 from apps.crm.models import Customer
 from apps.materials.models import Material
-from .utils import sync_customer_measurements
+from .utils import sync_customer_measurements, normalize_measurement_data
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -33,6 +33,14 @@ class JobOrderMeasurementSerializer(serializers.ModelSerializer):
         fields = ['id', 'material', 'material_name', 'material_arabic_name', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active', 'is_printed', 'printed_at']
         read_only_fields = ['id', 'is_printed', 'printed_at']
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from .utils import normalize_measurement_display
+        for field in ('thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab'):
+            if data.get(field):
+                data[field] = normalize_measurement_display(data[field])
+        return data
+
 
 class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name', read_only=True)
@@ -44,6 +52,14 @@ class JobOrderMeasurementReadSerializer(serializers.ModelSerializer):
         model = jobOrderMeasurement
         fields = ['id', 'material', 'material_id', 'material_name', 'material_arabic_name', 'quantity', 'thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab', 'note1', 'note2', 'note3', 'note4', 'is_active', 'is_printed', 'printed_at']
         read_only_fields = ['id']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from .utils import normalize_measurement_display
+        for field in ('thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab'):
+            if data.get(field):
+                data[field] = normalize_measurement_display(data[field])
+        return data
     
     def get_quantity(self, obj):
         """Get the total quantity for this material from job order items"""
@@ -211,6 +227,7 @@ class JobOrderCreateSerializer(serializers.ModelSerializer):
             # Remove material from measurement_data and add the Material object
             measurement_data_copy = measurement_data.copy()
             measurement_data_copy.pop('material', None)
+            normalize_measurement_data(measurement_data_copy)
             
             jobOrderMeasurement.objects.create(
                 job_order=job_order,
@@ -363,6 +380,7 @@ class JobOrderUpdateSerializer(serializers.ModelSerializer):
                 # Remove material from measurement_data and add the Material object
                 measurement_data_copy = measurement_data.copy()
                 measurement_data_copy.pop('material', None)
+                normalize_measurement_data(measurement_data_copy)
                 
                 jobOrderMeasurement.objects.create(
                     job_order=instance,

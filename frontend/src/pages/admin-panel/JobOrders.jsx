@@ -46,8 +46,13 @@ export default function JobOrders() {
     to: formatDateStr(new Date())
   })
 
-  // Search state
+  // Search state: immediate for input, debounced for API to avoid focus loss and excessive requests
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => clearTimeout(t)
+  }, [searchTerm])
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -725,11 +730,11 @@ export default function JobOrders() {
     }
   }
 
-  // Load job orders and stats on component mount and when date filter or search changes
+  // Load job orders and stats on component mount and when date filter or debounced search changes
   useEffect(() => {
     loadJobOrders()
     loadStats()
-  }, [dateFilter.from, dateFilter.to, searchTerm])
+  }, [dateFilter.from, dateFilter.to, debouncedSearch])
 
   useEffect(() => {
     const onAfter = () => setPrintOrder(null)
@@ -742,12 +747,12 @@ export default function JobOrders() {
       setIsLoading(true)
       setError(null) // Clear previous errors
 
-      // Pass parameters to the API
+      // Pass parameters to the API (use debounced search so typing doesn't refetch every keystroke)
       const params = {}
 
       // If there's a search term, search across all job orders (ignore date filter)
-      if (searchTerm.trim()) {
-        params.search = searchTerm.trim()
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim()
       } else {
         // Only apply date filter when not searching
         params.from_date = dateFilter.from
@@ -785,7 +790,7 @@ export default function JobOrders() {
     try {
       // Only apply date filter when not searching (same logic as loadJobOrders)
       const params = {}
-      if (!searchTerm.trim()) {
+      if (!debouncedSearch.trim()) {
         params.from_date = dateFilter.from
         params.to_date = dateFilter.to
       }

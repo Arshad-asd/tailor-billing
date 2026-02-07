@@ -3,6 +3,33 @@ from apps.joborder.models import JobOrder
 from django.db.models import Sum
 from decimal import Decimal
 
+MEASUREMENT_STR_FIELDS = ('thool', 'kethet', 'thool_kum', 'ardh_f_kum', 'jamba', 'ragab')
+
+
+def normalize_measurement_display(s):
+    """
+    Convert '1.00' -> '1', '1.50' -> '1.5'. Leaves non-numeric as-is.
+    Used so whole numbers display without decimal point.
+    """
+    if s is None or (isinstance(s, str) and s.strip() == ''):
+        return ''
+    s = str(s).strip()
+    try:
+        f = float(s)
+        if f == int(f):
+            return str(int(f))
+        return str(f).rstrip('0').rstrip('.')
+    except ValueError:
+        return s
+
+
+def normalize_measurement_data(data):
+    """Normalize the 6 measurement char fields in a dict (in-place). Returns data."""
+    for key in MEASUREMENT_STR_FIELDS:
+        if key in data and data[key] is not None:
+            data[key] = normalize_measurement_display(data[key])
+    return data
+
 
 def update_customer_balance(customer):
     """

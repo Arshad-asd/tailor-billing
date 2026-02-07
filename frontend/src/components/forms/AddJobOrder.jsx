@@ -628,19 +628,19 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                 material_name: materialName,
                 material_price: materialPrice,
                 measurements: {
-                  thool: measurement.thool || 0,
-                  kethet: measurement.kethet || 0,
-                  thool_kum: measurement.thool_kum || 0,
-                  ardh_f_kum: measurement.ardh_f_kum || 0,
-                  jamba: measurement.jamba || 0,
-                  ragab: measurement.ragab || 0
+                  thool: measurement.thool != null && measurement.thool !== '' ? String(measurement.thool) : '',
+                  kethet: measurement.kethet != null && measurement.kethet !== '' ? String(measurement.kethet) : '',
+                  thool_kum: measurement.thool_kum != null && measurement.thool_kum !== '' ? String(measurement.thool_kum) : '',
+                  ardh_f_kum: measurement.ardh_f_kum != null && measurement.ardh_f_kum !== '' ? String(measurement.ardh_f_kum) : '',
+                  jamba: measurement.jamba != null && measurement.jamba !== '' ? String(measurement.jamba) : '',
+                  ragab: measurement.ragab != null && measurement.ragab !== '' ? String(measurement.ragab) : ''
                 },
-                custom_thool: measurement.thool ? Math.round(parseFloat(measurement.thool)).toString() : '',
-                custom_kethet: measurement.kethet ? Math.round(parseFloat(measurement.kethet)).toString() : '',
-                custom_thool_kum: measurement.thool_kum ? Math.round(parseFloat(measurement.thool_kum)).toString() : '',
-                custom_ardh_f_kum: measurement.ardh_f_kum ? Math.round(parseFloat(measurement.ardh_f_kum)).toString() : '',
-                custom_jamba: measurement.jamba ? Math.round(parseFloat(measurement.jamba)).toString() : '',
-                custom_ragab: measurement.ragab ? Math.round(parseFloat(measurement.ragab)).toString() : '',
+                custom_thool: measurement.thool != null && measurement.thool !== '' ? String(measurement.thool) : '',
+                custom_kethet: measurement.kethet != null && measurement.kethet !== '' ? String(measurement.kethet) : '',
+                custom_thool_kum: measurement.thool_kum != null && measurement.thool_kum !== '' ? String(measurement.thool_kum) : '',
+                custom_ardh_f_kum: measurement.ardh_f_kum != null && measurement.ardh_f_kum !== '' ? String(measurement.ardh_f_kum) : '',
+                custom_jamba: measurement.jamba != null && measurement.jamba !== '' ? String(measurement.jamba) : '',
+                custom_ragab: measurement.ragab != null && measurement.ragab !== '' ? String(measurement.ragab) : '',
                 note1: measurement.note1 || '',
                 note2: measurement.note2 || '',
                 note3: measurement.note3 || '',
@@ -879,12 +879,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         material_name: material.name,
         material_price: material.price,
         measurements: {
-          thool: material.thool || 0,
-          kethet: material.kethet || 0,
-          thool_kum: material.thool_kum || 0,
-          ardh_f_kum: material.ardh_f_kum || 0,
-          jamba: material.jamba || 0,
-          ragab: material.ragab || 0
+          thool: material.thool != null && material.thool !== '' ? String(material.thool) : '',
+          kethet: material.kethet != null && material.kethet !== '' ? String(material.kethet) : '',
+          thool_kum: material.thool_kum != null && material.thool_kum !== '' ? String(material.thool_kum) : '',
+          ardh_f_kum: material.ardh_f_kum != null && material.ardh_f_kum !== '' ? String(material.ardh_f_kum) : '',
+          jamba: material.jamba != null && material.jamba !== '' ? String(material.jamba) : '',
+          ragab: material.ragab != null && material.ragab !== '' ? String(material.ragab) : ''
         },
         custom_thool: '',
         custom_kethet: '',
@@ -994,12 +994,12 @@ export default function AddJobOrder({ onClose, onSuccess }) {
         material_name: material.name,
         material_price: material.price,
         measurements: {
-          thool: material.thool,
-          kethet: material.kethet,
-          thool_kum: material.thool_kum,
-          ardh_f_kum: material.ardh_f_kum,
-          jamba: material.jamba,
-          ragab: material.ragab
+          thool: material.thool != null && material.thool !== '' ? String(material.thool) : '',
+          kethet: material.kethet != null && material.kethet !== '' ? String(material.kethet) : '',
+          thool_kum: material.thool_kum != null && material.thool_kum !== '' ? String(material.thool_kum) : '',
+          ardh_f_kum: material.ardh_f_kum != null && material.ardh_f_kum !== '' ? String(material.ardh_f_kum) : '',
+          jamba: material.jamba != null && material.jamba !== '' ? String(material.jamba) : '',
+          ragab: material.ragab != null && material.ragab !== '' ? String(material.ragab) : ''
         },
         custom_thool: '',
         custom_kethet: '',
@@ -1177,22 +1177,16 @@ export default function AddJobOrder({ onClose, onSuccess }) {
             throw new Error(`Invalid material ID for measurement: ${material.material_name}`);
           }
           // Helper function to convert text input to number for backend
-          // Allows text input in UI but converts to number when saving
-          const parseMeasurement = (value) => {
-            if (value === '' || value === null || value === undefined) return 0;
-            // Try to extract numeric value from text
-            const num = parseFloat(String(value).replace(/[^\d.-]/g, ''));
-            if (isNaN(num)) return 0;
-            return Math.round(num); // Convert to integer, removing decimal point
-          };
+          // Measurement fields are stored as strings (char fields)
+          const toMeasurementStr = (value) => (value === '' || value === null || value === undefined ? '' : String(value).trim());
           return {
             material: materialId,
-            thool: parseMeasurement(material.custom_thool),
-            kethet: parseMeasurement(material.custom_kethet),
-            thool_kum: parseMeasurement(material.custom_thool_kum),
-            ardh_f_kum: parseMeasurement(material.custom_ardh_f_kum),
-            jamba: parseMeasurement(material.custom_jamba),
-            ragab: parseMeasurement(material.custom_ragab),
+            thool: toMeasurementStr(material.custom_thool),
+            kethet: toMeasurementStr(material.custom_kethet),
+            thool_kum: toMeasurementStr(material.custom_thool_kum),
+            ardh_f_kum: toMeasurementStr(material.custom_ardh_f_kum),
+            jamba: toMeasurementStr(material.custom_jamba),
+            ragab: toMeasurementStr(material.custom_ragab),
             note1: material.note1 || '',
             note2: material.note2 || '',
             note3: material.note3 || '',

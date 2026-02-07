@@ -360,6 +360,11 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
                           value={saleItem.searchTerm || ""}
                           onChange={(e) => handleItemSearchChange(saleItem.id, e.target.value)}
                           onFocus={() => handleItemSearchChange(saleItem.id, saleItem.searchTerm || "")}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setSaleItems(prev => prev.map(i => i.id === saleItem.id ? { ...i, isSearching: false } : i));
+                            }, 150);
+                          }}
                           onKeyDown={(e) => handleItemSearchKeyDown(e, saleItem)}
                           className="pl-9 pr-9 h-9 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
@@ -386,7 +391,11 @@ export default function EditSaleModal({ open, onClose, onSubmit, editingSale = n
                           {filteredItems.map((item) => (
                             <div
                               key={item.id}
-                              onClick={() => handleItemSelect(saleItem.id, item)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleItemSelect(saleItem.id, item);
+                              }}
                               className="p-3 hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors"
                             >
                               <div className="font-medium text-gray-900 dark:text-white">{item.name}</div>
