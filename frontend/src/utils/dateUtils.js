@@ -26,7 +26,7 @@ export function formatDate(date) {
   if (!date) return '';
   try {
     const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleDateString(undefined, tzOpt());
+    return d.toLocaleDateString('en-GB', tzOpt());
   } catch {
     return '';
   }

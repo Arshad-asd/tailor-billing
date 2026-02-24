@@ -325,6 +325,14 @@ export default function Materials() {
             }
           });
         }
+
+        // Only print measurements whose material matches a job order item
+        const printableMeasurements = measurements.filter(m => materialQuantityMap[m.material]);
+        if (printableMeasurements.length === 0) {
+          alert("No matching measurements found for this job order's items.")
+          setLoading(false)
+          return
+        }
         
         const printContent = `
           <!DOCTYPE html>
@@ -510,9 +518,7 @@ export default function Materials() {
                 </div>
 
                 <div class="measurements-container">
-                  ${measurements.map(measurement => {
-                    // Combine all measurement values into a single string, remove trailing zeros
-                    // Display measurement as full string (e.g. "1--2--2--3" or "103")
+                  ${printableMeasurements.map(measurement => {
                     const formatValue = (val) => {
                       if (val === "" || val === null || val === undefined) return "";
                       return String(val).trim();
@@ -592,7 +598,7 @@ export default function Materials() {
           printWindow.focus()
           printWindow.print()
           try {
-            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, measurements.map((m) => m.id))
+            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, printableMeasurements.map((m) => m.id))
             loadJobOrders()
           } catch (e) {
             console.error("Failed to mark measurements as printed:", e)
@@ -706,12 +712,6 @@ export default function Materials() {
             continue
           }
 
-          try {
-            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, measurements.map((m) => m.id))
-          } catch (e) {
-            console.error(`Failed to mark measurements as printed for ${jobOrder.job_order_number}:`, e)
-          }
-
           // Create a map of material_id to total quantity from job_order_items
           const materialQuantityMap = {};
           if (jobOrder.job_order_items && Array.isArray(jobOrder.job_order_items)) {
@@ -725,6 +725,19 @@ export default function Materials() {
                 }
               }
             });
+          }
+
+          // Only print measurements whose material matches a job order item
+          const printableMeasurements = measurements.filter(m => materialQuantityMap[m.material]);
+          if (printableMeasurements.length === 0) {
+            console.log(`⚠ No matching measurements for job order items: ${jobOrder.job_order_number}`)
+            continue
+          }
+
+          try {
+            await jobOrdersApi.markMeasurementsPrinted(jobOrder.id, printableMeasurements.map((m) => m.id))
+          } catch (e) {
+            console.error(`Failed to mark measurements as printed for ${jobOrder.job_order_number}:`, e)
           }
 
           // STEP 4: Create and populate print content
@@ -904,9 +917,7 @@ export default function Materials() {
                   </div>
 
                   <div class="measurements-container">
-                    ${measurements.map(measurement => {
-                      // Combine all measurement values into a single string, remove trailing zeros
-                      // Display measurement as full string (e.g. "1--2--2--3" or "103")
+                    ${printableMeasurements.map(measurement => {
                       const formatValue = (val) => {
                         if (val === "" || val === null || val === undefined) return "";
                         return String(val).trim();

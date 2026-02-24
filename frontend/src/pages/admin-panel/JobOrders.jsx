@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, AlertCircle, DollarSign, Printer, User, Ruler, Calculator, Calendar } from "lucide-react"
+import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, AlertCircle, DollarSign, Printer, User, Calculator, Calendar } from "lucide-react"
 import AddJobOrder from "../../components/forms/AddJobOrder"
 import EditJobOrder from "../../components/forms/EditJobOrder"
 import jobOrdersApi from "../../services/jobOrdersApi"
@@ -892,6 +892,14 @@ export default function JobOrders() {
     setEditingJobOrderId(null)
   }
 
+  const handleSwitchToEdit = (jobOrderId) => {
+    setIsAddFormOpen(false)
+    setEditingJobOrderId(jobOrderId)
+    setIsEditFormOpen(true)
+    loadJobOrders()
+    loadStats()
+  }
+
   const openOrderDetail = async (order) => {
     // Fetch full job order details to ensure we have all information
     try {
@@ -1105,7 +1113,7 @@ export default function JobOrders() {
       )}
 
       {/* Add Job Order Form */}
-      {isAddFormOpen && <AddJobOrder onClose={handleFormClose} onSuccess={handleFormSuccess} />}
+      {isAddFormOpen && <AddJobOrder onClose={handleFormClose} onSuccess={handleFormSuccess} onSwitchToEdit={handleSwitchToEdit} />}
 
       {/* Edit Job Order Form */}
       {isEditFormOpen && editingJobOrderId && (
@@ -1215,86 +1223,6 @@ export default function JobOrders() {
                   </div>
                 </div>
               </div>
-
-              {/* Measurements */}
-              {selectedOrder.job_order_measurements && selectedOrder.job_order_measurements.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
-                    <Ruler className="w-5 h-5" />
-                    <span>Measurements</span>
-                  </h3>
-                  <div className="space-y-4">
-                    {selectedOrder.job_order_measurements.map((measurement, index) => {
-                      const materialName = measurement.material_name || `Material ${index + 1}`
-                      const arabicName = measurement.material_arabic_name || ""
-                      const displayName = arabicName ? `${materialName} - ${arabicName}` : materialName
-                      return (
-                      <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-                          {displayName}
-                        </h4>
-                        <div className="grid grid-cols-6 gap-4 text-sm">
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Thool</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.thool || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Kethef</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.kethet || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Thool Kum</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.thool_kum || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Ardh F Kum</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.ardh_f_kum || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Jamba</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.jamba || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600 dark:text-gray-400">Ragab</label>
-                            <p className="text-gray-900 dark:text-white font-medium">{measurement.ragab || 'N/A'}</p>
-                          </div>
-                        </div>
-                        {(measurement.note1 || measurement.note2 || measurement.note3 || measurement.note4) && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              {measurement.note1 && (
-                                <div>
-                                  <label className="text-gray-600 dark:text-gray-400">Note 1</label>
-                                  <p className="text-gray-900 dark:text-white">{measurement.note1}</p>
-                                </div>
-                              )}
-                              {measurement.note2 && (
-                                <div>
-                                  <label className="text-gray-600 dark:text-gray-400">Note 2</label>
-                                  <p className="text-gray-900 dark:text-white">{measurement.note2}</p>
-                                </div>
-                              )}
-                              {measurement.note3 && (
-                                <div>
-                                  <label className="text-gray-600 dark:text-gray-400">Note 3</label>
-                                  <p className="text-gray-900 dark:text-white">{measurement.note3}</p>
-                                </div>
-                              )}
-                              {measurement.note4 && (
-                                <div>
-                                  <label className="text-gray-600 dark:text-gray-400">Note 4</label>
-                                  <p className="text-gray-900 dark:text-white">{measurement.note4}</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Order Information */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">

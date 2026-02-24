@@ -49,8 +49,8 @@ export function DialogContent({ children, className }) {
       />
       <div
         className={
-          'relative z-10 bg-white dark:bg-gray-900 rounded-lg shadow-lg max-w-lg w-full mx-4 ' +
-          (className || '')
+          'relative z-10 bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full mx-4 ' +
+          (className ? className : 'max-w-lg')
         }
         role="dialog"
         aria-modal="true"

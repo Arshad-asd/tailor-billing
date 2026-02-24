@@ -11,7 +11,7 @@ import jobOrdersApi from '../../services/jobOrdersApi';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
 import { formatDateStr } from '../../utils/dateUtils';
 
-export default function AddJobOrder({ onClose, onSuccess }) {
+export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -1070,9 +1070,82 @@ export default function AddJobOrder({ onClose, onSuccess }) {
   };
 
   const isMaterialLocked = (materialId) => lockedMaterialIds.includes(materialId);
+  const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
 
-  const handleLockMaterial = (materialId) => {
+  const handleLockMaterial = async (materialId) => {
     setLockedMaterialIds(prev => (prev.includes(materialId) ? prev : [...prev, materialId]));
+
+    if (!selectedCustomer) {
+      setError('Please select or create a customer before saving a measurement.');
+      return;
+    }
+
+    setIsSavingMeasurement(true);
+    setError(null);
+
+    try {
+      const toMeasurementStr = (value) => (value === '' || value === null || value === undefined ? '' : String(value).trim());
+
+      const jobOrderPayload = {
+        customer_id: selectedCustomer.id,
+        status: 'pending',
+        order_date: (formData.bill.orderDate && String(formData.bill.orderDate).trim())
+          ? new Date(formData.bill.orderDate.trim() + 'T12:00:00').toISOString()
+          : new Date(formatDateStr(new Date()) + 'T12:00:00').toISOString(),
+        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate + 'T12:00:00').toISOString() : null,
+        total_amount: formData.bill.total || 0,
+        advance_amount: parseFloat(formData.bill.advance) || 0,
+        balance_amount: formData.bill.balance || 0,
+        payment_method: formData.bill.paymentMethod || 'cash',
+        cash_amount: formData.bill.cashAmount || 0,
+        card_amount: formData.bill.cardAmount || 0,
+        remarks: formData.measurement.remarks || '',
+        ...(billItems.length > 0 && {
+          job_order_items: billItems.filter(item => item.material_id).map(item => {
+            const quantity = parseInt(item.qty) || 1;
+            const amount = parseFloat(item.amount) || 0;
+            return {
+              material: parseInt(item.material_id),
+              quantity,
+              amount,
+              sub_total: quantity * amount,
+              remarks: item.remarks || ''
+            };
+          })
+        }),
+        job_order_measurements: selectedMaterials.map(material => {
+          const matId = parseInt(material.material_id || material.id);
+          return {
+            material: matId,
+            thool: toMeasurementStr(material.custom_thool),
+            kethet: toMeasurementStr(material.custom_kethet),
+            thool_kum: toMeasurementStr(material.custom_thool_kum),
+            ardh_f_kum: toMeasurementStr(material.custom_ardh_f_kum),
+            jamba: toMeasurementStr(material.custom_jamba),
+            ragab: toMeasurementStr(material.custom_ragab),
+            note1: material.note1 || '',
+            note2: material.note2 || '',
+            note3: material.note3 || '',
+            note4: material.note4 || ''
+          };
+        })
+      };
+
+      const result = await jobOrdersApi.createJobOrder(jobOrderPayload);
+      console.log('Job order created on measurement save:', result);
+
+      if (onSwitchToEdit && result?.id) {
+        onSwitchToEdit(result.id);
+      } else if (onSuccess) {
+        onSuccess(result);
+      }
+    } catch (err) {
+      console.error('Error creating job order on measurement save:', err);
+      setError(err.response?.data?.error || 'Failed to save. Please try again.');
+      setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
+    } finally {
+      setIsSavingMeasurement(false);
+    }
   };
 
   const handleUnlockMaterial = (materialId) => {
@@ -1748,10 +1821,10 @@ export default function AddJobOrder({ onClose, onSuccess }) {
                         </button>
                         <button
                           onClick={() => handleLockMaterial(material.id)}
-                          disabled={isMaterialLocked(material.id)}
+                          disabled={isMaterialLocked(material.id) || isSavingMeasurement}
                           className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs px-2 py-1 rounded border border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Save
+                          {isSavingMeasurement ? 'Saving...' : 'Save'}
                         </button>
                       </div>
                       {isMaterialLocked(material.id) && (
