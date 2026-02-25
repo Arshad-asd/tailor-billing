@@ -43,7 +43,6 @@ export function DialogContent({ children, className }) {
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm"
         onClick={() => setOpen(false)}
-        onMouseDown={(e) => e.preventDefault()}
         tabIndex={-1}
         aria-label="Close dialog"
       />

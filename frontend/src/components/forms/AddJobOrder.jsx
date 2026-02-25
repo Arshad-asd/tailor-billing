@@ -503,17 +503,16 @@ export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
     setCustomerNoSearchResults([]);
   };
 
-  // Track materials length for ref
+  // Track materials length for ref, and clean up lockedMaterialIds when materials are removed
   useEffect(() => {
     if (selectedMaterials.length !== prevMaterialsLengthRef.current) {
       prevMaterialsLengthRef.current = selectedMaterials.length;
+      setLockedMaterialIds(prev => {
+        const filtered = prev.filter(id => selectedMaterials.some(m => m.id === id));
+        return filtered.length === prev.length ? prev : filtered;
+      });
     }
-  }, [selectedMaterials]);
-
-  // When a material is removed, remove its id from lockedMaterialIds
-  useEffect(() => {
-    setLockedMaterialIds(prev => prev.filter(id => selectedMaterials.some(m => m.id === id)));
-  }, [selectedMaterials]);
+  }, [selectedMaterials.length]);
 
   // Keep activeMaterialIndex in valid range when selectedMaterials changes
   useEffect(() => {
