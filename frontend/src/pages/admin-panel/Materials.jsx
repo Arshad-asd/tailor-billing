@@ -34,6 +34,9 @@ export default function Materials() {
   const [searchJobOrder, setSearchJobOrder] = useState("")
   const [searchCustomerId, setSearchCustomerId] = useState("")
   const [searchNamePhone, setSearchNamePhone] = useState("")
+  const [debouncedJobOrder, setDebouncedJobOrder] = useState("")
+  const [debouncedCustomerId, setDebouncedCustomerId] = useState("")
+  const [debouncedNamePhone, setDebouncedNamePhone] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -69,6 +72,19 @@ export default function Materials() {
     return `${day}/${month}/${year}`
   }
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedJobOrder(searchJobOrder), 300)
+    return () => clearTimeout(t)
+  }, [searchJobOrder])
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCustomerId(searchCustomerId), 300)
+    return () => clearTimeout(t)
+  }, [searchCustomerId])
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedNamePhone(searchNamePhone), 300)
+    return () => clearTimeout(t)
+  }, [searchNamePhone])
+
   // Load data on component mount and when dates/search change
   useEffect(() => {
     if (activeTab === "materials") {
@@ -76,7 +92,7 @@ export default function Materials() {
     } else {
       loadJobOrders()
     }
-  }, [activeTab, fromDate, toDate, searchJobOrder, searchCustomerId, searchNamePhone])
+  }, [activeTab, fromDate, toDate, debouncedJobOrder, debouncedCustomerId, debouncedNamePhone])
 
   const loadMaterials = async () => {
     setLoading(true)
@@ -93,7 +109,8 @@ export default function Materials() {
     }
   }
 
-  const hasAnyJobOrderSearch = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim()
+  const hasAnyJobOrderSearch = debouncedJobOrder.trim() || debouncedCustomerId.trim() || debouncedNamePhone.trim()
+  const hasAnySearchInput = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim()
 
   const loadJobOrders = async () => {
     setLoading(true)
@@ -101,14 +118,14 @@ export default function Materials() {
     try {
       const params = {}
       
-      if (searchJobOrder.trim()) {
-        params.search_job_order = searchJobOrder.trim()
+      if (debouncedJobOrder.trim()) {
+        params.search_job_order = debouncedJobOrder.trim()
       }
-      if (searchCustomerId.trim()) {
-        params.search_customer_id = searchCustomerId.trim()
+      if (debouncedCustomerId.trim()) {
+        params.search_customer_id = debouncedCustomerId.trim()
       }
-      if (searchNamePhone.trim()) {
-        params.search_name_phone = searchNamePhone.trim()
+      if (debouncedNamePhone.trim()) {
+        params.search_name_phone = debouncedNamePhone.trim()
       }
 
       if (!hasAnyJobOrderSearch) {
@@ -228,13 +245,13 @@ export default function Materials() {
     .sort((a, b) => (a.id || 0) - (b.id || 0))
 
   const filteredJobOrders = jobOrders.filter((jobOrder) => {
-    const matchesJobOrder = !searchJobOrder.trim() ||
-      jobOrder.job_order_number.toLowerCase().includes(searchJobOrder.toLowerCase())
-    const matchesCustomerId = !searchCustomerId.trim() ||
-      (jobOrder.customer_id && jobOrder.customer_id.toString().toLowerCase().includes(searchCustomerId.toLowerCase()))
-    const matchesNamePhone = !searchNamePhone.trim() ||
-      jobOrder.customer_name.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
-      (jobOrder.customer_phone && jobOrder.customer_phone.toLowerCase().includes(searchNamePhone.toLowerCase()))
+    const matchesJobOrder = !debouncedJobOrder.trim() ||
+      jobOrder.job_order_number.toLowerCase().includes(debouncedJobOrder.toLowerCase())
+    const matchesCustomerId = !debouncedCustomerId.trim() ||
+      (jobOrder.customer_id && jobOrder.customer_id.toString().toLowerCase().includes(debouncedCustomerId.toLowerCase()))
+    const matchesNamePhone = !debouncedNamePhone.trim() ||
+      jobOrder.customer_name.toLowerCase().includes(debouncedNamePhone.toLowerCase()) ||
+      (jobOrder.customer_phone && jobOrder.customer_phone.toLowerCase().includes(debouncedNamePhone.toLowerCase()))
 
     const matchesStatus = categoryFilter === "all" || jobOrder.status === categoryFilter
 
@@ -1307,9 +1324,9 @@ export default function Materials() {
                     type="date"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    disabled={!!hasAnyJobOrderSearch}
+                    disabled={!!hasAnySearchInput}
                     className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      hasAnyJobOrderSearch ? 'opacity-50 cursor-not-allowed' : ''
+                      hasAnySearchInput ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
@@ -1321,9 +1338,9 @@ export default function Materials() {
                     type="date"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
-                    disabled={!!hasAnyJobOrderSearch}
+                    disabled={!!hasAnySearchInput}
                     className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      hasAnyJobOrderSearch ? 'opacity-50 cursor-not-allowed' : ''
+                      hasAnySearchInput ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
@@ -1334,16 +1351,16 @@ export default function Materials() {
                       setFromDate(today)
                       setToDate(today)
                     }}
-                    disabled={!!hasAnyJobOrderSearch}
+                    disabled={!!hasAnySearchInput}
                     className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-                      hasAnyJobOrderSearch
+                      hasAnySearchInput
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
                     Reset to Today
                   </button>
-                  {hasAnyJobOrderSearch && (
+                  {hasAnySearchInput && (
                     <button
                       onClick={() => {
                         setSearchJobOrder("")
@@ -1357,7 +1374,7 @@ export default function Materials() {
                   )}
                 </div>
               </div>
-              {hasAnyJobOrderSearch && (
+              {hasAnySearchInput && (
                 <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
                   <strong>Search Mode:</strong> Searching across all job orders (date filter disabled)
                 </div>
@@ -1535,7 +1552,7 @@ export default function Materials() {
                 ) : filteredJobOrders.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                      No job orders found. {hasAnyJobOrderSearch && "Try adjusting your search."}
+                      No job orders found. {hasAnySearchInput && "Try adjusting your search."}
                     </td>
                   </tr>
                 ) : (
