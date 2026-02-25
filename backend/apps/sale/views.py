@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from .models import Sale, SaleItem
 from .serializers import SaleSerializer, SaleListSerializer, SaleItemSerializer
@@ -52,6 +53,18 @@ class SaleViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass  # Invalid date format, ignore the filter
         
+        search_sale_number = self.request.query_params.get('search_sale_number')
+        if search_sale_number:
+            queryset = queryset.filter(sale_number__icontains=search_sale_number)
+
+        search_customer_name = self.request.query_params.get('search_customer_name')
+        if search_customer_name:
+            queryset = queryset.filter(customer_name__icontains=search_customer_name)
+
+        search_notes = self.request.query_params.get('search_notes')
+        if search_notes:
+            queryset = queryset.filter(notes__icontains=search_notes)
+
         return queryset
     
     def generate_sale_number(self):

@@ -1,24 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Truck, CheckCircle, Clock, AlertCircle, MapPin, Phone, Calendar, Check, X, Lock, Unlock } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Truck, CheckCircle, Clock, AlertCircle, MapPin, Phone, Calendar, Check, X, Lock, Unlock, DollarSign } from 'lucide-react';
 import { deliveryApi } from '../../services/deliveryApi';
 import DeliveryEditModal from '../../components/modals/DeliveryEditModal';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
 import { formatDateStr, formatTime } from '../../utils/dateUtils';
 
 export default function Delivery() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchJobOrder, setSearchJobOrder] = useState('');
+  const [searchCustomerId, setSearchCustomerId] = useState('');
+  const [searchNamePhone, setSearchNamePhone] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [blockedFilter, setBlockedFilter] = useState('unblocked'); // Default to unblocked
-  const [fromDate, setFromDate] = useState(formatDateStr(new Date()));
-  const [toDate, setToDate] = useState(formatDateStr(new Date()));
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
-    scheduled: 0,
-    in_transit: 0,
-    completed: 0,
-    todays_deliveries: 0
+    total_orders: 0,
+    delivered: 0,
+    total_revenue: 0,
+    total_balance: 0
   });
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -33,11 +35,13 @@ export default function Delivery() {
     fetchStats();
   }, []);
 
+  const hasAnySearch = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim();
+
   // Fetch deliveries when filters change
   useEffect(() => {
     fetchDeliveries();
     fetchStats();
-  }, [statusFilter, searchTerm, fromDate, toDate, blockedFilter]);
+  }, [statusFilter, searchJobOrder, searchCustomerId, searchNamePhone, fromDate, toDate, blockedFilter]);
 
   const fetchDeliveries = async () => {
     try {
@@ -52,11 +56,17 @@ export default function Delivery() {
         params.is_blocked = blockedFilter === 'blocked';
       }
       
-      if (searchTerm) {
-        params.search = searchTerm;
-        // When searching, do not send date range — global search across all deliveries
-      } else {
-        // When not searching, apply from_date and to_date for listing
+      if (searchJobOrder.trim()) {
+        params.search_job_order = searchJobOrder.trim();
+      }
+      if (searchCustomerId.trim()) {
+        params.search_customer_id = searchCustomerId.trim();
+      }
+      if (searchNamePhone.trim()) {
+        params.search_name_phone = searchNamePhone.trim();
+      }
+
+      if (!hasAnySearch) {
         if (fromDate) {
           params.from_date = fromDate;
         }
@@ -88,10 +98,10 @@ export default function Delivery() {
       
       const data = await deliveryApi.getDeliveryStats(params);
       setStats({
-        scheduled: data.pending || 0,
-        in_transit: data.in_progress || 0,
-        completed: data.completed || 0,
-        todays_deliveries: data.delivered || 0
+        total_orders: data.total_orders || 0,
+        delivered: data.delivered || 0,
+        total_revenue: data.total_revenue || 0,
+        total_balance: data.total_balance || 0
       });
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -302,23 +312,25 @@ export default function Delivery() {
   const transformedDeliveries = deliveries.map(transformJobOrderToDelivery);
 
   const filteredDeliveries = transformedDeliveries.filter(delivery => {
-    const matchesSearch = delivery.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         delivery.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         delivery.jobOrderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         delivery.jobOrderId.toString().includes(searchTerm.toLowerCase());
+    const matchesJobOrder = !searchJobOrder.trim() ||
+      delivery.jobOrderNumber.toLowerCase().includes(searchJobOrder.toLowerCase());
+    const matchesCustId = !searchCustomerId.trim() ||
+      delivery.id.toLowerCase().includes(searchCustomerId.toLowerCase());
+    const matchesNamePhone = !searchNamePhone.trim() ||
+      delivery.customerName.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
+      (delivery.phone && delivery.phone.toLowerCase().includes(searchNamePhone.toLowerCase()));
     const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
     const matchesBlocked = blockedFilter === 'all' || 
                           (blockedFilter === 'blocked' && delivery.is_blocked) ||
                           (blockedFilter === 'unblocked' && !delivery.is_blocked);
-    return matchesSearch && matchesStatus && matchesBlocked;
+    return matchesJobOrder && matchesCustId && matchesNamePhone && matchesStatus && matchesBlocked;
   });
 
   // Handle search Enter key to start editing first result
   const handleSearchKeyDown = (e) => {
-    if (e.key === 'Enter' && filteredDeliveries.length > 0) {
+    if (e.key === 'Enter' && hasAnySearch && filteredDeliveries.length > 0) {
       const firstDelivery = filteredDeliveries[0];
       handleCellEditStart(firstDelivery.id, 'delivery_date', firstDelivery.deliveryDate);
-      // Focus will be handled by useEffect
     }
   };
 
@@ -362,22 +374,11 @@ export default function Delivery() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <Truck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Scheduled</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.scheduled}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-              <Truck className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Transit</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.in_transit}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Job Orders</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_orders}</p>
             </div>
           </div>
         </div>
@@ -387,19 +388,30 @@ export default function Delivery() {
               <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.completed}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Delivered</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.delivered}</p>
             </div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <MapPin className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <DollarSign className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Today's Deliveries</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.todays_deliveries}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR {formatCurrency(stats.total_revenue)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Balance</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">QAR {formatCurrency(stats.total_balance)}</p>
             </div>
           </div>
         </div>
@@ -408,20 +420,60 @@ export default function Delivery() {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          {/* 3 Split Search Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Job Order Number
+              </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search deliveries... (Press Enter to edit first result)"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by order number..."
+                  value={searchJobOrder}
+                  onChange={(e) => setSearchJobOrder(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer ID
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by customer ID..."
+                  value={searchCustomerId}
+                  onChange={(e) => setSearchCustomerId(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer Name / Phone
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or phone..."
+                  value={searchNamePhone}
+                  onChange={(e) => setSearchNamePhone(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Status, Blocked Filters, Date Range */}
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex items-center space-x-4">
               <select
                 value={statusFilter}
@@ -443,39 +495,51 @@ export default function Delivery() {
                 <option value="blocked">Blocked</option>
                 <option value="all">All</option>
               </select>
-              <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                <Filter className="w-4 h-4" />
-              </button>
             </div>
-          </div>
-          {/* Date Range Filter */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date Range:</span>
+              <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">From:</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                disabled={!!hasAnySearch}
+                className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  hasAnySearch ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              />
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 flex-1">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">From:</label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">To:</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  min={fromDate}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">To:</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                min={fromDate}
+                disabled={!!hasAnySearch}
+                className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  hasAnySearch ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              />
             </div>
+            {hasAnySearch && (
+              <button
+                onClick={() => {
+                  setSearchJobOrder('');
+                  setSearchCustomerId('');
+                  setSearchNamePhone('');
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors whitespace-nowrap"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
+
+          {hasAnySearch && (
+            <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
+              <strong>Search Mode:</strong> Searching across all deliveries (date filter disabled)
+            </div>
+          )}
         </div>
       </div>
 

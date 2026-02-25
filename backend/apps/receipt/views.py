@@ -39,6 +39,26 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'updated_at', 'receipt_date', 'receipt_amount', 'receipt_id']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        search_receipt_id = self.request.query_params.get('search_receipt_id')
+        if search_receipt_id:
+            queryset = queryset.filter(receipt_id__icontains=search_receipt_id)
+
+        search_customer_id = self.request.query_params.get('search_customer_id')
+        if search_customer_id:
+            queryset = queryset.filter(job_order__customer__customer_id__icontains=search_customer_id)
+
+        search_name_phone = self.request.query_params.get('search_name_phone')
+        if search_name_phone:
+            queryset = queryset.filter(
+                Q(job_order__customer__name__icontains=search_name_phone) |
+                Q(job_order__customer__phone__icontains=search_name_phone)
+            )
+
+        return queryset
+
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
         if self.action == 'create':

@@ -31,6 +31,9 @@ import { formatCurrency } from "../../utils/currencyUtils"
 export default function Materials() {
   const [activeTab, setActiveTab] = useState("measurements") // 'materials' or 'measurements'
   const [searchTerm, setSearchTerm] = useState("")
+  const [searchJobOrder, setSearchJobOrder] = useState("")
+  const [searchCustomerId, setSearchCustomerId] = useState("")
+  const [searchNamePhone, setSearchNamePhone] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -66,14 +69,14 @@ export default function Materials() {
     return `${day}/${month}/${year}`
   }
 
-  // Load data on component mount and when dates change
+  // Load data on component mount and when dates/search change
   useEffect(() => {
     if (activeTab === "materials") {
       loadMaterials()
     } else {
       loadJobOrders()
     }
-  }, [activeTab, fromDate, toDate])
+  }, [activeTab, fromDate, toDate, searchJobOrder, searchCustomerId, searchNamePhone])
 
   const loadMaterials = async () => {
     setLoading(true)
@@ -90,18 +93,31 @@ export default function Materials() {
     }
   }
 
+  const hasAnyJobOrderSearch = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim()
+
   const loadJobOrders = async () => {
     setLoading(true)
     setError(null)
     try {
       const params = {}
       
-      // Only add date filters if dates are valid
-      if (fromDate) {
-        params.from_date = fromDate
+      if (searchJobOrder.trim()) {
+        params.search_job_order = searchJobOrder.trim()
       }
-      if (toDate) {
-        params.to_date = toDate
+      if (searchCustomerId.trim()) {
+        params.search_customer_id = searchCustomerId.trim()
+      }
+      if (searchNamePhone.trim()) {
+        params.search_name_phone = searchNamePhone.trim()
+      }
+
+      if (!hasAnyJobOrderSearch) {
+        if (fromDate) {
+          params.from_date = fromDate
+        }
+        if (toDate) {
+          params.to_date = toDate
+        }
       }
       
       const data = await jobOrdersApi.getJobOrders(params)
@@ -212,14 +228,17 @@ export default function Materials() {
     .sort((a, b) => (a.id || 0) - (b.id || 0))
 
   const filteredJobOrders = jobOrders.filter((jobOrder) => {
-    const matchesSearch =
-      jobOrder.job_order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jobOrder.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jobOrder.id.toString().toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesJobOrder = !searchJobOrder.trim() ||
+      jobOrder.job_order_number.toLowerCase().includes(searchJobOrder.toLowerCase())
+    const matchesCustomerId = !searchCustomerId.trim() ||
+      (jobOrder.customer_id && jobOrder.customer_id.toString().toLowerCase().includes(searchCustomerId.toLowerCase()))
+    const matchesNamePhone = !searchNamePhone.trim() ||
+      jobOrder.customer_name.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
+      (jobOrder.customer_phone && jobOrder.customer_phone.toLowerCase().includes(searchNamePhone.toLowerCase()))
 
     const matchesStatus = categoryFilter === "all" || jobOrder.status === categoryFilter
 
-    return matchesSearch && matchesStatus
+    return matchesJobOrder && matchesCustomerId && matchesNamePhone && matchesStatus
   })
 
   const totalValue = materials.reduce((sum, material) => sum + Number.parseFloat(material.price || 0), 0)
@@ -303,6 +322,227 @@ export default function Materials() {
     }
   }
 
+  const MEASUREMENTS_PER_PAGE = 4
+
+  const generateMeasurementItemHtml = (measurement, materialQuantityMap) => {
+    const formatValue = (val) => {
+      if (val === "" || val === null || val === undefined) return "";
+      return String(val).trim();
+    };
+    
+    const measurementValues = [
+      formatValue(measurement.thool),
+      formatValue(measurement.kethet),
+      formatValue(measurement.thool_kum),
+      formatValue(measurement.ardh_f_kum),
+      formatValue(measurement.jamba),
+      formatValue(measurement.ragab)
+    ].filter(val => val !== "")
+     .map(val => `<span>${val}</span>`)
+     .join('<span class="measurement-separator"> - </span>');
+    
+    const note1 = measurement.note1?.trim() || "";
+    const note2 = measurement.note2?.trim() || "";
+    const note3 = measurement.note3?.trim() || "";
+    const note4 = measurement.note4?.trim() || "";
+    
+    let notesHtml = "";
+    if (note1 || note2 || note3 || note4) {
+      notesHtml = '<div class="notes">';
+      if (note1 || note2) {
+        notesHtml += '<div class="notes-row">';
+        if (note1) notesHtml += `<div class="notes-row-item">${note1}</div>`;
+        if (note2) notesHtml += `<div class="notes-row-item">${note2}</div>`;
+        notesHtml += '</div>';
+      }
+      if (note3 || note4) {
+        notesHtml += '<div class="notes-row">';
+        if (note3) notesHtml += `<div class="notes-row-item">${note3}</div>`;
+        if (note4) notesHtml += `<div class="notes-row-item">${note4}</div>`;
+        notesHtml += '</div>';
+      }
+      notesHtml += '</div>';
+    }
+    
+    const materialId = measurement.material;
+    const quantity = materialId && materialQuantityMap[materialId] ? materialQuantityMap[materialId] : null;
+    const quantityText = quantity ? ` (${quantity} pcs)` : '';
+    
+    return `
+      <div class="measurement-item">
+        <div class="measurement-left">
+          <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
+          <div class="measurement-values">${measurementValues || ""}</div>
+          ${notesHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  const generateMeasurementPrintContent = (jobOrder, printableMeasurements, materialQuantityMap, extraScript = '') => {
+    const chunks = [];
+    for (let i = 0; i < printableMeasurements.length; i += MEASUREMENTS_PER_PAGE) {
+      chunks.push(printableMeasurements.slice(i, i + MEASUREMENTS_PER_PAGE));
+    }
+    if (chunks.length === 0) chunks.push([]);
+
+    const headerHtml = `
+      <div class="header">
+        <div class="header-left">
+          <h1>${jobOrder.customer_id || 'N/A'}</h1>
+          <p>${formatDateDMY(jobOrder.delivery_date)}</p>
+        </div>
+        <div class="header-center">
+          <h1>${jobOrder.customer_name}</h1>
+        </div>
+        <div class="header-right">
+          <h1>${jobOrder.job_order_number}</h1>
+          <p>${jobOrder.customer_phone || ''}</p>
+        </div>
+      </div>
+    `;
+
+    const pagesHtml = chunks.map((chunk) => `
+      <div class="a5-page">
+        ${headerHtml}
+        <div class="measurements-container">
+          ${chunk.map(m => generateMeasurementItemHtml(m, materialQuantityMap)).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Job Order Measurement - ${jobOrder.job_order_number}</title>
+          <style>
+            @page {
+              size: A5 portrait;
+              margin: 5mm;
+            }
+            html, body {
+              height: auto;
+              overflow: visible;
+              margin: 0;
+              padding: 0;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              font-size: 16px;
+              line-height: 1.4;
+              color: #111;
+            }
+            .a5-page {
+              width: 100%;
+              max-width: 100%;
+              page-break-after: always;
+            }
+            .a5-page:last-child {
+              page-break-after: avoid;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 8px;
+              margin-bottom: 4mm;
+              border-bottom: 1px solid #000;
+              padding-bottom: 2mm;
+            }
+            .header-left, .header-center, .header-right {
+              flex: 1;
+              max-width: 33%;
+              display: flex;
+              flex-direction: column;
+              justify-content: flex-start;
+              line-height: 1.4;
+            }
+            .header-left { text-align: left; }
+            .header-center { text-align: center; }
+            .header-right { text-align: right; }
+            .header h1 {
+              margin: 0; padding: 0;
+              font-size: 16px; color: #111;
+              line-height: 1.4; vertical-align: top;
+            }
+            .header p {
+              margin: 0; padding: 0;
+              font-size: 16px; color: #444;
+              line-height: 1.4; vertical-align: top;
+            }
+            .measurement-item {
+              margin-bottom: 3mm;
+              padding-bottom: 2mm;
+              border-bottom: 0.5px solid #ccc;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .measurement-left {
+              flex: 1 1 auto;
+              min-width: 0; width: 100%;
+              overflow: visible;
+            }
+            .material-name {
+              font-weight: 600; font-size: 16px;
+              margin: 0 0 1mm 0; padding: 0;
+              color: #111; line-height: 1.4;
+            }
+            .notes {
+              font-size: 16px; color: #555;
+              margin: 0 0 1mm 0; padding: 0;
+              line-height: 1.4; width: 100%;
+            }
+            .notes-row {
+              display: table; width: 100%;
+              table-layout: fixed; margin-bottom: 0.5mm;
+              border-collapse: separate; border-spacing: 1.5mm 0;
+            }
+            .notes-row-item {
+              display: table-cell; width: 50%;
+              word-wrap: break-word; word-break: break-word;
+              overflow-wrap: break-word; hyphens: auto;
+              line-height: 1.4; padding: 0; margin: 0;
+              vertical-align: top;
+            }
+            .measurement-values {
+              font-size: 20px; color: #333;
+              white-space: nowrap; margin: 1mm 0; padding: 0;
+              line-height: 1.4; letter-spacing: 0.5px;
+            }
+            .measurement-values .measurement-separator {
+              padding: 0 3mm; display: inline-block;
+            }
+            .measurement-values span:not(.measurement-separator) {
+              display: inline-block;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .a5-page {
+                page-break-after: always;
+                page-break-inside: avoid;
+              }
+              .a5-page:last-child {
+                page-break-after: avoid;
+              }
+              .measurement-item {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${pagesHtml}
+          ${extraScript}
+        </body>
+      </html>
+    `;
+  }
+
   const handlePrintJobOrderMeasurements = async (jobOrder) => {
     try {
       setLoading(true)
@@ -334,262 +574,9 @@ export default function Materials() {
           return
         }
         
-        const printContent = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Job Order Measurement - ${jobOrder.job_order_number}</title>
-              <style>
-                /* Page + base */
-                @page {
-                  size: A5 portrait;
-                  margin: 5mm;
-                }
-                html, body {
-                  height: auto;
-                  overflow: visible;
-                }
-                body {
-                  font-family: Arial, sans-serif;
-                  font-size: 16px;
-                  line-height: 1.4;
-                  margin: 0;
-                  padding: 0;
-                  color: #111;
-                }
-                .a5 {
-                  width: 100%;
-                  max-width: 100%;
-                }
+        const autoScript = `<script>window.document.close();window.focus();window.print();window.close();</script>`;
+        const printContent = generateMeasurementPrintContent(jobOrder, printableMeasurements, materialQuantityMap, autoScript)
 
-                /* Header */
-                .header {
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: flex-start;
-                  gap: 8px;
-                  margin-bottom: 4mm;
-                  border-bottom: 1px solid #000;
-                  padding-bottom: 2mm;
-                }
-                .header-left, .header-center, .header-right {
-                  flex: 1;
-                  max-width: 33%;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: flex-start;
-                  line-height: 1.4;
-                }
-                .header-left { text-align: left; }
-                .header-center { text-align: center; }
-                .header-right { text-align: right; }
-                .header h1 {
-                  margin: 0;
-                  padding: 0;
-                  font-size: 16px;
-                  color: #111;
-                  line-height: 1.4;
-                  vertical-align: top;
-                }
-                .header p {
-                  margin: 0;
-                  padding: 0;
-                  font-size: 16px;
-                  color: #444;
-                  line-height: 1.4;
-                  vertical-align: top;
-                }
-
-                /* Measurement Items */
-                .measurement-item {
-                  margin-bottom: 3mm;
-                  padding-bottom: 2mm;
-                  border-bottom: 0.5px solid #ccc;
-                  page-break-inside: avoid;
-                  break-inside: avoid;
-                  orphans: 3;
-                  widows: 3;
-                }
-                .measurement-left {
-                  flex: 1 1 auto;
-                  min-width: 0;
-                  width: 100%;
-                  overflow: visible;
-                }
-                .material-name {
-                  font-weight: 600;
-                  font-size: 16px;
-                  margin: 0 0 1mm 0;
-                  padding: 0;
-                  color: #111;
-                  line-height: 1.4;
-                  vertical-align: top;
-                }
-                .notes {
-                  font-size: 16px;
-                  color: #555;
-                  margin: 0 0 1mm 0;
-                  padding: 0;
-                  line-height: 1.4;
-                  width: 100%;
-                  max-width: 100%;
-                }
-                .notes-row {
-                  display: table;
-                  width: 100%;
-                  table-layout: fixed;
-                  margin-bottom: 0.5mm;
-                  border-collapse: separate;
-                  border-spacing: 1.5mm 0;
-                }
-                .notes-row-item {
-                  display: table-cell;
-                  width: 50%;
-                  word-wrap: break-word;
-                  word-break: break-word;
-                  overflow-wrap: break-word;
-                  hyphens: auto;
-                  line-height: 1.4;
-                  padding: 0;
-                  margin: 0;
-                  vertical-align: top;
-                }
-                .measurement-values {
-                  font-size: 20px;
-                  color: #333;
-                  white-space: nowrap;
-                  margin: 1mm 0;
-                  padding: 0;
-                  line-height: 1.4;
-                  vertical-align: top;
-                  letter-spacing: 0.5px;
-                }
-                .measurement-values .measurement-separator {
-                  padding: 0 3mm;
-                  display: inline-block;
-                }
-                .measurement-values span:not(.measurement-separator) {
-                  display: inline-block;
-                }
-
-                /* Footer */
-                .footer {
-                  margin-top: 6mm;
-                  text-align: center;
-                  font-size: 16px;
-                  color: #555;
-                  border-top: 0.6px solid #bbb;
-                  padding-top: 3mm;
-                }
-
-                /* Print-specific tweaks */
-                @media print {
-                  body { 
-                    -webkit-print-color-adjust: exact; 
-                    print-color-adjust: exact;
-                  }
-                  .measurement-item { 
-                    page-break-inside: avoid;
-                    break-inside: avoid;
-                    page-break-after: auto;
-                    orphans: 3;
-                    widows: 3;
-                  }
-                  .measurements-container {
-                    page-break-inside: auto;
-                  }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="a5">
-                <div class="header">
-                  <div class="header-left">
-                    <h1>${jobOrder.customer_id || 'N/A'}</h1>
-                    <p>${formatDateDMY(jobOrder.delivery_date)}</p>
-                  </div>
-                  <div class="header-center">
-                    <h1>${jobOrder.customer_name}</h1>
-                  </div>
-                  <div class="header-right">
-                    <h1>${jobOrder.job_order_number}</h1>
-                    <p>${jobOrder.customer_phone || ''}</p>
-                  </div>
-                </div>
-
-                <div class="measurements-container">
-                  ${printableMeasurements.map(measurement => {
-                    const formatValue = (val) => {
-                      if (val === "" || val === null || val === undefined) return "";
-                      return String(val).trim();
-                    };
-                    
-                    const measurementValues = [
-                      formatValue(measurement.thool),
-                      formatValue(measurement.kethet),
-                      formatValue(measurement.thool_kum),
-                      formatValue(measurement.ardh_f_kum),
-                      formatValue(measurement.jamba),
-                      formatValue(measurement.ragab)
-                    ].filter(val => val !== "")
-                     .map(val => `<span>${val}</span>`)
-                     .join('<span class="measurement-separator"> - </span>');
-                    
-                    // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
-                    const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
-                    const note2 = measurement.note2 && measurement.note2.trim() ? measurement.note2.trim() : "";
-                    const note3 = measurement.note3 && measurement.note3.trim() ? measurement.note3.trim() : "";
-                    const note4 = measurement.note4 && measurement.note4.trim() ? measurement.note4.trim() : "";
-                    
-                    let notesHtml = "";
-                    if (note1 || note2 || note3 || note4) {
-                      notesHtml = '<div class="notes">';
-                      // First row: note1 and note2
-                      if (note1 || note2) {
-                        notesHtml += '<div class="notes-row">';
-                        if (note1) notesHtml += `<div class="notes-row-item">${note1}</div>`;
-                        if (note2) notesHtml += `<div class="notes-row-item">${note2}</div>`;
-                        notesHtml += '</div>';
-                      }
-                      // Second row: note3 and note4
-                      if (note3 || note4) {
-                        notesHtml += '<div class="notes-row">';
-                        if (note3) notesHtml += `<div class="notes-row-item">${note3}</div>`;
-                        if (note4) notesHtml += `<div class="notes-row-item">${note4}</div>`;
-                        notesHtml += '</div>';
-                      }
-                      notesHtml += '</div>';
-                    }
-                    
-                    // Get quantity for this material
-                    const materialId = measurement.material;
-                    const quantity = materialId && materialQuantityMap[materialId] ? materialQuantityMap[materialId] : null;
-                    const quantityText = quantity ? ` (${quantity} pcs)` : '';
-                    
-                    return `
-                      <div class="measurement-item">
-                        <div class="measurement-left">
-                          <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
-                          <div class="measurement-values">${measurementValues || ""}</div>
-                          ${notesHtml}
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-                </div>
-
-              </div>
-              <script>
-                window.document.close();
-                window.focus();
-                window.print();
-                window.close();
-              </script>
-            </body>
-          </html>
-        `
-
-        // Create one print window with all measurements for this job order
         const printWindow = window.open("", "_blank")
         
         if (printWindow) {
@@ -740,349 +727,52 @@ export default function Materials() {
             console.error(`Failed to mark measurements as printed for ${jobOrder.job_order_number}:`, e)
           }
 
-          // STEP 4: Create and populate print content
-          const printContent = `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>Job Order Measurement - ${jobOrder.job_order_number}</title>
-                <style>
-                  @page {
-                    size: A5 portrait;
-                    margin: 5mm;
+          // STEP 4: Create print content with pagination (4 measurements per page)
+          const multiPrintScript = `<script>
+            (function() {
+              var printIndex = ${index};
+              var printTriggered = false;
+              var dialogClosed = false;
+              var afterPrint = function() {
+                if (dialogClosed) return;
+                dialogClosed = true;
+                try {
+                  if (window.opener) {
+                    window.opener.postMessage('printDialogClosed_' + printIndex, '*');
                   }
-                  html, body {
-                    height: auto;
-                    overflow: visible;
-                  }
-                  body {
-                    font-family: Arial, sans-serif;
-                    font-size: 16px;
-                    line-height: 1.4;
-                    margin: 0;
-                    padding: 0;
-                    color: #111;
-                  }
-                  .a5 {
-                    width: 100%;
-                    max-width: 100%;
-                  }
-                  .header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    gap: 8px;
-                    margin-bottom: 4mm;
-                    border-bottom: 1px solid #000;
-                    padding-bottom: 2mm;
-                  }
-                  .header-left, .header-center, .header-right {
-                    flex: 1;
-                    max-width: 33%;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: flex-start;
-                    line-height: 1.4;
-                  }
-                  .header-left { text-align: left; }
-                  .header-center { text-align: center; }
-                  .header-right { text-align: right; }
-                  .header h1 {
-                    margin: 0;
-                    padding: 0;
-                    font-size: 16px;
-                    color: #111;
-                    line-height: 1.4;
-                    vertical-align: top;
-                  }
-                  .header p {
-                    margin: 0;
-                    padding: 0;
-                    font-size: 16px;
-                    color: #444;
-                    line-height: 1.4;
-                    vertical-align: top;
-                  }
-                  /* Measurement Items */
-                  .measurement-item {
-                    margin-bottom: 3mm;
-                    padding-bottom: 2mm;
-                    border-bottom: 0.5px solid #ccc;
-                    page-break-inside: avoid;
-                    break-inside: avoid;
-                    orphans: 3;
-                    widows: 3;
-                  }
-                  .measurement-left {
-                    flex: 1 1 auto;
-                    min-width: 0;
-                    width: 100%;
-                    overflow: visible;
-                  }
-                  .material-name {
-                    font-weight: 600;
-                    font-size: 16px;
-                    margin: 0 0 1mm 0;
-                    padding: 0;
-                    color: #111;
-                    line-height: 1.4;
-                    vertical-align: top;
-                  }
-                  .notes {
-                    font-size: 16px;
-                    color: #555;
-                    margin: 0 0 1mm 0;
-                    padding: 0;
-                    line-height: 1.4;
-                    width: 100%;
-                    max-width: 100%;
-                  }
-                  .notes-row {
-                    display: table;
-                    width: 100%;
-                    table-layout: fixed;
-                    margin-bottom: 0.5mm;
-                    border-collapse: separate;
-                    border-spacing: 1.5mm 0;
-                  }
-                  .notes-row-item {
-                    display: table-cell;
-                    width: 50%;
-                    word-wrap: break-word;
-                    word-break: break-word;
-                    overflow-wrap: break-word;
-                    hyphens: auto;
-                    line-height: 1.4;
-                    padding: 0;
-                    margin: 0;
-                    vertical-align: top;
-                  }
-                  .measurement-values {
-                    font-size: 20px;
-                    color: #333;
-                    white-space: nowrap;
-                    margin: 1mm 0;
-                    padding: 0;
-                    line-height: 1.4;
-                    vertical-align: top;
-                    letter-spacing: 0.5px;
-                  }
-                  .measurement-values .measurement-separator {
-                    padding: 0 3mm;
-                    display: inline-block;
-                  }
-                  .measurement-values span:not(.measurement-separator) {
-                    display: inline-block;
-                  }
-                  .footer {
-                    margin-top: 6mm;
-                    text-align: center;
-                    font-size: 16px;
-                    color: #555;
-                    border-top: 0.6px solid #bbb;
-                    padding-top: 3mm;
-                  }
-                  @media print {
-                    body { 
-                      -webkit-print-color-adjust: exact; 
-                      print-color-adjust: exact;
-                    }
-                    .measurement-item { 
-                      page-break-inside: avoid;
-                      break-inside: avoid;
-                      page-break-after: auto;
-                      orphans: 3;
-                      widows: 3;
-                    }
-                    .measurements-container {
-                      page-break-inside: auto;
-                    }
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="a5">
-                  <div class="header">
-                    <div class="header-left">
-                      <h1>${jobOrder.customer_id || 'N/A'}</h1>
-                      <p>${formatDateDMY(jobOrder.delivery_date)}</p>
-                    </div>
-                    <div class="header-center">
-                      <h1>${jobOrder.customer_name}</h1>
-                    </div>
-                    <div class="header-right">
-                      <h1>${jobOrder.job_order_number}</h1>
-                      <p>${jobOrder.customer_phone || ''}</p>
-                    </div>
-                  </div>
-
-                  <div class="measurements-container">
-                    ${printableMeasurements.map(measurement => {
-                      const formatValue = (val) => {
-                        if (val === "" || val === null || val === undefined) return "";
-                        return String(val).trim();
-                      };
-                      
-                      const measurementValues = [
-                        formatValue(measurement.thool),
-                        formatValue(measurement.kethet),
-                        formatValue(measurement.thool_kum),
-                        formatValue(measurement.ardh_f_kum),
-                        formatValue(measurement.jamba),
-                        formatValue(measurement.ragab)
-                      ].filter(val => val !== "")
-                       .map(val => `<span>${val}</span>`)
-                       .join('<span class="measurement-separator"> - </span>');
-                      
-                      // Format notes in two rows: note1/note2 in first row, note3/note4 in second row
-                      const note1 = measurement.note1 && measurement.note1.trim() ? measurement.note1.trim() : "";
-                      const note2 = measurement.note2 && measurement.note2.trim() ? measurement.note2.trim() : "";
-                      const note3 = measurement.note3 && measurement.note3.trim() ? measurement.note3.trim() : "";
-                      const note4 = measurement.note4 && measurement.note4.trim() ? measurement.note4.trim() : "";
-                      
-                      let notesHtml = "";
-                      if (note1 || note2 || note3 || note4) {
-                        notesHtml = '<div class="notes">';
-                        // First row: note1 and note2
-                        if (note1 || note2) {
-                          notesHtml += '<div class="notes-row">';
-                          if (note1) notesHtml += `<div class="notes-row-item">${note1}</div>`;
-                          if (note2) notesHtml += `<div class="notes-row-item">${note2}</div>`;
-                          notesHtml += '</div>';
-                        }
-                        // Second row: note3 and note4
-                        if (note3 || note4) {
-                          notesHtml += '<div class="notes-row">';
-                          if (note3) notesHtml += `<div class="notes-row-item">${note3}</div>`;
-                          if (note4) notesHtml += `<div class="notes-row-item">${note4}</div>`;
-                          notesHtml += '</div>';
-                        }
-                        notesHtml += '</div>';
-                      }
-                      
-                      // Get quantity for this material
-                      const materialId = measurement.material;
-                      const quantity = materialId && materialQuantityMap[materialId] ? materialQuantityMap[materialId] : null;
-                      const quantityText = quantity ? ` (${quantity} pcs)` : '';
-                      
-                      return `
-                        <div class="measurement-item">
-                          <div class="measurement-left">
-                            <div class="material-name">${measurement.material_name || "Material"}${quantityText}</div>
-                            <div class="measurement-values">${measurementValues || ""}</div>
-                            ${notesHtml}
-                          </div>
-                        </div>
-                      `;
-                    }).join('')}
-                  </div>
-
-
-                </div>
-                <script>
-                  (function() {
-                    var printIndex = ${index};
-                    var printTriggered = false;
-                    var dialogClosed = false;
-                    var printDialogOpen = false;
-                    
-                    // Monitor for print dialog close
-                    var afterPrint = function() {
-                      if (dialogClosed) return;
-                      dialogClosed = true;
-                      
-                      console.log('Print dialog closed detected for index ' + printIndex);
-                      
-                      try {
-                        if (window.opener) {
-                          window.opener.postMessage('printDialogClosed_' + printIndex, '*');
-                        }
-                      } catch(e) {
-                        console.log('Could not send message to opener');
-                      }
-                      
-                      // Don't close window - we're reusing it for multiple prints
-                    };
-                    
-                    // Track when print is called
-                    var originalPrint = window.print;
-                    window.print = function() {
-                      printTriggered = true;
-                      printDialogOpen = true;
-                      console.log('Print called for index ' + printIndex);
-                      originalPrint.apply(window, arguments);
-                      
-                      // Set a flag that dialog is open
-                      setTimeout(function() {
-                        printDialogOpen = false;
-                      }, 100);
-                    };
-                    
-                    // Use afterprint event (most reliable)
-                    window.addEventListener('afterprint', function() {
-                      console.log('afterprint event fired for index ' + printIndex);
-                      afterPrint();
-                    });
-                    
-                    // Use beforeprint to track
-                    window.addEventListener('beforeprint', function() {
-                      printDialogOpen = true;
-                      console.log('beforeprint event fired for index ' + printIndex);
-                    });
-                    
-                    // Fallback: Use matchMedia for print detection
-                    if (window.matchMedia) {
-                      var mediaQueryList = window.matchMedia('print');
-                      var handleChange = function(mql) {
-                        console.log('matchMedia change: matches=' + mql.matches + ' for index ' + printIndex);
-                        if (!mql.matches && printTriggered) {
-                          setTimeout(function() {
-                            afterPrint();
-                          }, 100);
-                        }
-                      };
-                      
-                      if (mediaQueryList.addEventListener) {
-                        mediaQueryList.addEventListener('change', handleChange);
-                      } else {
-                        mediaQueryList.addListener(handleChange);
-                      }
-                    }
-                    
-                    // Aggressive fallback: Monitor window focus
-                    var hadFocus = false;
-                    var focusCheckCount = 0;
-                    var focusCheckInterval = setInterval(function() {
-                      try {
-                        focusCheckCount++;
-                        var hasFocus = window.document.hasFocus();
-                        
-                        // If we had focus, lost it (print dialog opened), then regained it (dialog closed)
-                        if (hasFocus && !hadFocus && printTriggered && focusCheckCount > 5) {
-                          // Wait a bit to confirm dialog is really closed
-                          setTimeout(function() {
-                            if (!dialogClosed && window.document.hasFocus()) {
-                              console.log('Focus regained, dialog likely closed for index ' + printIndex);
-                              afterPrint();
-                            }
-                          }, 800);
-                        }
-                        
-                        hadFocus = hasFocus;
-                      } catch(e) {
-                        clearInterval(focusCheckInterval);
-                      }
-                    }, 200);
-                    
-                    // Cleanup after 2 minutes
+                } catch(e) {}
+              };
+              var originalPrint = window.print;
+              window.print = function() {
+                printTriggered = true;
+                originalPrint.apply(window, arguments);
+              };
+              window.addEventListener('afterprint', function() { afterPrint(); });
+              if (window.matchMedia) {
+                var mql = window.matchMedia('print');
+                var handleChange = function(m) {
+                  if (!m.matches && printTriggered) { setTimeout(afterPrint, 100); }
+                };
+                if (mql.addEventListener) { mql.addEventListener('change', handleChange); }
+                else { mql.addListener(handleChange); }
+              }
+              var hadFocus = false, focusCount = 0;
+              var focusInterval = setInterval(function() {
+                try {
+                  focusCount++;
+                  var hasFocus = window.document.hasFocus();
+                  if (hasFocus && !hadFocus && printTriggered && focusCount > 5) {
                     setTimeout(function() {
-                      clearInterval(focusCheckInterval);
-                    }, 120000);
-                  })();
-                </script>
-              </body>
-            </html>
-          `
+                      if (!dialogClosed && window.document.hasFocus()) { afterPrint(); }
+                    }, 800);
+                  }
+                  hadFocus = hasFocus;
+                } catch(e) { clearInterval(focusInterval); }
+              }, 200);
+              setTimeout(function() { clearInterval(focusInterval); }, 120000);
+            })();
+          </script>`;
+          const printContent = generateMeasurementPrintContent(jobOrder, printableMeasurements, materialQuantityMap, multiPrintScript)
 
           // STEP 4: Populate window with content (shows preview)
           console.log(`Populating window with content for ${jobOrder.job_order_number}...`)
@@ -1512,21 +1202,22 @@ export default function Materials() {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={activeTab === "materials" ? "Search materials..." : "Search job orders..."}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+          {/* Materials tab: single search bar */}
+          {activeTab === "materials" && (
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search materials..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              {activeTab === "materials" && (
+              <div className="flex items-center space-x-4">
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
@@ -1537,61 +1228,141 @@ export default function Materials() {
                   <option value="Hardware">Hardware</option>
                   <option value="Sewing">Sewing</option>
                 </select>
-              )}
-              {activeTab === "measurements" && (
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="delivered">Delivered</option>
-                </select>
-              )}
-              <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                <Filter className="w-4 h-4" />
-              </button>
+                <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <Filter className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-          {/* Date Filters - Only show for measurements tab */}
+          )}
+
+          {/* Measurements tab: 3 split search bars */}
           {activeTab === "measurements" && (
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1 sm:flex-initial">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  From Date
-                </label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Job Order Number
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by order number..."
+                      value={searchJobOrder}
+                      onChange={(e) => setSearchJobOrder(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Customer ID
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by customer ID..."
+                      value={searchCustomerId}
+                      onChange={(e) => setSearchCustomerId(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Customer Name / Phone
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by name or phone..."
+                      value={searchNamePhone}
+                      onChange={(e) => setSearchNamePhone(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 sm:flex-initial">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex items-center space-x-4">
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="delivered">Delivered</option>
+                  </select>
+                </div>
+                <div className="flex-1 sm:flex-initial">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    disabled={!!hasAnyJobOrderSearch}
+                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      hasAnyJobOrderSearch ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  />
+                </div>
+                <div className="flex-1 sm:flex-initial">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    disabled={!!hasAnyJobOrderSearch}
+                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      hasAnyJobOrderSearch ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const today = getTodayDate()
+                      setFromDate(today)
+                      setToDate(today)
+                    }}
+                    disabled={!!hasAnyJobOrderSearch}
+                    className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
+                      hasAnyJobOrderSearch
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    Reset to Today
+                  </button>
+                  {hasAnyJobOrderSearch && (
+                    <button
+                      onClick={() => {
+                        setSearchJobOrder("")
+                        setSearchCustomerId("")
+                        setSearchNamePhone("")
+                      }}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  const today = getTodayDate()
-                  setFromDate(today)
-                  setToDate(today)
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
-              >
-                Reset to Today
-              </button>
-            </div>
+              {hasAnyJobOrderSearch && (
+                <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
+                  <strong>Search Mode:</strong> Searching across all job orders (date filter disabled)
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1764,7 +1535,7 @@ export default function Materials() {
                 ) : filteredJobOrders.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                      No job orders found. {searchTerm && "Try adjusting your search."}
+                      No job orders found. {hasAnyJobOrderSearch && "Try adjusting your search."}
                     </td>
                   </tr>
                 ) : (

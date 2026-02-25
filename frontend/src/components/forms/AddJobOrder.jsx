@@ -1516,13 +1516,6 @@ export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <button 
-                onClick={() => selectedMaterials.length > 0 && handleMaterialsChange([])}
-                disabled={selectedMaterials.length === 0}
-                className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Remove All</span>
-              </button>
-              <button 
                 onClick={handleMaterialSearch}
                 className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
               >

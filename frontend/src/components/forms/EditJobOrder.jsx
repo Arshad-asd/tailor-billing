@@ -1396,11 +1396,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         throw new Error('Material not found in selected materials');
       }
 
-      // Check if we have a measurement_id (for existing measurements)
-      if (!material.measurement_id) {
-        throw new Error(`Measurement ID is missing for material: ${material.material_name || 'Unknown'}. This measurement may not have been saved yet. Please use "Save All" to create it first.`);
-      }
-
       // Validate material_id exists and is valid
       if (material.material_id === undefined || material.material_id === null) {
         throw new Error(`Material ID is missing for material: ${material.material_name || 'Unknown'}. Please reload the page or re-add this material.`);
@@ -1424,13 +1419,11 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         if (materialError.response?.status === 404) {
           throw new Error(`Material "${material.material_name || 'Unknown'}" (ID: ${materialIdInt}) no longer exists in the database. Please remove this measurement or contact support.`);
         }
-        // If it's not a 404, continue (might be a network error, but material might still exist)
         console.warn('Could not verify material existence:', materialError);
       }
 
       const toMeasurementStr = (value) => (value === '' || value === null || value === undefined ? '' : String(value).trim());
 
-      // Prepare payload for single measurement update (measurement fields are strings)
       const measurementPayload = {
         material: materialIdInt,
         thool: toMeasurementStr(material.custom_thool),
@@ -1445,26 +1438,35 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         note4: material.note4 || ''
       };
 
-      // Update only this single measurement
-      const result = await jobOrdersApi.updateSingleMeasurement(jobOrderId, material.measurement_id, measurementPayload);
-      console.log('Single measurement updated successfully:', result);
+      let result;
+      const isNewMeasurement = !material.measurement_id;
+
+      if (isNewMeasurement) {
+        // Create new measurement
+        result = await jobOrdersApi.createSingleMeasurement(jobOrderId, measurementPayload);
+        console.log('Single measurement created successfully:', result);
+      } else {
+        // Update existing measurement
+        result = await jobOrdersApi.updateSingleMeasurement(jobOrderId, material.measurement_id, measurementPayload);
+        console.log('Single measurement updated successfully:', result);
+      }
       
-      // Mark this measurement as saved (not customized anymore)
+      // Update local state: store the measurement_id from the response and mark as saved
       setSelectedMaterials(prev => 
         prev.map(m => 
           (m.id === materialId || m.material_id === materialId)
-            ? { ...m, is_customized: false }
+            ? { ...m, is_customized: false, measurement_id: result.id || m.measurement_id }
             : m
         )
       );
       
-      setMeasurementError(prev => ({ ...prev, [materialId]: 'Measurement updated successfully' }));
+      setMeasurementError(prev => ({ ...prev, [materialId]: isNewMeasurement ? 'Measurement created successfully' : 'Measurement updated successfully' }));
       setTimeout(() => {
         setMeasurementError(prev => ({ ...prev, [materialId]: null }));
       }, 3000);
       
     } catch (error) {
-      console.error('Error updating measurement:', error);
+      console.error('Error saving measurement:', error);
       
       // Parse backend error messages to extract material ID
       let errorMessage = error.message || 'Failed to update measurement';
@@ -1880,13 +1882,6 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => selectedMaterials.length > 0 && handleMaterialsChange([])}
-                disabled={selectedMaterials.length === 0}
-                className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Remove All</span>
-              </button>
               <button 
                 onClick={handleMaterialSearch}
                 className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"

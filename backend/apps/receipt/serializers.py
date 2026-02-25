@@ -6,6 +6,8 @@ from apps.joborder.models import JobOrder
 class ReceiptSerializer(serializers.ModelSerializer):
     job_order_number = serializers.CharField(source='job_order.job_order_number', read_only=True)
     customer_name = serializers.CharField(source='job_order.customer.name', read_only=True)
+    customer_id = serializers.CharField(source='job_order.customer.customer_id', read_only=True)
+    customer_phone = serializers.CharField(source='job_order.customer.phone', read_only=True)
     
     class Meta:
         model = Receipt
@@ -18,6 +20,8 @@ class ReceiptSerializer(serializers.ModelSerializer):
             'job_order',
             'job_order_number',
             'customer_name',
+            'customer_id',
+            'customer_phone',
             'created_at',
             'updated_at',
             'is_active'

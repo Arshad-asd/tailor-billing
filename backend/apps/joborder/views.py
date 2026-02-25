@@ -73,9 +73,25 @@ class JobOrderViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass  # Invalid date format, ignore the filter
         
-        # Search by job order number, customer name, customer phone, or customer ID
+        # Specific field searches (split search bars)
+        search_job_order = self.request.query_params.get('search_job_order')
+        if search_job_order:
+            queryset = queryset.filter(job_order_number__icontains=search_job_order)
+
+        search_customer_id = self.request.query_params.get('search_customer_id')
+        if search_customer_id:
+            queryset = queryset.filter(customer__customer_id__icontains=search_customer_id)
+
+        search_name_phone = self.request.query_params.get('search_name_phone')
+        if search_name_phone:
+            queryset = queryset.filter(
+                models.Q(customer__name__icontains=search_name_phone) |
+                models.Q(customer__phone__icontains=search_name_phone)
+            )
+
+        # General search fallback (backward compatibility)
         search = self.request.query_params.get('search')
-        if search:
+        if search and not (search_job_order or search_customer_id or search_name_phone):
             queryset = queryset.filter(
                 models.Q(job_order_number__icontains=search) |
                 models.Q(customer__name__icontains=search) |
@@ -259,6 +275,10 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 elif time_range == '90d':
                     # Last 90 days
                     start_date = now - timedelta(days=90)
+                elif time_range == '180d':
+                    start_date = now - timedelta(days=180)
+                elif time_range == '365d':
+                    start_date = now - timedelta(days=365)
                 else:
                     start_date = None
                 
@@ -363,17 +383,36 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         if payment_method:
             queryset = queryset.filter(payment_method=payment_method)
         
-        # When search is provided: global search (do not apply date range).
-        # When no search: filter by delivery_date range for listing.
+        # Specific field searches (split search bars)
+        search_job_order = request.query_params.get('search_job_order')
+        if search_job_order:
+            queryset = queryset.filter(job_order_number__icontains=search_job_order)
+
+        search_customer_id = request.query_params.get('search_customer_id')
+        if search_customer_id:
+            queryset = queryset.filter(customer__customer_id__icontains=search_customer_id)
+
+        search_name_phone = request.query_params.get('search_name_phone')
+        if search_name_phone:
+            queryset = queryset.filter(
+                models.Q(customer__name__icontains=search_name_phone) |
+                models.Q(customer__phone__icontains=search_name_phone)
+            )
+
+        has_specific_search = bool(search_job_order or search_customer_id or search_name_phone)
+
+        # General search fallback (backward compatibility)
         search = request.query_params.get('search')
-        if search:
+        if search and not has_specific_search:
             queryset = queryset.filter(
                 models.Q(job_order_number__icontains=search) |
                 models.Q(customer__name__icontains=search) |
                 models.Q(customer__phone__icontains=search) |
                 models.Q(customer__customer_id__icontains=search)
             )
-        else:
+            has_specific_search = True
+
+        if not has_specific_search:
             # Filter by delivery_date range for listing (from_date / to_date)
             from_date = request.query_params.get('from_date')
             to_date = request.query_params.get('to_date')
@@ -467,6 +506,57 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['post'], url_path='create_measurement')
+    def create_single_measurement(self, request, pk=None):
+        """Create a single measurement for a job order"""
+        job_order = self.get_object()
+
+        material_id = request.data.get('material')
+        if material_id is None:
+            return Response(
+                {'error': 'Material field is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            material_id = int(material_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': f'Invalid material ID: {material_id}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            material = Material.objects.get(id=material_id)
+        except Material.DoesNotExist:
+            return Response(
+                {'error': f'Material with ID {material_id} does not exist'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            with transaction.atomic():
+                measurement_data = request.data.copy()
+                measurement_data.pop('material', None)
+                from .utils import normalize_measurement_data
+                normalize_measurement_data(measurement_data)
+
+                measurement = jobOrderMeasurement.objects.create(
+                    job_order=job_order,
+                    material=material,
+                    **measurement_data
+                )
+
+                sync_customer_measurements(job_order)
+
+                serializer = JobOrderMeasurementSerializer(measurement)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create measurement: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=True, methods=['patch'], url_path='update_measurement/(?P<measurement_id>[^/.]+)')
     def update_single_measurement(self, request, pk=None, measurement_id=None):
         """Update a single measurement by its ID"""

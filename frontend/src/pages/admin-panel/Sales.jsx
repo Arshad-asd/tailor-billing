@@ -14,7 +14,9 @@ export default function Sales() {
   const location = useLocation()
   const navigate = useNavigate()
   const today = formatDateStr(new Date())
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchSaleNumber, setSearchSaleNumber] = useState("")
+  const [searchCustomerName, setSearchCustomerName] = useState("")
+  const [searchNotes, setSearchNotes] = useState("")
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -30,10 +32,12 @@ export default function Sales() {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [pendingPrintSale, setPendingPrintSale] = useState(null)
 
+  const hasAnySearch = searchSaleNumber.trim() || searchCustomerName.trim() || searchNotes.trim()
+
   // Load sales data on component mount and when filters change
   useEffect(() => {
     loadSales()
-  }, [startDate, endDate])
+  }, [startDate, endDate, searchSaleNumber, searchCustomerName, searchNotes])
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -721,13 +725,24 @@ export default function Sales() {
       setLoading(true)
       setError(null)
       
-      // Build query parameters
       const params = {}
-      if (startDate) {
-        params.start_date = startDate
+      if (searchSaleNumber.trim()) {
+        params.search_sale_number = searchSaleNumber.trim()
       }
-      if (endDate) {
-        params.end_date = endDate
+      if (searchCustomerName.trim()) {
+        params.search_customer_name = searchCustomerName.trim()
+      }
+      if (searchNotes.trim()) {
+        params.search_notes = searchNotes.trim()
+      }
+
+      if (!hasAnySearch) {
+        if (startDate) {
+          params.start_date = startDate
+        }
+        if (endDate) {
+          params.end_date = endDate
+        }
       }
       
       const response = await salesAPI.getSales(params)
@@ -765,11 +780,13 @@ export default function Sales() {
   }
 
   const filteredSales = (sales || []).filter((sale) => {
-    const matchesSearch =
-      sale.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.sale_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
+    const matchesSaleNumber = !searchSaleNumber.trim() ||
+      sale.sale_number?.toLowerCase().includes(searchSaleNumber.toLowerCase())
+    const matchesCustomer = !searchCustomerName.trim() ||
+      sale.customer_name?.toLowerCase().includes(searchCustomerName.toLowerCase())
+    const matchesNotes = !searchNotes.trim() ||
+      sale.notes?.toLowerCase().includes(searchNotes.toLowerCase())
+    return matchesSaleNumber && matchesCustomer && matchesNotes
   })
 
   const totalRevenue = (sales || [])
@@ -934,27 +951,68 @@ export default function Sales() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search sales..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="flex flex-col gap-4">
+          {/* 3 Split Search Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sale Order Number
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by sale number..."
+                  value={searchSaleNumber}
+                  onChange={(e) => setSearchSaleNumber(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer Name
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by customer name..."
+                  value={searchCustomerName}
+                  onChange={(e) => setSearchCustomerName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Notes / Service
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by notes..."
+                  value={searchNotes}
+                  onChange={(e) => setSearchNotes(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+
+          {/* Date Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex items-center space-x-2">
               <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">From:</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!!hasAnySearch}
+                className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  hasAnySearch ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
             </div>
             <div className="flex items-center space-x-2">
@@ -964,10 +1022,13 @@ export default function Sales() {
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate || undefined}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!!hasAnySearch}
+                className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  hasAnySearch ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
             </div>
-            {(startDate || endDate) && (
+            {!hasAnySearch && (startDate || endDate) && (
               <button
                 onClick={() => {
                   setStartDate("")
@@ -978,7 +1039,25 @@ export default function Sales() {
                 Clear Dates
               </button>
             )}
+            {hasAnySearch && (
+              <button
+                onClick={() => {
+                  setSearchSaleNumber("")
+                  setSearchCustomerName("")
+                  setSearchNotes("")
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors whitespace-nowrap"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
+
+          {hasAnySearch && (
+            <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
+              <strong>Search Mode:</strong> Searching across all sales (date filter disabled)
+            </div>
+          )}
         </div>
       </div>
 
@@ -1125,7 +1204,7 @@ export default function Sales() {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No sales found</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {searchTerm || startDate || endDate
+              {hasAnySearch || startDate || endDate
                 ? "No sales match your current filters."
                 : "Get started by creating a new sale."}
             </p>

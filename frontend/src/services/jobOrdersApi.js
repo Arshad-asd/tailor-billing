@@ -178,6 +178,17 @@ export const jobOrdersApi = {
     }
   },
 
+  // Create a single measurement for a job order
+  createSingleMeasurement: async (jobOrderId, measurementData) => {
+    try {
+      const response = await api.post(`${JOB_ORDERS_BASE_URL}${jobOrderId}/create_measurement/`, measurementData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating single measurement:', error);
+      throw error;
+    }
+  },
+
   // Update a single measurement by measurement ID
   updateSingleMeasurement: async (jobOrderId, measurementId, measurementData) => {
     try {

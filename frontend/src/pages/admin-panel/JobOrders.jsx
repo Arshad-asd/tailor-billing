@@ -46,13 +46,29 @@ export default function JobOrders() {
     to: formatDateStr(new Date())
   })
 
-  // Search state: immediate for input, debounced for API to avoid focus loss and excessive requests
-  const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  // Split search states: one per field, each with its own debounce
+  const [searchJobOrder, setSearchJobOrder] = useState("")
+  const [searchCustomerId, setSearchCustomerId] = useState("")
+  const [searchNamePhone, setSearchNamePhone] = useState("")
+  const [debouncedJobOrder, setDebouncedJobOrder] = useState("")
+  const [debouncedCustomerId, setDebouncedCustomerId] = useState("")
+  const [debouncedNamePhone, setDebouncedNamePhone] = useState("")
+
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    const t = setTimeout(() => setDebouncedJobOrder(searchJobOrder), 300)
     return () => clearTimeout(t)
-  }, [searchTerm])
+  }, [searchJobOrder])
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCustomerId(searchCustomerId), 300)
+    return () => clearTimeout(t)
+  }, [searchCustomerId])
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedNamePhone(searchNamePhone), 300)
+    return () => clearTimeout(t)
+  }, [searchNamePhone])
+
+  const hasAnySearch = debouncedJobOrder.trim() || debouncedCustomerId.trim() || debouncedNamePhone.trim()
+  const hasAnySearchInput = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim()
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -734,7 +750,7 @@ export default function JobOrders() {
   useEffect(() => {
     loadJobOrders()
     loadStats()
-  }, [dateFilter.from, dateFilter.to, debouncedSearch])
+  }, [dateFilter.from, dateFilter.to, debouncedJobOrder, debouncedCustomerId, debouncedNamePhone])
 
   useEffect(() => {
     const onAfter = () => setPrintOrder(null)
@@ -747,14 +763,20 @@ export default function JobOrders() {
       setIsLoading(true)
       setError(null) // Clear previous errors
 
-      // Pass parameters to the API (use debounced search so typing doesn't refetch every keystroke)
       const params = {}
 
-      // If there's a search term, search across all job orders (ignore date filter)
-      if (debouncedSearch.trim()) {
-        params.search = debouncedSearch.trim()
-      } else {
-        // Only apply date filter when not searching
+      // If any search field has a value, search across all job orders (ignore date filter)
+      if (debouncedJobOrder.trim()) {
+        params.search_job_order = debouncedJobOrder.trim()
+      }
+      if (debouncedCustomerId.trim()) {
+        params.search_customer_id = debouncedCustomerId.trim()
+      }
+      if (debouncedNamePhone.trim()) {
+        params.search_name_phone = debouncedNamePhone.trim()
+      }
+
+      if (!hasAnySearch) {
         params.from_date = dateFilter.from
         params.to_date = dateFilter.to
       }
@@ -788,9 +810,8 @@ export default function JobOrders() {
 
   const loadStats = async () => {
     try {
-      // Only apply date filter when not searching (same logic as loadJobOrders)
       const params = {}
-      if (!debouncedSearch.trim()) {
+      if (!hasAnySearch) {
         params.from_date = dateFilter.from
         params.to_date = dateFilter.to
       }
@@ -920,17 +941,14 @@ export default function JobOrders() {
     }))
   }
 
-  const handleSearchChange = (value) => {
-    setSearchTerm(value)
-  }
-
   const handleClearSearch = () => {
-    setSearchTerm("")
+    setSearchJobOrder("")
+    setSearchCustomerId("")
+    setSearchNamePhone("")
   }
 
   const handleSearchKeyDown = (e) => {
-    if (e.key === 'Enter' && searchTerm.trim() && jobOrders.length > 0) {
-      // Open the first result in edit mode
+    if (e.key === 'Enter' && hasAnySearchInput && jobOrders.length > 0) {
       handleEditJobOrder(jobOrders[0])
     }
   }
@@ -1010,32 +1028,69 @@ export default function JobOrders() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Search and Filter Job Orders</h3>
           
-          {/* Search Bar */}
-          <div className="mb-4">
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Search by Job Order Number, Customer Name, Phone, or Customer ID
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                id="search"
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Enter job order number, customer name, phone, or customer ID..."
-                className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+          {/* Search Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label htmlFor="search-job-order" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Job Order Number
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="search-job-order"
+                  value={searchJobOrder}
+                  onChange={(e) => setSearchJobOrder(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search by order number..."
+                  className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
               </div>
             </div>
-            {searchTerm && (
-              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Searching for: <span className="font-medium">"{searchTerm}"</span>
+            <div>
+              <label htmlFor="search-customer-id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer ID
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="search-customer-id"
+                  value={searchCustomerId}
+                  onChange={(e) => setSearchCustomerId(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search by customer ID..."
+                  className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
               </div>
-            )}
+            </div>
+            <div>
+              <label htmlFor="search-name-phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer Name / Phone
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="search-name-phone"
+                  value={searchNamePhone}
+                  onChange={(e) => setSearchNamePhone(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search by name or phone..."
+                  className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Date Filter and Controls */}
@@ -1049,9 +1104,9 @@ export default function JobOrders() {
                 id="from-date"
                 value={dateFilter.from}
                 onChange={(e) => handleDateFilterChange('from', e.target.value)}
-                disabled={searchTerm.trim() !== ""}
+                disabled={!!hasAnySearchInput}
                 className={`w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
-                  searchTerm.trim() !== "" ? 'opacity-50 cursor-not-allowed' : ''
+                  hasAnySearchInput ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               />
             </div>
@@ -1064,9 +1119,9 @@ export default function JobOrders() {
                 id="to-date"
                 value={dateFilter.to}
                 onChange={(e) => handleDateFilterChange('to', e.target.value)}
-                disabled={searchTerm.trim() !== ""}
+                disabled={!!hasAnySearchInput}
                 className={`w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
-                  searchTerm.trim() !== "" ? 'opacity-50 cursor-not-allowed' : ''
+                  hasAnySearchInput ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               />
             </div>
@@ -1076,16 +1131,16 @@ export default function JobOrders() {
                   const today = formatDateStr(new Date())
                   setDateFilter({ from: today, to: today })
                 }}
-                disabled={searchTerm.trim() !== ""}
+                disabled={!!hasAnySearchInput}
                 className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                  searchTerm.trim() !== "" 
+                  hasAnySearchInput 
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                     : 'bg-gray-500 hover:bg-gray-600 text-white'
                 }`}
               >
                 Today
               </button>
-              {searchTerm && (
+              {hasAnySearchInput && (
                 <button
                   onClick={handleClearSearch}
                   className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 text-sm rounded-md transition-colors"
@@ -1097,7 +1152,7 @@ export default function JobOrders() {
           </div>
           
           {/* Status indicator */}
-          {searchTerm.trim() !== "" && (
+          {hasAnySearchInput && (
             <div className="mt-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
               <strong>Search Mode:</strong> Searching across all job orders (date filter disabled)
             </div>

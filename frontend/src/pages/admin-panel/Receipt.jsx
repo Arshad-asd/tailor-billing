@@ -10,7 +10,9 @@ import { formatDate } from '../../utils/dateUtils';
 export default function ReceiptPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchReceiptId, setSearchReceiptId] = useState('');
+  const [searchCustomerId, setSearchCustomerId] = useState('');
+  const [searchNamePhone, setSearchNamePhone] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,10 +21,10 @@ export default function ReceiptPage() {
   const [editingReceipt, setEditingReceipt] = useState(null);
   const { showNotification } = useNotification();
 
-  // Fetch receipts on component mount
+  // Fetch receipts on component mount and when search changes
   useEffect(() => {
     fetchReceipts();
-  }, []);
+  }, [searchReceiptId, searchCustomerId, searchNamePhone]);
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -44,17 +46,28 @@ export default function ReceiptPage() {
     }
   }, [location.state, receipts, navigate, location.pathname]);
 
+  const hasAnySearch = searchReceiptId.trim() || searchCustomerId.trim() || searchNamePhone.trim();
+
   const fetchReceipts = async () => {
     setLoading(true);
     try {
-      const response = await receiptApi.getReceipts();
-      // Handle both paginated and non-paginated responses
+      const params = {};
+      if (searchReceiptId.trim()) {
+        params.search_receipt_id = searchReceiptId.trim();
+      }
+      if (searchCustomerId.trim()) {
+        params.search_customer_id = searchCustomerId.trim();
+      }
+      if (searchNamePhone.trim()) {
+        params.search_name_phone = searchNamePhone.trim();
+      }
+
+      const response = await receiptApi.getReceipts(params);
       const receiptsData = response.results || response;
       setReceipts(Array.isArray(receiptsData) ? receiptsData : []);
     } catch (error) {
       console.error('Error fetching receipts:', error);
       showNotification('Error fetching receipts', 'error');
-      // Set empty array on error instead of mock data
       setReceipts([]);
     } finally {
       setLoading(false);
@@ -117,10 +130,14 @@ export default function ReceiptPage() {
   const receiptsArray = Array.isArray(receipts) ? receipts : [];
 
   const filteredReceipts = receiptsArray.filter(receipt => {
-    const matchesSearch = receipt.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.receipt_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.receipt_remarks?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesReceiptId = !searchReceiptId.trim() ||
+      receipt.receipt_id?.toLowerCase().includes(searchReceiptId.toLowerCase());
+    const matchesCustId = !searchCustomerId.trim() ||
+      receipt.customer_id?.toString().toLowerCase().includes(searchCustomerId.toLowerCase());
+    const matchesNamePhone = !searchNamePhone.trim() ||
+      receipt.customer_name?.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
+      receipt.customer_phone?.toLowerCase().includes(searchNamePhone.toLowerCase());
+    const matchesSearch = matchesReceiptId && matchesCustId && matchesNamePhone;
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'active' && receipt.is_active) ||
                          (statusFilter === 'inactive' && !receipt.is_active);
@@ -198,20 +215,58 @@ export default function ReceiptPage() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search receipts..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="flex flex-col gap-4">
+          {/* 3 Split Search Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Receipt Number
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by receipt number..."
+                  value={searchReceiptId}
+                  onChange={(e) => setSearchReceiptId(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer ID
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by customer ID..."
+                  value={searchCustomerId}
+                  onChange={(e) => setSearchCustomerId(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Customer Name / Phone
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or phone..."
+                  value={searchNamePhone}
+                  onChange={(e) => setSearchNamePhone(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+
+          {/* Status Filter & Clear */}
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -221,9 +276,18 @@ export default function ReceiptPage() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-            <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <Filter className="w-4 h-4" />
-            </button>
+            {hasAnySearch && (
+              <button
+                onClick={() => {
+                  setSearchReceiptId('');
+                  setSearchCustomerId('');
+                  setSearchNamePhone('');
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors whitespace-nowrap"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
         </div>
       </div>

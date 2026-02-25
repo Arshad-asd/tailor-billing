@@ -193,7 +193,9 @@ const AdminDashboard = () => {
                  timeRange === "1d" ? "Last 24 hours" :
                  timeRange === "7d" ? "Last 7 days" :
                  timeRange === "30d" ? "Last 30 days" :
-                 timeRange === "90d" ? "Last 90 days" : "Last 7 days"}
+                 timeRange === "90d" ? "Last 90 days" :
+                 timeRange === "180d" ? "Last 6 months" :
+                 timeRange === "365d" ? "Last 1 year" : "Last 7 days"}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -202,6 +204,8 @@ const AdminDashboard = () => {
               <DropdownMenuItem onClick={() => setTimeRange("7d")}>Last 7 days</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("30d")}>Last 30 days</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTimeRange("90d")}>Last 90 days</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTimeRange("180d")}>Last 6 months</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTimeRange("365d")}>Last 1 year</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Link to="/admin/job-orders">
