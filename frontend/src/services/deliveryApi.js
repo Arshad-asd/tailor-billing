@@ -167,6 +167,28 @@ export const deliveryApi = {
       console.error('Error toggling block status:', error);
       throw error;
     }
+  },
+
+  // Recall/return a delivered job order back to pending (for alterations)
+  recallDelivery: async (id) => {
+    try {
+      const response = await api.post(`${DELIVERY_BASE_URL}${id}/recall_delivery/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error recalling delivery:', error);
+      throw error;
+    }
+  },
+
+  // Cancel a job order and refund all amounts
+  cancelDelivery: async (id) => {
+    try {
+      const response = await api.post(`${DELIVERY_BASE_URL}${id}/cancel_delivery/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling delivery:', error);
+      throw error;
+    }
   }
 };
 

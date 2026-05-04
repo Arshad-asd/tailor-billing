@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, ShoppingCart, Package, Truck, CheckCircle, Clock } from 'lucide-react';
 import AddPurchaseModal from '../../components/modals/AddPurchaseModal';
 import EditPurchaseModal from '../../components/modals/EditPurchaseModal';
 
 export default function Purchase() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState(null);
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const purchases = [
     {
@@ -78,9 +85,9 @@ export default function Purchase() {
   };
 
   const filteredPurchases = purchases.filter(purchase => {
-    const matchesSearch = purchase.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         purchase.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         purchase.items.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = purchase.supplier.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         purchase.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         purchase.items.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || purchase.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

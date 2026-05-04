@@ -10,9 +10,12 @@ import { formatDate } from '../../utils/dateUtils';
 export default function ReceiptPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchReceiptId, setSearchReceiptId] = useState('');
+  const [searchJobOrder, setSearchJobOrder] = useState('');
   const [searchCustomerId, setSearchCustomerId] = useState('');
-  const [searchNamePhone, setSearchNamePhone] = useState('');
+  const [searchPhone, setSearchPhone] = useState('');
+  const [debouncedJobOrder, setDebouncedJobOrder] = useState('');
+  const [debouncedCustomerId, setDebouncedCustomerId] = useState('');
+  const [debouncedPhone, setDebouncedPhone] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,10 +24,26 @@ export default function ReceiptPage() {
   const [editingReceipt, setEditingReceipt] = useState(null);
   const { showNotification } = useNotification();
 
+  // Debounce search inputs (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedJobOrder(searchJobOrder), 300);
+    return () => clearTimeout(timer);
+  }, [searchJobOrder]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCustomerId(searchCustomerId), 300);
+    return () => clearTimeout(timer);
+  }, [searchCustomerId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPhone(searchPhone), 300);
+    return () => clearTimeout(timer);
+  }, [searchPhone]);
+
   // Fetch receipts on component mount and when search changes
   useEffect(() => {
     fetchReceipts();
-  }, [searchReceiptId, searchCustomerId, searchNamePhone]);
+  }, [debouncedJobOrder, debouncedCustomerId, debouncedPhone]);
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -46,20 +65,20 @@ export default function ReceiptPage() {
     }
   }, [location.state, receipts, navigate, location.pathname]);
 
-  const hasAnySearch = searchReceiptId.trim() || searchCustomerId.trim() || searchNamePhone.trim();
+  const hasAnySearch = debouncedJobOrder.trim() || debouncedCustomerId.trim() || debouncedPhone.trim();
 
   const fetchReceipts = async () => {
     setLoading(true);
     try {
       const params = {};
-      if (searchReceiptId.trim()) {
-        params.search_receipt_id = searchReceiptId.trim();
+      if (debouncedJobOrder.trim()) {
+        params.search_job_order = debouncedJobOrder.trim();
       }
-      if (searchCustomerId.trim()) {
-        params.search_customer_id = searchCustomerId.trim();
+      if (debouncedCustomerId.trim()) {
+        params.search_customer_id = debouncedCustomerId.trim();
       }
-      if (searchNamePhone.trim()) {
-        params.search_name_phone = searchNamePhone.trim();
+      if (debouncedPhone.trim()) {
+        params.search_phone = debouncedPhone.trim();
       }
 
       const response = await receiptApi.getReceipts(params);
@@ -130,14 +149,13 @@ export default function ReceiptPage() {
   const receiptsArray = Array.isArray(receipts) ? receipts : [];
 
   const filteredReceipts = receiptsArray.filter(receipt => {
-    const matchesReceiptId = !searchReceiptId.trim() ||
-      receipt.receipt_id?.toLowerCase().includes(searchReceiptId.toLowerCase());
+    const matchesJobOrder = !searchJobOrder.trim() ||
+      receipt.job_order_number?.toLowerCase().includes(searchJobOrder.toLowerCase());
     const matchesCustId = !searchCustomerId.trim() ||
       receipt.customer_id?.toString().toLowerCase().includes(searchCustomerId.toLowerCase());
-    const matchesNamePhone = !searchNamePhone.trim() ||
-      receipt.customer_name?.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
-      receipt.customer_phone?.toLowerCase().includes(searchNamePhone.toLowerCase());
-    const matchesSearch = matchesReceiptId && matchesCustId && matchesNamePhone;
+    const matchesPhone = !searchPhone.trim() ||
+      receipt.customer_phone?.toLowerCase().includes(searchPhone.toLowerCase());
+    const matchesSearch = matchesJobOrder && matchesCustId && matchesPhone;
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'active' && receipt.is_active) ||
                          (statusFilter === 'inactive' && !receipt.is_active);
@@ -220,15 +238,15 @@ export default function ReceiptPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Receipt Number
+                Job Order Number
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by receipt number..."
-                  value={searchReceiptId}
-                  onChange={(e) => setSearchReceiptId(e.target.value)}
+                  placeholder="Search by job order number..."
+                  value={searchJobOrder}
+                  onChange={(e) => setSearchJobOrder(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -250,15 +268,15 @@ export default function ReceiptPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Customer Name / Phone
+                Phone
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by name or phone..."
-                  value={searchNamePhone}
-                  onChange={(e) => setSearchNamePhone(e.target.value)}
+                  placeholder="Search by phone..."
+                  value={searchPhone}
+                  onChange={(e) => setSearchPhone(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -279,9 +297,9 @@ export default function ReceiptPage() {
             {hasAnySearch && (
               <button
                 onClick={() => {
-                  setSearchReceiptId('');
+                  setSearchJobOrder('');
                   setSearchCustomerId('');
-                  setSearchNamePhone('');
+                  setSearchPhone('');
                 }}
                 className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors whitespace-nowrap"
               >

@@ -76,17 +76,17 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         # Specific field searches (split search bars)
         search_job_order = self.request.query_params.get('search_job_order')
         if search_job_order:
-            queryset = queryset.filter(job_order_number__icontains=search_job_order)
+            queryset = queryset.filter(job_order_number=search_job_order)
 
         search_customer_id = self.request.query_params.get('search_customer_id')
         if search_customer_id:
-            queryset = queryset.filter(customer__customer_id__icontains=search_customer_id)
+            queryset = queryset.filter(customer__customer_id=search_customer_id)
 
         search_name_phone = self.request.query_params.get('search_name_phone')
         if search_name_phone:
             queryset = queryset.filter(
                 models.Q(customer__name__icontains=search_name_phone) |
-                models.Q(customer__phone__icontains=search_name_phone)
+                models.Q(customer__phone=search_name_phone)
             )
 
         # General search fallback (backward compatibility)
@@ -357,6 +357,122 @@ class JobOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['post'])
+    def recall_delivery(self, request, pk=None):
+        """
+        Recall/return a delivered job order back to pending status.
+        Used when customer returns material for alteration and gets money back.
+        - Changes status from delivered to pending
+        - Resets received_on_delivery_amount to 0
+        - Recalculates balance_amount
+        - Updates corresponding transaction
+        """
+        from decimal import Decimal
+        job_order = self.get_object()
+        
+        # Only allow recall if the order is currently delivered or completed
+        if job_order.status not in ['delivered', 'completed']:
+            return Response(
+                {'error': f'Can only recall orders with status "delivered" or "completed". Current status: {job_order.status}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Reset received delivery amount to 0
+                job_order.recived_on_delivery_amount = Decimal('0')
+                
+                # Recalculate balance amount (total - advance - 0)
+                job_order.balance_amount = job_order.total_amount - job_order.advance_amount
+                
+                # Change status back to pending
+                job_order.status = 'pending'
+                
+                job_order.save()
+                
+                # Update transaction for the job order (reflect the refund)
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=True)
+                
+                # Update customer balance and points
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
+                
+                serializer = JobOrderListSerializer(job_order)
+                return Response({
+                    'message': 'Job order successfully recalled to pending status',
+                    'data': serializer.data
+                })
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to recall delivery: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def cancel_delivery(self, request, pk=None):
+        """
+        Cancel a job order and refund all amounts to the customer.
+        Used when customer doesn't want the order anymore.
+        - Changes status to cancelled
+        - Refunds advance_amount and received_on_delivery_amount (set to 0)
+        - Sets balance_amount to total_amount (nothing paid)
+        - Deactivates all transaction lines
+        - Marks job order as inactive
+        """
+        from decimal import Decimal
+        job_order = self.get_object()
+        
+        # Don't allow cancelling already cancelled orders
+        if job_order.status == 'cancelled':
+            return Response(
+                {'error': 'Job order is already cancelled'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Store original amounts for refund tracking
+                original_advance = job_order.advance_amount
+                original_delivery = job_order.recived_on_delivery_amount
+                
+                # Reset all payment amounts to 0 (full refund)
+                job_order.advance_amount = Decimal('0')
+                job_order.recived_on_delivery_amount = Decimal('0')
+                
+                # Set balance to full total amount (nothing paid)
+                job_order.balance_amount = job_order.total_amount
+                
+                # Change status to cancelled
+                job_order.status = 'cancelled'
+                
+                # Mark as inactive (optional - keeps it in system but hidden from active lists)
+                job_order.is_active = False
+                
+                job_order.save()
+                
+                # Deactivate all transaction lines for this job order
+                TransactionViewSet.transaction_create_or_update_job_order(job_order, is_update=True)
+                
+                # Update customer balance and points
+                update_customer_balance(job_order.customer)
+                update_customer_points(job_order.customer)
+                
+                serializer = JobOrderListSerializer(job_order)
+                return Response({
+                    'message': 'Job order successfully cancelled and amounts refunded',
+                    'data': serializer.data,
+                    'refunded': {
+                        'advance_amount': float(original_advance),
+                        'delivery_amount': float(original_delivery),
+                        'total_refunded': float(original_advance + original_delivery)
+                    }
+                })
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to cancel delivery: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
     @action(detail=False, methods=['get'])
     def deliveries(self, request):
         """Get deliveries filtered by delivery_date"""
@@ -386,17 +502,17 @@ class JobOrderViewSet(viewsets.ModelViewSet):
         # Specific field searches (split search bars)
         search_job_order = request.query_params.get('search_job_order')
         if search_job_order:
-            queryset = queryset.filter(job_order_number__icontains=search_job_order)
+            queryset = queryset.filter(job_order_number=search_job_order)
 
         search_customer_id = request.query_params.get('search_customer_id')
         if search_customer_id:
-            queryset = queryset.filter(customer__customer_id__icontains=search_customer_id)
+            queryset = queryset.filter(customer__customer_id=search_customer_id)
 
         search_name_phone = request.query_params.get('search_name_phone')
         if search_name_phone:
             queryset = queryset.filter(
                 models.Q(customer__name__icontains=search_name_phone) |
-                models.Q(customer__phone__icontains=search_name_phone)
+                models.Q(customer__phone=search_name_phone)
             )
 
         has_specific_search = bool(search_job_order or search_customer_id or search_name_phone)

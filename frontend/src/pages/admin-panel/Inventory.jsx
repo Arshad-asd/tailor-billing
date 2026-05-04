@@ -47,6 +47,7 @@ import { useNotification } from "../../hooks/useNotification"
 
 const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("item_number")
   const [activeTab, setActiveTab] = useState("items") // "categories", "items", "stock"
@@ -66,6 +67,12 @@ const Inventory = () => {
   const fileInputRef = useRef(null)
   
   const { showNotification } = useNotification()
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   // Load data on component mount and when activeTab changes
   useEffect(() => {
@@ -157,7 +164,7 @@ const Inventory = () => {
 
   const filteredItems = inventoryItems
     .filter((item) => {
-      const term = searchTerm.toLowerCase()
+      const term = debouncedSearchTerm.toLowerCase()
       const matchesSearch = (item.name || "").toLowerCase().includes(term) ||
                            (item.sku || "").toLowerCase().includes(term) ||
                            (item.item_number || "").toLowerCase().includes(term)

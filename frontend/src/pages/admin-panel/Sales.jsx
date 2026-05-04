@@ -17,6 +17,9 @@ export default function Sales() {
   const [searchSaleNumber, setSearchSaleNumber] = useState("")
   const [searchCustomerName, setSearchCustomerName] = useState("")
   const [searchNotes, setSearchNotes] = useState("")
+  const [debouncedSaleNumber, setDebouncedSaleNumber] = useState("")
+  const [debouncedCustomerName, setDebouncedCustomerName] = useState("")
+  const [debouncedNotes, setDebouncedNotes] = useState("")
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -32,12 +35,28 @@ export default function Sales() {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [pendingPrintSale, setPendingPrintSale] = useState(null)
 
-  const hasAnySearch = searchSaleNumber.trim() || searchCustomerName.trim() || searchNotes.trim()
+  // Debounce search inputs (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSaleNumber(searchSaleNumber), 300)
+    return () => clearTimeout(timer)
+  }, [searchSaleNumber])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCustomerName(searchCustomerName), 300)
+    return () => clearTimeout(timer)
+  }, [searchCustomerName])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedNotes(searchNotes), 300)
+    return () => clearTimeout(timer)
+  }, [searchNotes])
+
+  const hasAnySearch = debouncedSaleNumber.trim() || debouncedCustomerName.trim() || debouncedNotes.trim()
 
   // Load sales data on component mount and when filters change
   useEffect(() => {
     loadSales()
-  }, [startDate, endDate, searchSaleNumber, searchCustomerName, searchNotes])
+  }, [startDate, endDate, debouncedSaleNumber, debouncedCustomerName, debouncedNotes])
 
   // Check for search result navigation and open edit form
   useEffect(() => {
@@ -726,14 +745,14 @@ export default function Sales() {
       setError(null)
       
       const params = {}
-      if (searchSaleNumber.trim()) {
-        params.search_sale_number = searchSaleNumber.trim()
+      if (debouncedSaleNumber.trim()) {
+        params.search_sale_number = debouncedSaleNumber.trim()
       }
-      if (searchCustomerName.trim()) {
-        params.search_customer_name = searchCustomerName.trim()
+      if (debouncedCustomerName.trim()) {
+        params.search_customer_name = debouncedCustomerName.trim()
       }
-      if (searchNotes.trim()) {
-        params.search_notes = searchNotes.trim()
+      if (debouncedNotes.trim()) {
+        params.search_notes = debouncedNotes.trim()
       }
 
       if (!hasAnySearch) {

@@ -112,19 +112,42 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def search(self, request):
-        """Search customers by name, phone, or customer_id"""
-        query = request.query_params.get('q', '')
-        if query:
-            customers = self.get_queryset().filter(
-                name__icontains=query
-            ) | self.get_queryset().filter(
-                phone__icontains=query
-            ) | self.get_queryset().filter(
-                customer_id__icontains=query
-            )
-            serializer = self.get_serializer(customers, many=True)
-            return Response(serializer.data)
-        return Response([])
+        """
+        Search customers with separate filters for each field.
+        
+        Query Parameters:
+        - name: partial match (case-insensitive)
+        - customer_id: exact match
+        - phone: exact match
+        
+        All provided filters are combined with AND logic.
+        If no filters provided, returns all active customers.
+        
+        Example: /api/crm/customers/search/?name=john&phone=12345
+        """
+        name = request.query_params.get('name', '').strip()
+        customer_id = request.query_params.get('customer_id', '').strip()
+        phone = request.query_params.get('phone', '').strip()
+        
+        # Start with base queryset
+        queryset = self.get_queryset()
+        
+        # Apply filters only if values are provided
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+        
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+        
+        if phone:
+            queryset = queryset.filter(phone=phone)
+        
+        # If no filters provided, return active customers
+        if not name and not customer_id and not phone:
+            queryset = queryset.filter(is_active=True)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['patch'])
     def update_balance(self, request, pk=None):
@@ -202,6 +225,66 @@ class CustomerViewSet(viewsets.ModelViewSet):
         measurements = CustomerMeasurement.objects.filter(customer=customer, is_active=True).select_related('material').order_by('material__material_number')
         serializer = CustomerMeasurementSerializer(measurements, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def save_measurement(self, request, pk=None):
+        """Save or update a customer measurement"""
+        from apps.materials.models import Material
+        from apps.joborder.utils import normalize_measurement_data
+        from django.db import transaction as db_transaction
+        
+        customer = self.get_object()
+        material_id = request.data.get('material')
+        
+        if material_id is None:
+            return Response(
+                {'error': 'Material field is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            material_id = int(material_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': f'Invalid material ID: {material_id}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            material = Material.objects.get(id=material_id)
+        except Material.DoesNotExist:
+            return Response(
+                {'error': f'Material with ID {material_id} does not exist'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with db_transaction.atomic():
+                measurement_data = request.data.copy()
+                measurement_data.pop('material', None)
+                normalize_measurement_data(measurement_data)
+                
+                # Get or create customer measurement
+                customer_measurement, created = CustomerMeasurement.objects.get_or_create(
+                    customer=customer,
+                    material=material,
+                    defaults=measurement_data
+                )
+                
+                # If it already exists, update it
+                if not created:
+                    for field, value in measurement_data.items():
+                        setattr(customer_measurement, field, value)
+                    customer_measurement.is_active = True
+                    customer_measurement.save()
+                
+                serializer = CustomerMeasurementSerializer(customer_measurement)
+                return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to save measurement: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=False, methods=['get'])
     def next_customer_id(self, request):

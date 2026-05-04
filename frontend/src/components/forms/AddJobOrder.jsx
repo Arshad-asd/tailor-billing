@@ -673,8 +673,8 @@ export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
     setIsCustomerModalOpen(true);
   };
 
-  const handleCreateCustomer = () => {
-    setEditingCustomer(null);
+  const handleCreateCustomer = (prefilledData = null) => {
+    setEditingCustomer(prefilledData);
     setIsEditCustomer(false);
     setIsCustomerModalOpen(true);
   };
@@ -683,6 +683,11 @@ export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
     try {
       setSelectedCustomer(savedCustomer);
       handleSelectCustomer(savedCustomer);
+      // Close both modals after successfully saving
+      setIsCustomerModalOpen(false);
+      setIsCustomerSearchOpen(false);
+      setEditingCustomer(null);
+      setIsEditCustomer(false);
     } catch (error) {
       console.error('Error handling saved customer:', error);
     }
@@ -1085,62 +1090,38 @@ export default function AddJobOrder({ onClose, onSuccess, onSwitchToEdit }) {
     try {
       const toMeasurementStr = (value) => (value === '' || value === null || value === undefined ? '' : String(value).trim());
 
-      const jobOrderPayload = {
-        customer_id: selectedCustomer.id,
-        status: 'pending',
-        order_date: (formData.bill.orderDate && String(formData.bill.orderDate).trim())
-          ? new Date(formData.bill.orderDate.trim() + 'T12:00:00').toISOString()
-          : new Date(formatDateStr(new Date()) + 'T12:00:00').toISOString(),
-        delivery_date: formData.bill.deliveryDate ? new Date(formData.bill.deliveryDate + 'T12:00:00').toISOString() : null,
-        total_amount: formData.bill.total || 0,
-        advance_amount: parseFloat(formData.bill.advance) || 0,
-        balance_amount: formData.bill.balance || 0,
-        payment_method: formData.bill.paymentMethod || 'cash',
-        cash_amount: formData.bill.cashAmount || 0,
-        card_amount: formData.bill.cardAmount || 0,
-        remarks: formData.measurement.remarks || '',
-        ...(billItems.length > 0 && {
-          job_order_items: billItems.filter(item => item.material_id).map(item => {
-            const quantity = parseInt(item.qty) || 1;
-            const amount = parseFloat(item.amount) || 0;
-            return {
-              material: parseInt(item.material_id),
-              quantity,
-              amount,
-              sub_total: quantity * amount,
-              remarks: item.remarks || ''
-            };
-          })
-        }),
-        job_order_measurements: selectedMaterials.map(material => {
-          const matId = parseInt(material.material_id || material.id);
-          return {
-            material: matId,
-            thool: toMeasurementStr(material.custom_thool),
-            kethet: toMeasurementStr(material.custom_kethet),
-            thool_kum: toMeasurementStr(material.custom_thool_kum),
-            ardh_f_kum: toMeasurementStr(material.custom_ardh_f_kum),
-            jamba: toMeasurementStr(material.custom_jamba),
-            ragab: toMeasurementStr(material.custom_ragab),
-            note1: material.note1 || '',
-            note2: material.note2 || '',
-            note3: material.note3 || '',
-            note4: material.note4 || ''
-          };
-        })
+      // Find the material to save
+      const materialToSave = selectedMaterials.find(m => (m.id === materialId || m.material_id === materialId));
+      if (!materialToSave) {
+        setError('Material not found.');
+        setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
+        return;
+      }
+
+      const matId = parseInt(materialToSave.material_id || materialToSave.id);
+      
+      // Save only this one measurement to customer measurements (no job order created)
+      const measurementPayload = {
+        material: matId,
+        thool: toMeasurementStr(materialToSave.custom_thool),
+        kethet: toMeasurementStr(materialToSave.custom_kethet),
+        thool_kum: toMeasurementStr(materialToSave.custom_thool_kum),
+        ardh_f_kum: toMeasurementStr(materialToSave.custom_ardh_f_kum),
+        jamba: toMeasurementStr(materialToSave.custom_jamba),
+        ragab: toMeasurementStr(materialToSave.custom_ragab),
+        note1: materialToSave.note1 || '',
+        note2: materialToSave.note2 || '',
+        note3: materialToSave.note3 || '',
+        note4: materialToSave.note4 || ''
       };
 
-      const result = await jobOrdersApi.createJobOrder(jobOrderPayload);
-      console.log('Job order created on measurement save:', result);
+      const result = await customerApi.saveCustomerMeasurement(selectedCustomer.id, measurementPayload);
+      console.log('Customer measurement saved:', result);
 
-      if (onSwitchToEdit && result?.id) {
-        onSwitchToEdit(result.id);
-      } else if (onSuccess) {
-        onSuccess(result);
-      }
+      // Measurement saved successfully - material is now locked (read-only)
     } catch (err) {
-      console.error('Error creating job order on measurement save:', err);
-      setError(err.response?.data?.error || 'Failed to save. Please try again.');
+      console.error('Error saving customer measurement:', err);
+      setError(err.response?.data?.error || 'Failed to save measurement. Please try again.');
       setLockedMaterialIds(prev => prev.filter(id => id !== materialId));
     } finally {
       setIsSavingMeasurement(false);

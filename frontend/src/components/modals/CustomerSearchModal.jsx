@@ -4,7 +4,9 @@ import customerApi from '../../services/customerApi';
 import { formatCurrency } from '../../utils/currencyUtils';
 
 export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer, onEditCustomer, onCreateCustomer }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [nameSearch, setNameSearch] = useState('');
+  const [customerIdSearch, setCustomerIdSearch] = useState('');
+  const [phoneSearch, setPhoneSearch] = useState('');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -51,6 +53,10 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
 
   useEffect(() => {
     if (isOpen) {
+      // Reset search fields when modal opens
+      setNameSearch('');
+      setCustomerIdSearch('');
+      setPhoneSearch('');
       loadCustomers();
     }
   }, [isOpen]);
@@ -69,31 +75,17 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
     }
   };
 
-  const handleSearch = async (query) => {
-    setSearchQuery(query);
+  const handleSearch = async (name = nameSearch, customerId = customerIdSearch, phone = phoneSearch) => {
     setLoading(true);
     
     try {
-      if (query.trim() === '') {
-        const data = await customerApi.getActiveCustomers();
-        setCustomers(data);
-      } else {
-        const data = await customerApi.searchCustomers(query);
-        setCustomers(data);
-      }
+      // Call backend API with separate search parameters
+      const data = await customerApi.searchCustomers(name, customerId, phone);
+      setCustomers(data);
     } catch (error) {
       console.error('Error searching customers:', error);
-      // Fallback to local filtering with sample data
-      if (query.trim() === '') {
-        setCustomers(sampleCustomers);
-      } else {
-        const filtered = sampleCustomers.filter(customer =>
-          customer.name.toLowerCase().includes(query.toLowerCase()) ||
-          customer.phone.includes(query) ||
-          customer.customer_id.includes(query)
-        );
-        setCustomers(filtered);
-      }
+      // Fallback to sample data on error
+      setCustomers(sampleCustomers);
     } finally {
       setLoading(false);
     }
@@ -110,7 +102,12 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
   };
 
   const handleCreateCustomer = () => {
-    onCreateCustomer();
+    // Pass the search values to pre-fill the create form
+    onCreateCustomer({
+      name: nameSearch,
+      customer_id: customerIdSearch,
+      phone: phoneSearch
+    });
   };
 
   if (!isOpen) return null;
@@ -144,15 +141,66 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
 
         {/* Search Bar */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, phone, or customer ID..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Name Search */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Customer Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name..."
+                  value={nameSearch}
+                  onChange={(e) => {
+                    setNameSearch(e.target.value);
+                    handleSearch(e.target.value, customerIdSearch, phoneSearch);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Customer ID Search */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Customer ID
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by ID..."
+                  value={customerIdSearch}
+                  onChange={(e) => {
+                    setCustomerIdSearch(e.target.value);
+                    handleSearch(nameSearch, e.target.value, phoneSearch);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Phone Search */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Phone Number
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by phone..."
+                  value={phoneSearch}
+                  onChange={(e) => {
+                    setPhoneSearch(e.target.value);
+                    handleSearch(nameSearch, customerIdSearch, e.target.value);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

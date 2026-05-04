@@ -87,45 +87,80 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 
                 # Handle advance_amount TransactionLine (created_at synced to job order order date)
                 if advance_amount > 0:
-                    advance_line, advance_created = TransactionLine.objects.get_or_create(
-                        transaction=transaction_obj,
-                        transaction_line_method='job_order_advance',
-                        defaults={
-                            'transaction_line_type': 'credit',
-                            'transaction_line_amount': advance_amount,
-                            'transaction_line_description': f'Advance payment for Job Order {job_order.job_order_number}',
-                            'created_at': order_date,
-                            'is_active': True,
-                        }
-                    )
+                    # First, try to find any existing line (active or inactive)
+                    try:
+                        advance_line = TransactionLine.objects.get(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_advance',
+                        )
+                        advance_created = False
+                    except TransactionLine.DoesNotExist:
+                        # Create new line if none exists
+                        advance_line = TransactionLine.objects.create(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_advance',
+                            transaction_line_type='credit',
+                            transaction_line_amount=advance_amount,
+                            transaction_line_description=f'Advance payment for Job Order {job_order.job_order_number}',
+                            created_at=order_date,
+                            is_active=True,
+                        )
+                        advance_created = True
+                    
                     if advance_created:
                         advance_line.created_at = order_date
                         advance_line.save(update_fields=['created_at'])
                     
-                    # If updating and advance amount changed, update the line
+                    # If updating and line exists, update the line and reactivate if needed
                     if not advance_created and is_update:
                         advance_line.transaction_line_amount = advance_amount
                         advance_line.transaction_line_description = f'Advance payment for Job Order {job_order.job_order_number}'
+                        advance_line.is_active = True  # Reactivate if it was deactivated
                         advance_line.save()
+                else:
+                    # If advance_amount is 0 and we're updating, deactivate existing advance line
+                    if is_update:
+                        TransactionLine.objects.filter(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_advance',
+                            is_active=True,
+                        ).update(is_active=False, transaction_line_amount=Decimal('0'))
                 
                 # Handle delivery_amount (recived_on_delivery_amount) TransactionLine
                 if delivery_amount > 0:
-                    delivery_line, delivery_created = TransactionLine.objects.get_or_create(
-                        transaction=transaction_obj,
-                        transaction_line_method='job_order_delivery',
-                        defaults={
-                            'transaction_line_type': 'credit',
-                            'transaction_line_amount': delivery_amount,
-                            'transaction_line_description': f'Delivery payment for Job Order {job_order.job_order_number}',
-                            'is_active': True,
-                        }
-                    )
+                    # First, try to find any existing line (active or inactive)
+                    try:
+                        delivery_line = TransactionLine.objects.get(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_delivery',
+                        )
+                        delivery_created = False
+                    except TransactionLine.DoesNotExist:
+                        # Create new line if none exists
+                        delivery_line = TransactionLine.objects.create(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_delivery',
+                            transaction_line_type='credit',
+                            transaction_line_amount=delivery_amount,
+                            transaction_line_description=f'Delivery payment for Job Order {job_order.job_order_number}',
+                            is_active=True,
+                        )
+                        delivery_created = True
                     
-                    # If updating and delivery amount changed, update the line
+                    # If updating and line exists, update the line and reactivate if needed
                     if not delivery_created and is_update:
                         delivery_line.transaction_line_amount = delivery_amount
                         delivery_line.transaction_line_description = f'Delivery payment for Job Order {job_order.job_order_number}'
+                        delivery_line.is_active = True  # Reactivate if it was deactivated
                         delivery_line.save()
+                else:
+                    # If delivery_amount is 0 and we're updating (e.g., recall), deactivate existing delivery line
+                    if is_update:
+                        TransactionLine.objects.filter(
+                            transaction=transaction_obj,
+                            transaction_line_method='job_order_delivery',
+                            is_active=True,
+                        ).update(is_active=False, transaction_line_amount=Decimal('0'))
                 
                 return transaction_obj
                 

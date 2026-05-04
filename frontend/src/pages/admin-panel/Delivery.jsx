@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Truck, CheckCircle, Clock, AlertCircle, MapPin, Phone, Calendar, Check, X, Lock, Unlock, DollarSign } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Truck, CheckCircle, Clock, AlertCircle, MapPin, Phone, Calendar, Check, X, Lock, Unlock, DollarSign, RotateCcw, XCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { deliveryApi } from '../../services/deliveryApi';
 import DeliveryEditModal from '../../components/modals/DeliveryEditModal';
 import { formatCurrency, safeParseFloat } from '../../utils/currencyUtils';
@@ -9,6 +10,9 @@ export default function Delivery() {
   const [searchJobOrder, setSearchJobOrder] = useState('');
   const [searchCustomerId, setSearchCustomerId] = useState('');
   const [searchNamePhone, setSearchNamePhone] = useState('');
+  const [debouncedJobOrder, setDebouncedJobOrder] = useState('');
+  const [debouncedCustomerId, setDebouncedCustomerId] = useState('');
+  const [debouncedNamePhone, setDebouncedNamePhone] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [blockedFilter, setBlockedFilter] = useState('unblocked'); // Default to unblocked
   const [fromDate, setFromDate] = useState('');
@@ -29,19 +33,35 @@ export default function Delivery() {
   const [currentEditingDeliveryId, setCurrentEditingDeliveryId] = useState(null);
   const [deliveryAmountError, setDeliveryAmountError] = useState(null); // validation error when received amount > balance
 
+  // Debounce search inputs (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedJobOrder(searchJobOrder), 300);
+    return () => clearTimeout(timer);
+  }, [searchJobOrder]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCustomerId(searchCustomerId), 300);
+    return () => clearTimeout(timer);
+  }, [searchCustomerId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedNamePhone(searchNamePhone), 300);
+    return () => clearTimeout(timer);
+  }, [searchNamePhone]);
+
   // Fetch deliveries on component mount
   useEffect(() => {
     fetchDeliveries();
     fetchStats();
   }, []);
 
-  const hasAnySearch = searchJobOrder.trim() || searchCustomerId.trim() || searchNamePhone.trim();
+  const hasAnySearch = debouncedJobOrder.trim() || debouncedCustomerId.trim() || debouncedNamePhone.trim();
 
   // Fetch deliveries when filters change
   useEffect(() => {
     fetchDeliveries();
     fetchStats();
-  }, [statusFilter, searchJobOrder, searchCustomerId, searchNamePhone, fromDate, toDate, blockedFilter]);
+  }, [statusFilter, debouncedJobOrder, debouncedCustomerId, debouncedNamePhone, fromDate, toDate, blockedFilter]);
 
   const fetchDeliveries = async () => {
     try {
@@ -56,14 +76,14 @@ export default function Delivery() {
         params.is_blocked = blockedFilter === 'blocked';
       }
       
-      if (searchJobOrder.trim()) {
-        params.search_job_order = searchJobOrder.trim();
+      if (debouncedJobOrder.trim()) {
+        params.search_job_order = debouncedJobOrder.trim();
       }
-      if (searchCustomerId.trim()) {
-        params.search_customer_id = searchCustomerId.trim();
+      if (debouncedCustomerId.trim()) {
+        params.search_customer_id = debouncedCustomerId.trim();
       }
-      if (searchNamePhone.trim()) {
-        params.search_name_phone = searchNamePhone.trim();
+      if (debouncedNamePhone.trim()) {
+        params.search_name_phone = debouncedNamePhone.trim();
       }
 
       if (!hasAnySearch) {
@@ -153,6 +173,145 @@ export default function Delivery() {
     }
   };
 
+  const handleRecallDelivery = async (deliveryId) => {
+    const delivery = transformedDeliveries.find(d => d.id === deliveryId);
+    if (!delivery) return;
+
+    // Confirm before recalling with SweetAlert2
+    const result = await Swal.fire({
+      title: 'Recall Delivery?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3 font-semibold">Job Order: <span class="text-blue-600">${delivery.jobOrderNumber}</span></p>
+          <p class="mb-2">This action will:</p>
+          <ul class="list-disc list-inside space-y-1 text-sm">
+            <li>Change status back to <strong>Pending</strong></li>
+            <li>Reset received delivery amount to <strong>0</strong></li>
+            <li>Refund the customer</li>
+          </ul>
+          <p class="mt-3 text-amber-600 text-sm">
+            ⚠️ This should only be done when customer returns material for alteration.
+          </p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, Recall it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      await deliveryApi.recallDelivery(delivery.jobOrderId);
+      
+      // Show success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Delivery has been recalled to pending status.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      
+      // Refresh the list
+      await fetchDeliveries();
+      await fetchStats();
+    } catch (err) {
+      console.error('Error recalling delivery:', err);
+      
+      // Show error message
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to recall delivery: ' + (err.response?.data?.error || err.message),
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    }
+  };
+  const handleCancelDelivery = async (deliveryId) => {
+    const delivery = transformedDeliveries.find(d => d.id === deliveryId);
+    if (!delivery) return;
+
+    // Calculate total refund amount
+    const totalRefund = (parseFloat(delivery.advance_amount) || 0) + (parseFloat(delivery.recived_on_delivery_amount) || 0);
+
+    // Confirm before cancelling with SweetAlert2
+    const result = await Swal.fire({
+      title: 'Cancel Job Order?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3 font-semibold">Job Order: <span class="text-blue-600">${delivery.jobOrderNumber}</span></p>
+          <p class="mb-3">Customer: <span class="font-semibold">${delivery.customerName}</span></p>
+          <p class="mb-2 text-red-600 font-semibold">⚠️ This action will:</p>
+          <ul class="list-disc list-inside space-y-1 text-sm">
+            <li>Cancel the job order permanently</li>
+            <li>Refund advance amount: <strong>QAR ${formatCurrency(delivery.advance_amount || 0)}</strong></li>
+            <li>Refund delivery amount: <strong>QAR ${formatCurrency(delivery.recived_on_delivery_amount || 0)}</strong></li>
+            <li>Total refund: <strong>QAR ${formatCurrency(totalRefund)}</strong></li>
+            <li>Mark order as <strong>Cancelled</strong> and <strong>Inactive</strong></li>
+          </ul>
+          <p class="mt-3 text-red-600 text-sm font-semibold">
+            ⚠️ This action cannot be undone!
+          </p>
+        </div>
+      `,
+      icon: 'error',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, Cancel Order & Refund',
+      cancelButtonText: 'No, Keep Order',
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      const response = await deliveryApi.cancelDelivery(delivery.jobOrderId);
+      
+      // Show success message with refund details
+      await Swal.fire({
+        title: 'Order Cancelled!',
+        html: `
+          <div class="text-left">
+            <p class="mb-2">Job order has been cancelled successfully.</p>
+            <p class="mb-2 font-semibold">Refund Summary:</p>
+            <ul class="list-disc list-inside text-sm">
+              <li>Advance: QAR ${formatCurrency(response.refunded?.advance_amount || 0)}</li>
+              <li>Delivery: QAR ${formatCurrency(response.refunded?.delivery_amount || 0)}</li>
+              <li class="font-semibold">Total Refunded: QAR ${formatCurrency(response.refunded?.total_refunded || 0)}</li>
+            </ul>
+          </div>
+        `,
+        icon: 'success',
+        timer: 4000,
+        showConfirmButton: true,
+        confirmButtonColor: '#3085d6'
+      });
+      
+      // Refresh the list
+      await fetchDeliveries();
+      await fetchStats();
+    } catch (err) {
+      console.error('Error cancelling delivery:', err);
+      
+      // Show error message
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to cancel delivery: ' + (err.response?.data?.error || err.message),
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    }
+  };
   const handleCellEditStart = (deliveryId, field, currentValue) => {
     setEditingCell({ deliveryId, field });
     setEditValue(currentValue || '');
@@ -286,6 +445,7 @@ export default function Delivery() {
       id: `DEL-${jobOrder.id}`,
       jobOrderId: jobOrder.id, // Use the actual database ID, not the job_order_number
       jobOrderNumber: jobOrder.job_order_number, // Keep the job order number for display
+      customerId: jobOrder.customer_id,
       customerName: jobOrder.customer_name,
       phone: jobOrder.customer_phone,
       service: jobOrder.job_order_items?.[0]?.material_name || 'Service',
@@ -315,7 +475,7 @@ export default function Delivery() {
     const matchesJobOrder = !searchJobOrder.trim() ||
       delivery.jobOrderNumber.toLowerCase().includes(searchJobOrder.toLowerCase());
     const matchesCustId = !searchCustomerId.trim() ||
-      delivery.id.toLowerCase().includes(searchCustomerId.toLowerCase());
+      (delivery.customerId && delivery.customerId.toString().toLowerCase().includes(searchCustomerId.toLowerCase()));
     const matchesNamePhone = !searchNamePhone.trim() ||
       delivery.customerName.toLowerCase().includes(searchNamePhone.toLowerCase()) ||
       (delivery.phone && delivery.phone.toLowerCase().includes(searchNamePhone.toLowerCase()));
@@ -330,7 +490,9 @@ export default function Delivery() {
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && hasAnySearch && filteredDeliveries.length > 0) {
       const firstDelivery = filteredDeliveries[0];
-      handleCellEditStart(firstDelivery.id, 'delivery_date', firstDelivery.deliveryDate);
+      // Use today's date as default when starting edit from search
+      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      handleCellEditStart(firstDelivery.id, 'delivery_date', today);
     }
   };
 
@@ -612,7 +774,7 @@ export default function Delivery() {
                 <tr key={delivery.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${delivery.is_blocked ? 'opacity-60 bg-red-50 dark:bg-red-900/20' : ''}`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">{delivery.jobOrderNumber}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Job Order ID: {delivery.jobOrderId}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Customer ID: {delivery.customerId}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">{delivery.createdAt || 'N/A'}</div>
@@ -809,8 +971,21 @@ export default function Delivery() {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                        <Trash2 className="w-4 h-4" />
+                      <button 
+                        onClick={() => handleRecallDelivery(delivery.id)}
+                        className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Recall/Return Delivery (Reset to Pending)"
+                        disabled={delivery.status !== 'delivered' && delivery.status !== 'completed'}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleCancelDelivery(delivery.id)}
+                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Cancel Order & Refund Customer"
+                        disabled={delivery.status === 'cancelled'}
+                      >
+                        <XCircle className="w-4 h-4" />
                       </button>
                     </div>
                   </td>

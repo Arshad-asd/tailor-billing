@@ -22,7 +22,9 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
   const [filteredJobOrders, setFilteredJobOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [jobOrdersLoading, setJobOrdersLoading] = useState(false);
-  const [jobOrderSearchTerm, setJobOrderSearchTerm] = useState('');
+  const [searchJobOrderNumber, setSearchJobOrderNumber] = useState('');
+  const [searchJobCustomerId, setSearchJobCustomerId] = useState('');
+  const [searchJobPhone, setSearchJobPhone] = useState('');
   const [showJobOrderDropdown, setShowJobOrderDropdown] = useState(false);
   const { showNotification } = useNotification();
 
@@ -92,24 +94,44 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
     }
   };
 
-  // Filter job orders based on search term
-  const handleJobOrderSearch = (searchTerm) => {
-    setJobOrderSearchTerm(searchTerm);
-    setShowJobOrderDropdown(true);
-    
-    if (!searchTerm.trim()) {
+  // Filter job orders based on search terms with debouncing
+  const [debouncedJobOrderNumber, setDebouncedJobOrderNumber] = useState('');
+  const [debouncedJobCustomerId, setDebouncedJobCustomerId] = useState('');
+  const [debouncedJobPhone, setDebouncedJobPhone] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedJobOrderNumber(searchJobOrderNumber), 150);
+    return () => clearTimeout(timer);
+  }, [searchJobOrderNumber]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedJobCustomerId(searchJobCustomerId), 150);
+    return () => clearTimeout(timer);
+  }, [searchJobCustomerId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedJobPhone(searchJobPhone), 150);
+    return () => clearTimeout(timer);
+  }, [searchJobPhone]);
+
+  useEffect(() => {
+    if (!debouncedJobOrderNumber.trim() && !debouncedJobCustomerId.trim() && !debouncedJobPhone.trim()) {
       // Already filtered by balance > 0 in fetchJobOrders
       setFilteredJobOrders(jobOrders);
     } else {
-      const filtered = jobOrders.filter(jobOrder => 
-        (jobOrder.job_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        jobOrder.customer_phone?.includes(searchTerm) ||
-        jobOrder.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        parseFloat(jobOrder.balance_amount || 0) > 0
-      );
+      const filtered = jobOrders.filter(jobOrder => {
+        const matchesJobOrder = !debouncedJobOrderNumber.trim() ||
+          jobOrder.job_order_number?.toLowerCase().includes(debouncedJobOrderNumber.toLowerCase());
+        const matchesCustomerId = !debouncedJobCustomerId.trim() ||
+          jobOrder.customer_id?.toString().includes(debouncedJobCustomerId);
+        const matchesPhone = !debouncedJobPhone.trim() ||
+          jobOrder.customer_phone?.includes(debouncedJobPhone);
+        const hasBalance = parseFloat(jobOrder.balance_amount || 0) > 0;
+        return matchesJobOrder && matchesCustomerId && matchesPhone && hasBalance;
+      });
       setFilteredJobOrders(filtered);
     }
-  };
+  }, [debouncedJobOrderNumber, debouncedJobCustomerId, debouncedJobPhone, jobOrders]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -154,7 +176,9 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
       receipt_remarks: "",
       job_order: "",
     });
-    setJobOrderSearchTerm('');
+    setSearchJobOrderNumber('');
+    setSearchJobCustomerId('');
+    setSearchJobPhone('');
     setShowJobOrderDropdown(false);
     onClose();
   };
@@ -173,19 +197,56 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="job_order" className="text-sm">Job Order</Label>
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <Label htmlFor="job_order" className="text-sm">Job Order Search</Label>
+              
+              {/* Three Search Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Job Order Number..."
+                    value={searchJobOrderNumber}
+                    onChange={(e) => setSearchJobOrderNumber(e.target.value)}
+                    onFocus={() => setShowJobOrderDropdown(true)}
+                    className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Customer ID..."
+                    value={searchJobCustomerId}
+                    onChange={(e) => setSearchJobCustomerId(e.target.value)}
+                    onFocus={() => setShowJobOrderDropdown(true)}
+                    className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Phone..."
+                    value={searchJobPhone}
+                    onChange={(e) => setSearchJobPhone(e.target.value)}
+                    onFocus={() => setShowJobOrderDropdown(true)}
+                    className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                </div>
+              </div>
               
               {/* Searchable Select Component */}
               <div className="relative job-order-dropdown">
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search and select job order..."
-                    value={selectedJobOrder ? `${selectedJobOrder.job_order_number} - ${selectedJobOrder.customer_name}` : jobOrderSearchTerm}
-                    onChange={(e) => handleJobOrderSearch(e.target.value)}
+                    placeholder="Selected job order..."
+                    value={selectedJobOrder ? `${selectedJobOrder.job_order_number} - ${selectedJobOrder.customer_name}` : ''}
+                    readOnly
                     onFocus={() => setShowJobOrderDropdown(true)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
                   />
                   <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 </div>
@@ -199,7 +260,7 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
                       </div>
                     ) : filteredJobOrders.length === 0 ? (
                       <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                        {jobOrderSearchTerm ? 'No job orders found matching your search' : 'No active job orders found'}
+                        {(searchJobOrderNumber || searchJobCustomerId || searchJobPhone) ? 'No job orders found matching your search' : 'No active job orders found'}
                       </div>
                     ) : (
                       filteredJobOrders.map((jobOrder) => (
@@ -208,7 +269,9 @@ export default function AddReceiptModal({ open, onClose, onSubmit }) {
                           onClick={() => {
                             handleSelectChange("job_order", jobOrder.id.toString());
                             setShowJobOrderDropdown(false);
-                            setJobOrderSearchTerm('');
+                            setSearchJobOrderNumber('');
+                            setSearchJobCustomerId('');
+                            setSearchJobPhone('');
                           }}
                           className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-600 last:border-b-0"
                         >

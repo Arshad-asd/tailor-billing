@@ -35,20 +35,20 @@ export default function CustomerModal({ isOpen, onClose, onSave, customer = null
             const response = await customerApi.getNextCustomerId();
             setFormData({
               customer_id: response.next_customer_id || '',
-              name: '',
-              phone: '',
-              balance: 0.00,
-              points: 0,
+              name: customer?.name || '',
+              phone: customer?.phone || '',
+              balance: customer?.balance || 0.00,
+              points: customer?.points || 0,
               is_active: true
             });
           } catch (error) {
-            // If fetching fails, just use empty string
+            // If fetching fails, use prefilled data from customer if available
             setFormData({
               customer_id: '',
-              name: '',
-              phone: '',
-              balance: 0.00,
-              points: 0,
+              name: customer?.name || '',
+              phone: customer?.phone || '',
+              balance: customer?.balance || 0.00,
+              points: customer?.points || 0,
               is_active: true
             });
           }

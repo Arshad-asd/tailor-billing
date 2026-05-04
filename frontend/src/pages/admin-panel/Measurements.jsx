@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -25,10 +25,19 @@ import MeasurementModal from '../../components/modals/MeasurementModal';
 
 export default function Measurements() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedJobOrder, setSelectedJobOrder] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isMeasurementModalOpen, setIsMeasurementModalOpen] = useState(false);
   const [editingMeasurement, setEditingMeasurement] = useState(null);
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Mock data for job orders with measurements
 
   // Mock data for job orders with measurements
   const jobOrdersWithMeasurements = [
@@ -204,9 +213,9 @@ export default function Measurements() {
   };
 
   const filteredJobOrders = jobOrdersWithMeasurements.filter(jobOrder =>
-    jobOrder.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    jobOrder.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    jobOrder.service.toLowerCase().includes(searchTerm.toLowerCase())
+    jobOrder.customerName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+    jobOrder.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+    jobOrder.service.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
   );
 
   return (

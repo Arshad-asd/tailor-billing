@@ -12,12 +12,15 @@ const customerApi = {
     }
   },
 
-  // Search customers
-  searchCustomers: async (query) => {
+  // Search customers with separate filters
+  searchCustomers: async (name = '', customerId = '', phone = '') => {
     try {
-      const response = await api.get('/crm/customers/search/', { 
-        params: { q: query } 
-      });
+      const params = {};
+      if (name.trim()) params.name = name.trim();
+      if (customerId.trim()) params.customer_id = customerId.trim();
+      if (phone.trim()) params.phone = phone.trim();
+      
+      const response = await api.get('/crm/customers/search/', { params });
       return response.data;
     } catch (error) {
       console.error('Error searching customers:', error);
@@ -142,6 +145,17 @@ const customerApi = {
       return response.data;
     } catch (error) {
       console.error('Error fetching customer measurements:', error);
+      throw error;
+    }
+  },
+
+  // Save or update a customer measurement
+  saveCustomerMeasurement: async (customerId, measurementData) => {
+    try {
+      const response = await api.post(`/crm/customers/${customerId}/save_measurement/`, measurementData);
+      return response.data;
+    } catch (error) {
+      console.error('Error saving customer measurement:', error);
       throw error;
     }
   },

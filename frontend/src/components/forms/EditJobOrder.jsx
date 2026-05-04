@@ -884,8 +884,8 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     setIsCustomerModalOpen(true);
   };
 
-  const handleCreateCustomer = () => {
-    setEditingCustomer(null);
+  const handleCreateCustomer = (prefilledData = null) => {
+    setEditingCustomer(prefilledData);
     setIsEditCustomer(false);
     setIsCustomerModalOpen(true);
   };
@@ -894,6 +894,11 @@ export default function EditJobOrder({ jobOrderId, onClose, onSuccess }) {
     try {
       setSelectedCustomer(savedCustomer);
       handleSelectCustomer(savedCustomer);
+      // Close both modals after successfully saving
+      setIsCustomerModalOpen(false);
+      setIsCustomerSearchOpen(false);
+      setEditingCustomer(null);
+      setIsEditCustomer(false);
     } catch (error) {
       console.error('Error handling saved customer:', error);
     }

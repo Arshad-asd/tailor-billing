@@ -42,20 +42,17 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        search_receipt_id = self.request.query_params.get('search_receipt_id')
-        if search_receipt_id:
-            queryset = queryset.filter(receipt_id__icontains=search_receipt_id)
+        search_job_order = self.request.query_params.get('search_job_order')
+        if search_job_order:
+            queryset = queryset.filter(job_order__job_order_id__icontains=search_job_order)
 
         search_customer_id = self.request.query_params.get('search_customer_id')
         if search_customer_id:
-            queryset = queryset.filter(job_order__customer__customer_id__icontains=search_customer_id)
+            queryset = queryset.filter(job_order__customer__customer_id=search_customer_id)
 
-        search_name_phone = self.request.query_params.get('search_name_phone')
-        if search_name_phone:
-            queryset = queryset.filter(
-                Q(job_order__customer__name__icontains=search_name_phone) |
-                Q(job_order__customer__phone__icontains=search_name_phone)
-            )
+        search_phone = self.request.query_params.get('search_phone')
+        if search_phone:
+            queryset = queryset.filter(job_order__customer__phone=search_phone)
 
         return queryset
 

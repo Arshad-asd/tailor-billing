@@ -13,6 +13,7 @@ export default function Customers() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -25,6 +26,12 @@ export default function Customers() {
   const [measurements, setMeasurements] = useState([]);
   const [measurementsLoading, setMeasurementsLoading] = useState(false);
   const { showNotification } = useNotification();
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Load customers on component mount
   useEffect(() => {
@@ -54,9 +61,9 @@ export default function Customers() {
   };
 
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.phone.includes(searchTerm) ||
-                         customer.customer_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = customer.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         customer.phone.includes(debouncedSearchTerm) ||
+                         customer.customer_id.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'active' && customer.is_active) ||
                          (statusFilter === 'inactive' && !customer.is_active);

@@ -1,16 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Scissors, DollarSign, Clock, Star, CheckCircle, AlertCircle, XCircle, Package, Settings } from 'lucide-react';
 import AddServiceModal from '../../components/modals/AddServiceModal';
 import EditServiceModal from '../../components/modals/EditServiceModal';
 
 export default function Services() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedService, setSelectedService] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingService, setEditingService] = useState(null);
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const services = [
     {
@@ -135,10 +142,10 @@ export default function Services() {
   };
 
   const filteredServices = services.filter(service => {
-    const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = service.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         service.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         service.category.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         service.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || service.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
