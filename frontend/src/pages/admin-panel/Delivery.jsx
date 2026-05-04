@@ -15,8 +15,8 @@ export default function Delivery() {
   const [debouncedNamePhone, setDebouncedNamePhone] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [blockedFilter, setBlockedFilter] = useState('unblocked'); // Default to unblocked
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
