@@ -594,7 +594,19 @@ export default function Delivery() {
                   type="text"
                   placeholder="Search by order number..."
                   value={searchJobOrder}
-                  onChange={(e) => setSearchJobOrder(e.target.value)}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    // If only "JOB-" remains, clear it completely
+                    if (value === 'JOB-') {
+                      setSearchJobOrder('');
+                      return;
+                    }
+                    // Add JOB- prefix only when user types something
+                    if (value && !value.startsWith('JOB-')) {
+                      value = 'JOB-' + value.replace(/^JOB-*/i, '');
+                    }
+                    setSearchJobOrder(value);
+                  }}
                   onKeyDown={handleSearchKeyDown}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />

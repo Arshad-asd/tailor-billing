@@ -53,27 +53,13 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
 
   useEffect(() => {
     if (isOpen) {
-      // Reset search fields when modal opens
+      // Reset search fields and clear customer list when modal opens
       setNameSearch('');
       setCustomerIdSearch('');
       setPhoneSearch('');
-      loadCustomers();
+      setCustomers([]);
     }
   }, [isOpen]);
-
-  const loadCustomers = async () => {
-    setLoading(true);
-    try {
-      const data = await customerApi.getActiveCustomers();
-      setCustomers(data);
-    } catch (error) {
-      console.error('Error loading customers:', error);
-      // Fallback to sample data if API fails
-      setCustomers(sampleCustomers);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = async (name = nameSearch, customerId = customerIdSearch, phone = phoneSearch) => {
     setLoading(true);
@@ -108,6 +94,13 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
       customer_id: customerIdSearch,
       phone: phoneSearch
     });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && customers.length > 0) {
+      // Select the first customer when Enter is pressed
+      handleSelectCustomer(customers[0]);
+    }
   };
 
   if (!isOpen) return null;
@@ -157,6 +150,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
                     setNameSearch(e.target.value);
                     handleSearch(e.target.value, customerIdSearch, phoneSearch);
                   }}
+                  onKeyDown={handleKeyDown}
                   className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -177,6 +171,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
                     setCustomerIdSearch(e.target.value);
                     handleSearch(nameSearch, e.target.value, phoneSearch);
                   }}
+                  onKeyDown={handleKeyDown}
                   className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -197,6 +192,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
                     setPhoneSearch(e.target.value);
                     handleSearch(nameSearch, customerIdSearch, e.target.value);
                   }}
+                  onKeyDown={handleKeyDown}
                   className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -213,8 +209,16 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer,
           ) : customers.length === 0 ? (
             <div className="text-center py-8">
               <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">No customers found</p>
-              <p className="text-sm text-gray-500 dark:text-gray-500">Try adjusting your search or create a new customer</p>
+              <p className="text-gray-600 dark:text-gray-400">
+                {nameSearch || customerIdSearch || phoneSearch 
+                  ? 'No customers found' 
+                  : 'Start typing to search for customers'}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500">
+                {nameSearch || customerIdSearch || phoneSearch 
+                  ? 'Try adjusting your search or create a new customer' 
+                  : 'Search by name, ID, or phone number'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
